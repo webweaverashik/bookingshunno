@@ -34,10 +34,6 @@ Route::get('/_maintenance/artisan', function () {
         abort(403, 'Command not allowed.');
     }
 
-    Artisan::call($command, [
-        '--force' => true,
-    ]);
-
     return response()->json([
         'success' => true,
         'command' => $command,
