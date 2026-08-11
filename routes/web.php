@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\ReservationRequestController;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,3 +22,17 @@ Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::post('/reservation/request', [ReservationRequestController::class, 'store'])
     ->middleware('throttle:8,1')
     ->name('reservation.request.store');
+
+
+/*
+|--------------------------------------------------------------------------
+| Mail Test (DEV ONLY)
+|--------------------------------------------------------------------------
+| Quick mailer smoke-test. REMOVE before deploying to production.
+*/
+Route::get('/send-test-email', function () {
+    Mail::raw('This is a test email!', function ($message) {
+        $message->to('webweaverashik@gmail.com')->subject('Test Email');
+    });
+    return 'Test email sent!';
+});

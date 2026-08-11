@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
-            $table->string('reference_code', 20)->unique(); // SHN-2608-A7K3
+            $table->string('reference_code', 20)->unique();     // SHN-2608-A7K3
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
 
             $table->date('reserved_date');

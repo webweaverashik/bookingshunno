@@ -41,7 +41,7 @@ class ExperienceCatalogue
                 'description' => 'A short, refreshing creative break. Learn a technique, make a piece, take it home. Good for first-timers.',
                 'price'       => 800,
                 'hours'       => 2,
-                'image'       => 'img/shunno/exp-paint.webp',
+                'image'       => 'img/shunno/exp-paint.jpg',
             ],
             [
                 'slug'        => 'clay',
@@ -91,7 +91,7 @@ class ExperienceCatalogue
                 'description' => 'A deeper, slower experience: explore multiple media, experiment without pressure, develop a final work with guidance.',
                 'price'       => 2000,
                 'hours'       => 4,
-                'image'       => 'img/shunno/exp-mixed.png',
+                'image'       => 'img/shunno/exp-mixed.jpg',
             ],
         ];
     }

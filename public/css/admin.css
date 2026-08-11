@@ -1,0 +1,22 @@
+/* Small overrides on top of Metronic. Keep this file thin — anything large
+   belongs in a Metronic theme override, not here. */
+
+/* Sidebar items for modules that have not shipped yet. */
+.menu-link.disabled {
+    cursor: default;
+    opacity: .55;
+}
+.menu-link.disabled:hover {
+    background-color: transparent;
+}
+.menu-link.disabled .badge {
+    margin-left: auto;
+}
+
+/* Warm the primary to the cyanotype blue used on the public site so the two
+   halves of the product look related. */
+:root {
+    --bs-primary: #2A4A63;
+    --bs-primary-active: #1B3244;
+    --bs-primary-light: #E4EAEF;
+}
