@@ -1,0 +1,17 @@
+{
+  "resources/js/public.js": {
+    "file": "assets/public-BQ3Sdfxv.js",
+    "name": "public",
+    "src": "resources/js/public.js",
+    "isEntry": true
+  },
+  "resources/scss/public.scss": {
+    "file": "assets/public-BLcSEwmZ.css",
+    "name": "public",
+    "names": [
+      "public.css"
+    ],
+    "src": "resources/scss/public.scss",
+    "isEntry": true
+  }
+}
