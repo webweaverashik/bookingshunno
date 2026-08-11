@@ -35,6 +35,19 @@
         @yield('content')
     </main>
 
+    <x-public.reservation-modal />
+
+    <button class="sh-totop" id="sh-totop" type="button" aria-label="Back to top">
+        <svg class="sh-totop__ring" viewBox="0 0 58 58" aria-hidden="true">
+            <circle class="bg" cx="29" cy="29" r="27"></circle>
+            <circle class="fg" cx="29" cy="29" r="27"></circle>
+        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+        </svg>
+    </button>
+
     <x-public.footer />
 
     @stack('scripts')

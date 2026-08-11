@@ -19,7 +19,7 @@
             </p>
 
             <div class="sh-hero__actions">
-                <x-public.btn :href="route('reservation.info')" variant="primary" :arrow="true">Reserve your visit</x-public.btn>
+                <x-public.btn href="#" data-bs-toggle="modal" data-bs-target="#sh-reserve" variant="primary" :arrow="true">Reserve your visit</x-public.btn>
                 <x-public.btn href="#experiences" variant="onDark">See the experiences</x-public.btn>
             </div>
         </div>

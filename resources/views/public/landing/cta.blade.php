@@ -7,7 +7,7 @@
         <p class="sh-lede">Tell us what you'd like to do and when. We'll read it and come back to you.</p>
 
         <div class="sh-cta__actions">
-            <x-public.btn :href="route('reservation.info')" variant="primary" :arrow="true">Reserve your visit</x-public.btn>
+            <x-public.btn href="#" data-bs-toggle="modal" data-bs-target="#sh-reserve" variant="primary" :arrow="true">Reserve your visit</x-public.btn>
             <x-public.btn :href="'https://wa.me/' . config('shunno.contact.whatsapp')" variant="onDark">Ask on WhatsApp</x-public.btn>
         </div>
     </div>

@@ -16,7 +16,7 @@
             <li><a href="{{ route('home') }}#how">How it works</a></li>
             <li><a href="{{ route('home') }}#contact">Visit</a></li>
             <li class="sh-nav__cta">
-                <x-public.btn :href="route('reservation.info')" variant="onDark">Reserve your visit</x-public.btn>
+                <x-public.btn href="#" data-bs-toggle="modal" data-bs-target="#sh-reserve" variant="onDark">Reserve your visit</x-public.btn>
             </li>
         </ul>
     </div>

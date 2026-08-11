@@ -1,3 +1,5 @@
+import initReservation from './reservation';
+
 /**
  * Shunno Art Cafe — public site behaviour.
  *
@@ -105,6 +107,60 @@ function initQuietAnchors() {
     });
 }
 
+/**
+ * Scroll-to-top control. The ring around the button doubles as a reading
+ * progress indicator, so the element earns its place rather than just sitting
+ * in the corner.
+ */
+function initScrollTop() {
+    const button = document.getElementById('sh-totop');
+    if (!button) return;
+
+    const ring = button.querySelector('.sh-totop__ring .fg');
+    const circumference = ring ? 2 * Math.PI * Number(ring.getAttribute('r')) : 0;
+
+    if (ring) {
+        ring.style.strokeDasharray = `${circumference}`;
+        ring.style.strokeDashoffset = `${circumference}`;
+    }
+
+    let ticking = false;
+
+    const update = () => {
+        ticking = false;
+
+        const scrolled = window.scrollY;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+
+        button.classList.toggle('is-visible', scrolled > window.innerHeight * 0.6);
+
+        if (ring && max > 0) {
+            const progress = Math.min(scrolled / max, 1);
+            ring.style.strokeDashoffset = `${circumference * (1 - progress)}`;
+        }
+    };
+
+    const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+
+    button.addEventListener('click', () => {
+        window.scrollTo({
+            top: 0,
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        // Send keyboard focus back to the start of the document too.
+        const skip = document.querySelector('.sh-skip');
+        if (skip) skip.focus({ preventScroll: true });
+    });
+}
+
 function initReveal() {
     const targets = document.querySelectorAll('.sh-band');
 
@@ -130,5 +186,7 @@ function initReveal() {
 document.addEventListener('DOMContentLoaded', () => {
     initNav();
     initQuietAnchors();
+    initScrollTop();
     initReveal();
+    initReservation();
 });
