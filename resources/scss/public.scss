@@ -372,8 +372,10 @@ a{color:var(--sh-cyan);text-underline-offset:.22em}
 
 /* ---------- scroll to top ---------- */
 .sh-totop{
+  --sh-totop-size:48px;
+  --sh-totop-gap:5px;
   position:fixed;right:clamp(1rem,3vw,2rem);bottom:clamp(1rem,3vw,2rem);z-index:70;
-  width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;
+  width:var(--sh-totop-size);height:var(--sh-totop-size);border-radius:50%;border:0;cursor:pointer;
   display:grid;place-items:center;
   background:var(--sh-cyan);color:#fff;
   box-shadow:0 8px 24px rgba(27,50,68,.32);
@@ -382,19 +384,30 @@ a{color:var(--sh-cyan);text-underline-offset:.22em}
 }
 .sh-totop.is-visible{opacity:1;visibility:visible;transform:none}
 .sh-totop:hover{background:var(--sh-cyan-2);transform:translateY(-3px)}
-.sh-totop svg{width:18px;height:18px;transition:transform .3s ease}
-.sh-totop:hover svg{transform:translateY(-2px)}
+/* :not() keeps this off the progress ring — a bare `.sh-totop svg` rule has
+   higher specificity than `.sh-totop__ring` and was shrinking the ring to the
+   arrow's 18px, which is what threw it off centre. */
+.sh-totop svg:not(.sh-totop__ring){width:18px;height:18px;transition:transform .3s ease}
+.sh-totop:hover svg:not(.sh-totop__ring){transform:translateY(-2px)}
+/* The button is a grid container, so place-items:center would treat an
+   absolutely-positioned child as shrink-to-fit and re-centre it — inset alone
+   gets ignored and the ring drifts off-centre. Explicit size plus a
+   translate(-50%,-50%) keeps it concentric regardless of the parent's
+   alignment. Size is derived from the button so the two can never disagree. */
 .sh-totop__ring{
-  position:absolute;inset:-5px;border-radius:50%;pointer-events:none;
-  transform:rotate(-90deg);
+  position:absolute;top:50%;left:50%;
+  width:calc(var(--sh-totop-size) + var(--sh-totop-gap) * 2);
+  height:calc(var(--sh-totop-size) + var(--sh-totop-gap) * 2);
+  transform:translate(-50%,-50%) rotate(-90deg);
+  overflow:visible;pointer-events:none;
 }
 .sh-totop__ring circle{fill:none;stroke-width:2;stroke-linecap:round}
 .sh-totop__ring .bg{stroke:rgba(255,255,255,.22)}
 .sh-totop__ring .fg{stroke:var(--sh-clay-2);transition:stroke-dashoffset .1s linear}
 @media (prefers-reduced-motion:reduce){
   .sh-totop{transition:opacity .2s,visibility .2s;transform:none}
-  .sh-totop.is-visible{transform:none}
-  .sh-totop:hover{transform:none}
+  .sh-totop.is-visible,.sh-totop:hover{transform:none}
+  .sh-totop__ring{transform:translate(-50%,-50%) rotate(-90deg)}
 }
 
 /* ---------- reservation popup ---------- */
