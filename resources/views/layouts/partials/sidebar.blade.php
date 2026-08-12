@@ -38,23 +38,16 @@
                     </div>
                 </div>
 
-                {{--
-                    Every item below is disabled until its phase lands. A menu
-                    that 404s is worse than one that says "not yet".
-                    PHASE 9: reservations · PHASE 8: visitors
-                --}}
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-calendar-8 fs-2"></i></span>
                         <span class="menu-title">Reservations</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 9</span>
                     </span>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-profile-user fs-2"></i></span>
                         <span class="menu-title">Visitors</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 8</span>
                     </span>
                 </div>
 
@@ -63,17 +56,15 @@
                     </div>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-color-swatch fs-2"></i></span>
                         <span class="menu-title">Workshops</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 6</span>
                     </span>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-time fs-2"></i></span>
                         <span class="menu-title">Availability</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 7</span>
                     </span>
                 </div>
 
@@ -81,17 +72,15 @@
                     <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Money</span></div>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-credit-cart fs-2"></i></span>
                         <span class="menu-title">Payments</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 12</span>
                     </span>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link disabled text-muted">
+                    <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-gift fs-2"></i></span>
                         <span class="menu-title">Gift vouchers</span>
-                        <span class="badge badge-light-warning badge-sm">Phase 14</span>
                     </span>
                 </div>
 
@@ -101,11 +90,22 @@
                                 class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
                     <div class="menu-item">
-                        <span class="menu-link disabled text-muted">
-                            <span class="menu-icon"><i class="ki-outline ki-setting-2 fs-2"></i></span>
+                        <a class="menu-link {{ request()->routeIs('reports.index') ? 'active' : '' }}"
+                            href="#" id="settings_link">
+                            <span class="menu-icon">
+                                <i class="ki-outline ki-chart-simple-3 fs-2"></i>
+                            </span>
+                            <span class="menu-title">Reports</span>
+                        </a>
+                    </div>
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('settings.*', 'backup') ? 'active' : '' }}"
+                            href="#" id="settings_link">
+                            <span class="menu-icon">
+                                <i class="ki-outline ki-setting-2 fs-2"></i>
+                            </span>
                             <span class="menu-title">Settings</span>
-                            <span class="badge badge-light-warning badge-sm">Soon</span>
-                        </span>
+                        </a>
                     </div>
                 @endrole
             </div>

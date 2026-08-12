@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\IsLoggedIn;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -31,11 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            // Replaces `isLoggedIn`, which duplicated Laravel's own `auth` and
-            // added nothing. This one signs out an account that is deactivated
-            // mid-session instead of waiting for the session to expire.
-            // Use it alongside `auth`, not instead of it.
-            'active'             => EnsureUserIsActive::class,
+            'isLoggedIn'         => IsLoggedIn::class,
 
             'role'               => RoleMiddleware::class,
             'permission'         => PermissionMiddleware::class,

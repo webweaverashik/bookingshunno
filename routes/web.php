@@ -40,7 +40,7 @@ Route::post('/reservation/request', [ReservationRequestController::class, 'store
     ->middleware('throttle:8,1')
     ->name('reservation.request.store');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 /*
 |--------------------------------------------------------------------------

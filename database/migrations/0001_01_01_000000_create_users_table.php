@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('whatsapp', 20)->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->string('source', 32)->default('web');
             $table->string('photo_url')->nullable();
             $table->string('password');
             $table->rememberToken();

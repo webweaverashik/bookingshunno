@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
+use App\Models\Auth\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

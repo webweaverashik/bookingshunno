@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\Auth;
 
+use App\Enums\ReservationSource;
 use App\Models\Auth\LoginActivity;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,7 +14,7 @@ class User extends Authenticatable
 
     protected $guard_name = 'web';
 
-    protected $fillable = ['name', 'email', 'phone', 'whatsapp', 'is_active', 'photo_url', 'password'];
+    protected $fillable = ['name', 'email', 'phone', 'whatsapp', 'is_active', 'source', 'photo_url', 'password'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -23,8 +24,11 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
             'is_active'         => 'boolean',
+            'source'            => ReservationSource::class,
         ];
     }
+
+    public const ROLE_VISITOR = 'Visitor';
 
     /*
     |--------------------------------------------------------------------------
@@ -41,6 +45,10 @@ class User extends Authenticatable
         return $this->hasRole('Manager');
     }
 
+    public function isStaff(): bool
+    {
+        return $this->hasAnyRole(['Admin', 'Manager']);
+    }
     /*
     |--------------------------------------------------------------------------
     | Relationships

@@ -1,22 +1,42 @@
-/* Small overrides on top of Metronic. Keep this file thin — anything large
-   belongs in a Metronic theme override, not here. */
-
-/* Sidebar items for modules that have not shipped yet. */
-.menu-link.disabled {
-    cursor: default;
-    opacity: .55;
-}
-.menu-link.disabled:hover {
-    background-color: transparent;
-}
-.menu-link.disabled .badge {
-    margin-left: auto;
+/* Global Design Start */
+#toastr-container>div {
+      opacity: 0.95 !important;
 }
 
-/* Warm the primary to the cyanotype blue used on the public site so the two
-   halves of the product look related. */
-:root {
-    --bs-primary: #2A4A63;
-    --bs-primary-active: #1B3244;
-    --bs-primary-light: #E4EAEF;
+table.ashik-table {
+      border: 1px dashed #F1F1F4 !important;
+      border-collapse: collapse !important;
 }
+
+table.ashik-table th,
+table.ashik-table td {
+      border: 1px dashed #F1F1F4 !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+}
+
+/* Metronic Dark Mode */
+html[data-bs-theme="dark"] table.ashik-table {
+      border: 1px dashed #2B2B40 !important;
+      background-color: #1E1E2D;
+}
+
+html[data-bs-theme="dark"] table.ashik-table th,
+html[data-bs-theme="dark"] table.ashik-table td {
+      border: 1px dashed #2B2B40 !important;
+      color: #E1E1EF;
+      background-color: transparent;
+}
+
+/* Optional: header emphasis */
+html[data-bs-theme="dark"] table.ashik-table th {
+      color: #FFFFFF;
+      background-color: #1B1B29;
+}
+
+/* Optional: hover effect (Metronic-like) */
+html[data-bs-theme="dark"] table.ashik-table tbody tr:hover {
+      background-color: #2A2A3C;
+}
+
+/* Global Design End */

@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
-use App\Models\User;
+use App\Models\Auth\User;
 use App\Models\VisitPurpose;
 use App\Models\Workshop;
 use Illuminate\Support\Facades\DB;
@@ -145,7 +145,6 @@ class ReservationService
      * New visitors get an unusable random password rather than NULL: the auth
      * guard's handling of a null hash has changed between Laravel versions and
      * is not something a payment portal should depend on. They sign in by OTP;
-     * password_set_at stays null until they deliberately choose one.
      */
     private function resolveVisitor(array $data): User
     {
