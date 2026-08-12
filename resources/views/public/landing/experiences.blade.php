@@ -40,7 +40,7 @@
                         project. Describe what you're after and we'll come back with a plan.
                     </p>
                     <div class="sh-card__foot">
-                        <a class="sh-card__link" href="#" data-bs-toggle="modal" data-bs-target="#sh-reserve">Start a request &rarr;</a>
+                        <a class="sh-card__link" href="#" data-modal-open="sh-reserve">Start a request &rarr;</a>
                     </div>
                 </div>
             </article>

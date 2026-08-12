@@ -27,7 +27,7 @@ $reserveConfig = [
                     <p class="sh-eyebrow">Reserve your visit</p>
                     <h2 class="sh-modal__title" id="sh-reserve-title">Tell us about your visit</h2>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-modal-dismiss aria-label="Close"></button>
             </div>
 
             <div class="modal-body">
@@ -186,7 +186,7 @@ $reserveConfig = [
                         We'll email you once a person has reviewed it. Nothing has been charged, and
                         your date isn't held until the request is approved.
                     </p>
-                    <button type="button" class="sh-btn sh-btn--ghost" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="sh-btn sh-btn--ghost" data-modal-dismiss>Close</button>
                 </div>
             </div>
 

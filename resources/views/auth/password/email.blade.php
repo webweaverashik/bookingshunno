@@ -1,43 +1,50 @@
 @extends('auth.app')
 
-@section('title', 'Forgot password')
+
+@section('title', 'Forgot Password')
 
 @section('content')
-    <form class="form w-100" method="POST" action="{{ route('password.email') }}" id="kt_password_reset_form" novalidate>
+    <!--begin::Form-->
+    <form class="form w-100" id="kt_password_reset_form" action="{{ route('password.email') }}" method="POST"
+        data-kt-redirect-url="{{ route('login') }}" novalidate="novalidate">
         @csrf
-
+        <!--begin::Heading-->
         <div class="text-center mb-10">
-            <h1 class="text-dark fw-bolder mb-3">Forgot your password?</h1>
-            <div class="text-gray-500 fw-semibold fs-6">
-                Enter your email and we'll send you a link to set a new one.
+            <!--begin::Title-->
+            <h1 class="text-gray-900 mb-3">Forgot Your Password ?</h1>
+            <!--end::Title-->
+            <!--begin::Link-->
+            <div class="text-gray-500 fw-semibold fs-6">Enter your email to reset your password.
             </div>
+            <!--end::Link-->
         </div>
-
-        @if (session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
-        @endif
-
+        <!--begin::Heading-->
+        <!--begin::Input group=-->
         <div class="fv-row mb-8">
-            <label class="form-label fw-bold text-gray-900 fs-6" for="email">Email</label>
-            <input type="email" id="email" name="email" value="{{ old('email') }}"
-                   class="form-control bg-transparent @error('email') is-invalid @enderror" required>
-            @error('email')
-                <div class="invalid-feedback d-block">{{ $message }}</div>
-            @enderror
+            <!--begin::Email-->
+            <input type="text" placeholder="Enter your email" name="email" autocomplete="off"
+                class="form-control bg-transparent" />
+            <!--end::Email-->
         </div>
-
-        <div class="d-flex flex-wrap justify-content-center gap-3">
-            <button type="submit" id="kt_password_reset_submit" class="btn btn-primary">
-                <span class="indicator-label">Send link</span>
-                <span class="indicator-progress">
-                    Please wait… <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
-                </span>
+        <!--begin::Actions-->
+        <div class="d-flex flex-wrap justify-content-center pb-lg-0">
+            <button type="submit" id="kt_password_reset_submit" class="btn btn-primary me-4">
+                <!--begin::Indicator label-->
+                <span class="indicator-label">Submit</span>
+                <!--end::Indicator label-->
+                <!--begin::Indicator progress-->
+                <span class="indicator-progress">Please wait...
+                    <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                <!--end::Indicator progress-->
             </button>
-            <a href="{{ route('login') }}" class="btn btn-light">Back to sign in</a>
+            <a href="{{ route('login') }}" class="btn btn-light">Cancel</a>
         </div>
+        <!--end::Actions-->
     </form>
+    <!--end::Form-->
 @endsection
 
-@push('auth-scripts')
+
+@push('page-script')
     <script src="{{ asset('js/auth/password/email.js') }}"></script>
 @endpush

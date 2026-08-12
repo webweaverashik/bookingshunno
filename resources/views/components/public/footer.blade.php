@@ -26,7 +26,7 @@
             <div>
                 <h4>Reservations</h4>
                 <ul>
-                    <li><a href="#" data-bs-toggle="modal" data-bs-target="#sh-reserve">Reserve your visit</a></li>
+                    <li><a href="#" data-modal-open="sh-reserve">Reserve your visit</a></li>
                     <li><a href="{{ route('home') }}#how">How it works</a></li>
                     {{-- PHASE 19: these need copies on this domain before SSLCommerz merchant approval --}}
                     <li><a href="https://studioshunno.net/privacy-policy-2/">Privacy policy</a></li>
