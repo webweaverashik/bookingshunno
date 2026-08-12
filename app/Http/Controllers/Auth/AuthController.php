@@ -71,7 +71,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'message'  => 'Login successful!',
-                'redirect' => route('dashboard'),
+                'redirect' => route('admin.dashboard'),
             ]);
         }
 
@@ -173,7 +173,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message'  => 'Login successful!',
-            'redirect' => route('dashboard'),
+            'redirect' => route('admin.dashboard'),
         ]);
     }
 
