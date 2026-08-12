@@ -5,7 +5,7 @@
     <div class="app-sidebar-logo px-6" id="kt_app_sidebar_logo">
         <a href="{{ route('admin.dashboard') }}" class="d-flex align-items-center gap-3">
             <img alt="" src="{{ asset('img/shunno-white.png') }}" class="h-50px rounded-circle">
-            {{-- <span class="text-white fw-bold fs-6 d-none d-lg-inline">Shunno Art Cafe</span> --}}
+            <span class="text-white fw-bold fs-6 d-none d-lg-inline">Shunno Art Cafe</span>
         </a>
 
         <div id="kt_app_sidebar_toggle"
