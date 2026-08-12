@@ -76,9 +76,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;   // fall through to the normal redirect-with-errors
             }
 
+            // The auth screens surface `message` only, so send the first
+            // real validation message rather than a generic heading they
+            // would show instead of the actual problem.
+            $first = collect($e->errors())->flatten()->first();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Please correct the highlighted fields.',
+                'message' => $first ?: 'Please correct the highlighted fields.',
                 'errors'  => $e->errors(),
             ], 422);
         });
