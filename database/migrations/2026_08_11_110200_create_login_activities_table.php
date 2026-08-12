@@ -15,15 +15,13 @@ return new class extends Migration
     {
         Schema::create('login_activities', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->string('email')->nullable();
-            $table->string('event', 32);              // login|logout|failed|otp_failed|otp_sent|locked
-            $table->ipAddress('ip_address')->nullable();
-            $table->string('user_agent', 512)->nullable();
-            $table->timestamp('created_at')->useCurrent();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('ip_address')->nullable();
+            $table->string('user_agent')->nullable();
+            $table->string('device')->nullable();
+            $table->timestamps();
 
-            $table->index(['user_id', 'created_at']);
-            $table->index(['event', 'created_at']);
+            $table->index('user_id');
         });
     }
 

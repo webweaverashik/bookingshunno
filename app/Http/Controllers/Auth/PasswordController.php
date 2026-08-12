@@ -1,95 +1,159 @@
 <?php
-
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Http\RedirectResponse;
+use App\Models\Auth\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\View\View;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordController extends Controller
 {
-    /**
-     * Always the same answer, whether or not the address exists — the previous
-     * "We could not find an active account with that email" was an enumeration
-     * oracle open to anyone.
-     */
-    private const NEUTRAL_RESPONSE = 'If that address belongs to an account that uses a password, a reset link is on its way.';
-
-    public function showLinkRequest(): View
+/**
+ * Show the "forgot password" form.
+ */
+    public function showLinkRequestForm()
     {
         return view('auth.password.email');
     }
 
-    public function sendResetLink(Request $request): RedirectResponse
+    /**
+     * Handle sending the reset link email.
+     */
+    public function sendResetLinkEmail(Request $request)
     {
-        $request->validate(['email' => ['required', 'string', 'email', 'max:190']]);
+        $request->validate([
+            'email' => 'required|email',
+        ]);
 
-        $user = User::firstWhere('email', $request->string('email')->lower()->toString());
+        $user = User::where('email', $request->email)
+            ->where('is_active', true)
+            ->first();
 
-        // Password resets are for staff. A visitor has no usable password and
-        // signs in by OTP; sending them a reset link would be confusing at best.
-        $eligible = $user && $user->is_active && $user->hasUsablePassword();
-
-        if ($eligible) {
-            $status = Password::sendResetLink(['email' => $user->email]);
-
-            if ($status !== Password::RESET_LINK_SENT) {
-                Log::warning('Password reset link not sent', ['email' => $user->email, 'status' => $status]);
-            }
-        } else {
-            Log::info('Password reset requested for ineligible address', [
-                'email'  => $request->input('email'),
-                'reason' => match (true) {
-                    ! $user                      => 'no such user',
-                    ! $user->is_active           => 'inactive',
-                    ! $user->hasUsablePassword() => 'visitor account, OTP only',
-                    default                      => 'unknown',
-                },
-            ]);
+        if (! $user) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'We could not find an active account with that email address.',
+            ], 422);
         }
 
-        return back()->with('success', self::NEUTRAL_RESPONSE);
+        try {
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
+
+            Log::info('Password reset status: ' . $status);
+
+            if ($status === Password::RESET_LINK_SENT) {
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'Password reset link sent to your email.',
+                ]);
+            } else {
+                // Consider checking for INVALID_USER here too if needed
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Unable to send reset link. Please try again later.',
+                ], 422);
+            }
+        } catch (TransportExceptionInterface $e) {
+            Log::error('Mail sending failed: ' . $e->getMessage());
+
+            if (str_contains($e->getMessage(), 'rate limit') || str_contains($e->getMessage(), 'too many')) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'You can only request a password reset once every 60 seconds. Please check your email or try again later.',
+                ], 429); // 429 Too Many Requests
+            }
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'The email address seems invalid or unreachable. Please check and try again.',
+            ], 422);
+        }
     }
 
-    public function showResetForm(Request $request, string $token): View
+    /**
+     * Show the reset password form.
+     */
+    public function showResetForm(Request $request, $token = null)
     {
+        $email = $request->email;
+
+        if (! $token || ! $email) {
+            return redirect()->route('password.request')
+                ->with('error', 'Invalid password reset link.');
+        }
+
+        // Find token row
+        $record = DB::table('password_reset_tokens')
+            ->where('email', $email)
+            ->first();
+
+        if (! $record) {
+            return redirect()->route('password.request')
+                ->with('error', 'Invalid password reset link.');
+        }
+
+        // Tokens in DB are hashed, so verify hash matches token
+        if (! Hash::check($token, $record->token)) {
+            return redirect()->route('password.request')
+                ->with('error', 'Invalid password reset link.');
+        }
+
+        // Check expiration (default 60 minutes)
+        $expires   = config('auth.passwords.users.expire', 60);
+        $createdAt = Carbon::parse($record->created_at);
+        if ($createdAt->addMinutes($expires)->isPast()) {
+            return redirect()->route('password.request')
+                ->with('warning', 'This reset link has expired.');
+        }
+
+        // Valid token → show reset form
         return view('auth.password.reset', [
             'token' => $token,
-            'email' => $request->query('email'),
+            'email' => $email,
         ]);
     }
 
-    public function resetPassword(Request $request): RedirectResponse
+    /**
+     * Handle the actual password reset.
+     */
+    public function reset(Request $request)
     {
         $request->validate([
-            'token'    => ['required'],
-            'email'    => ['required', 'email'],
-            'password' => ['required', 'confirmed', PasswordRule::defaults()],
+            'token'    => 'required|string',
+            'email'    => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password) {
+            function ($user, $password) {
                 $user->forceFill([
-                    'password'        => $password,
-                    'password_set_at' => now(),
-                    'remember_token'  => Str::random(60),
+                    'password'       => Hash::make($password),
+                    'remember_token' => Str::random(60),
                 ])->save();
-
-                event(new PasswordReset($user));
-            },
+            }
         );
 
-        return $status === Password::PASSWORD_RESET
-            ? redirect()->route('login')->with('success', 'Your password has been reset. Please sign in.')
-            : back()->withInput($request->only('email'))
-                ->withErrors(['email' => 'That reset link is invalid or has expired. Please request a new one.']);
+        if ($status == Password::PASSWORD_RESET) {
+            // Success - return JSON success message
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Your password has been reset successfully.',
+            ]);
+        }
+
+        // Failure - invalid or expired token etc.
+        return response()->json([
+            'status'  => 'error',
+            'message' => __($status),
+        ], 422);
     }
 }

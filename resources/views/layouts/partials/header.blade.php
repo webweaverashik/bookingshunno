@@ -51,7 +51,7 @@
                     <div class="separator my-2"></div>
 
                     <div class="menu-item px-5">
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('admin.logout') }}">
                             @csrf
                             <button type="submit" class="menu-link px-5 border-0 bg-transparent w-100 text-start">
                                 Sign out

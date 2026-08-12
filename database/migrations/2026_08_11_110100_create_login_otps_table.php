@@ -10,26 +10,14 @@ return new class extends Migration
     {
         Schema::create('login_otps', function (Blueprint $table) {
             $table->id();
-
-            // Unique: OtpService uses updateOrCreate, which would race into
-            // duplicate rows on a double submit without this.
-            $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
-
-            // The code is hashed, never stored in the clear. VARCHAR, because a
-            // numeric column would eat the leading zero on a code like 048213.
-            $table->string('code');
-
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('code'); // bcrypt hash of the code
             $table->timestamp('expires_at');
             $table->unsignedTinyInteger('attempts')->default(0);
-
-            // Survives a resend; `attempts` does not.
-            $table->unsignedSmallInteger('total_attempts')->default(0);
-            $table->unsignedTinyInteger('resend_count')->default(0);
-
-            $table->timestamp('last_sent_at')->nullable();
+            $table->timestamp('last_sent_at')->nullable(); // resend throttle anchor
             $table->timestamps();
 
-            $table->index('expires_at');
+            $table->unique('user_id');
         });
     }
 

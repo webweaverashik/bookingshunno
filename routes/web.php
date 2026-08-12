@@ -1,9 +1,26 @@
 <?php
 
+use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes (Core Entry Point)
+|--------------------------------------------------------------------------
+|
+| Kept deliberately minimal. Only the public auth entry, the dashboard and
+| a few core/session routes live here. Everything else is split out and
+| loaded from bootstrap/app.php via the `then:` closure:
+|
+| routes/
+| ├── web.php          # This file — public + core authenticated routes
+| ├── auth.php         # Guest auth routes (forgot / reset password)
+| └── admin.php        # Admin panel routes
+
+*/
 
 /*
 |--------------------------------------------------------------------------
@@ -22,7 +39,8 @@ Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::post('/reservation/request', [ReservationRequestController::class, 'store'])
     ->middleware('throttle:8,1')
     ->name('reservation.request.store');
-
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
 /*
 |--------------------------------------------------------------------------

@@ -9,12 +9,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            RoleSeeder::class,          // roles and permissions first
+            RolePermissionSeeder::class,          // roles and permissions first
             SettingSeeder::class,
             OperatingHourSeeder::class,
             WorkshopSeeder::class,
             VisitPurposeSeeder::class,  // may reference workshops
-            AdminUserSeeder::class,     // needs the Admin role to exist
+            UserSeeder::class,     // needs the Admin role to exist
         ]);
     }
 }
