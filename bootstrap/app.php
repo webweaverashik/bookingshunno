@@ -1,13 +1,12 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsActive;
-use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
@@ -28,11 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Clickjacking and MIME-sniffing protection on every response. The BIDA
-        // template tried to do this with a frame-busting script in
-        // head.blade.php, but its entire body sat after a `//` and never ran.
-        $middleware->append(SecurityHeaders::class);
-
         $middleware->alias([
             // Replaces `isLoggedIn`, which duplicated Laravel's own `auth` and
             // added nothing. This one signs out an account that is deactivated
@@ -69,11 +63,11 @@ return Application::configure(basePath: dirname(__DIR__))
         | status code. Registered here once instead.
         */
 
-        $wantsJson = fn (Request $request): bool => $request->expectsJson() || $request->ajax();
+        $wantsJson = fn(Request $request): bool => $request->expectsJson() || $request->ajax();
 
         $exceptions->render(function (ValidationException $e, Request $request) use ($wantsJson) {
             if (! $wantsJson($request)) {
-                return null;   // fall through to the normal redirect-with-errors
+                return null; // fall through to the normal redirect-with-errors
             }
 
             // The auth screens surface `message` only, so send the first
