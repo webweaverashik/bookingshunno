@@ -104,7 +104,7 @@ class AuthController extends Controller
     public function showOtp(Request $request)
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route('admin.dashboard');
         }
 
         if (! config('otp.enabled', true)) {
