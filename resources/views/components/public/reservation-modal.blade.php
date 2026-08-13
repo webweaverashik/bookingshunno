@@ -1,21 +1,19 @@
 @php
     use App\Models\Workshop;
-    use App\Support\SessionSlots;
+    use App\Services\SettingsRepository;
     use App\Support\VisitPurposes;
 
-    // PHASE 6: the menu is read from the database. Workshop::menu() is cached,
-    // and the landing page has already warmed it by the time this partial runs.
     $experiences = Workshop::menu();
+    $settings = app(SettingsRepository::class);
 
     // Built here rather than inline below: Blade cannot balance a multi-line
     // array inside a directive's parentheses and emits broken PHP.
 $reserveConfig = [
     'endpoint' => route('reservation.request.store'),
-    'slots' => SessionSlots::byExperience(),
-    'closedDays' => array_values(config('shunno.operating.closed_days')),
+    'availability' => route('availability'),
     'discount' => [
-        'min' => (int) config('shunno.group_discount.min_participants'),
-        'percent' => (int) config('shunno.group_discount.percentage'),
+        'min' => (int) $settings->get('group_discount.min_participants', 4),
+        'percent' => (int) $settings->get('group_discount.percentage', 10),
         ],
     ];
 @endphp
@@ -60,8 +58,7 @@ $reserveConfig = [
                                     <input type="radio" name="experience" value="{{ $experience->slug }}"
                                         data-price="{{ $experience->price }}"
                                         data-minutes="{{ $experience->duration_minutes }}"
-                                        data-max="{{ $experience->max_participants }}"
-                                        @checked($loop->first)>
+                                        data-max="{{ $experience->max_participants }}" @checked($loop->first)>
                                     <span class="sh-choice__body">
                                         <span class="sh-choice__title">{{ $experience->title }}</span>
                                         <span class="sh-choice__meta">{{ $experience->medium }}</span>
@@ -109,8 +106,8 @@ $reserveConfig = [
                                     value="1" min="1" max="30" inputmode="numeric" required
                                     aria-describedby="sh-participants-help sh-participants-error">
                                 <p class="form-text" id="sh-participants-help">
-                                    {{ config('shunno.group_discount.min_participants') }} or more gets
-                                    {{ config('shunno.group_discount.percentage') }}% off.
+                                    {{ $settings->get('group_discount.min_participants', 4) }} or more gets
+                                    {{ $settings->get('group_discount.percentage', 10) }}% off.
                                 </p>
                                 <p class="invalid-feedback" id="sh-participants-error"></p>
                             </div>

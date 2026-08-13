@@ -4,52 +4,65 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReservationRequest;
-use App\Services\PricingService;
+use App\Services\ReservationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ReservationRequestController extends Controller
 {
-    public function __construct(private readonly PricingService $pricing)
+    public function __construct(private readonly ReservationService $reservations)
     {
     }
 
     /**
-     * Receive a reservation request from the popup.
+     * Receive a reservation request from the popup and persist it.
      *
-     * PHASE 6: the workshop and its price now come from the database rather
-     * than ExperienceCatalogue, and pricing goes through PricingService so the
-     * popup's running total, this response and the admin panel cannot disagree.
+     * PHASE 4 CLOSEOUT: this used to generate a reference, return it, and throw
+     * everything away. ReservationService does the whole job in one
+     * transaction — visitor, reservation, line item, purposes, first status
+     * history row — and it is the only place a reservation is ever created, so
+     * an admin-entered booking in Phase 9 goes through the same code.
      *
-     * STILL OUTSTANDING (Phase 4 closeout): this does not persist. The
-     * reference below is generated and thrown away. ReservationService::
-     * createFromPublicRequest() is written and does the whole job — creating
-     * the visitor, the reservation, its line item, the purposes and the first
-     * status-history row — but it is not wired here, and it writes two user
-     * columns (total_reservations, last_reservation_at) that the users table
-     * does not have yet. See the Phase 6 notes.
+     * Nothing is emailed yet; Phase 11 hangs the acknowledgement off the event
+     * the service already marks out.
      */
     public function store(StoreReservationRequest $request): JsonResponse
     {
-        $data     = $request->validated();
-        $workshop = $request->workshop();
+        $data = $request->validated();
 
-        $pricing = $this->pricing->forWorkshop($workshop, (int) $data['participants']);
+        try {
+            $reservation = $this->reservations->createFromPublicRequest(
+                $data,
+                $request->ip(),
+            );
+        } catch (Throwable $e) {
+            // The visitor gets nothing technical; §16 forbids leaking the
+            // exception. The reference is what support would need to trace it.
+            Log::error('Reservation request failed', [
+                'exception'  => $e,
+                'experience' => $data['experience'] ?? null,
+                'date'       => $data['date'] ?? null,
+            ]);
 
-        $reference = 'SHN-' . now()->format('ym') . '-' . Str::upper(Str::random(4));
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong saving your request. Please try again, or message us on WhatsApp and we will take it from there.',
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Your request has been received.',
             'data'    => [
-                'reference'  => $reference,
-                'experience' => $workshop->title,
-                'date'       => $data['date'],
-                'time'       => $data['time'],
+                'reference'  => $reservation->reference_code,
+                'experience' => $reservation->items->first()?->title_snapshot,
+                'date'       => $reservation->reserved_date->toDateString(),
+                'time'       => substr((string) $reservation->start_time, 0, 5),
                 'pricing'    => [
-                    'subtotal' => $pricing['subtotal'],
-                    'discount' => $pricing['discount'],
-                    'total'    => $pricing['total'],
+                    'subtotal' => (float) $reservation->subtotal,
+                    'discount' => (float) $reservation->discount_amount,
+                    'total'    => (float) $reservation->total_amount,
                 ],
             ],
         ]);

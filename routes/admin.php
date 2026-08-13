@@ -1,21 +1,11 @@
 <?php
 
+use App\Http\Controllers\Admin\AvailabilityController;
+use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Admin routes
-|--------------------------------------------------------------------------
-| Register in bootstrap/app.php:
-|
-|   ->withRouting(
-|       web: __DIR__.'/../routes/web.php',
-|       then: fn () => Route::middleware('web')->group(base_path('routes/admin.php')),
-|   )
-*/
 
 Route::prefix('admin')
     ->name('admin.')
@@ -23,11 +13,9 @@ Route::prefix('admin')
     ->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Logout (POST performs logout; GET bounces back — used by stray links).
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/logout', fn() => redirect()->back())->name('logout.get');
 
-        // Clear application/server cache (AJAX helper).
         Route::get('clear-cache', function () {
             clearServerCache();
             return response()->json(['success' => true]);
@@ -37,13 +25,6 @@ Route::prefix('admin')
         |----------------------------------------------------------------------
         | PHASE 6 — Workshops
         |----------------------------------------------------------------------
-        | Bound on {workshop:id}, not the slug: the slug is editable, and an
-        | admin who renames a workshop should not find the edit URL they are
-        | sitting on has stopped resolving.
-        |
-        | The group is gated on workshops.view; WorkshopPolicy handles the
-        | write abilities per action, so Manager reaches the page read-only
-        | rather than being bounced to a 403.
         */
         Route::prefix('workshops')
             ->name('workshops.')
@@ -58,9 +39,37 @@ Route::prefix('admin')
                 Route::delete('{workshop:id}', [WorkshopController::class, 'destroy'])->name('destroy');
             });
 
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 7B — Availability
+        |----------------------------------------------------------------------
+        | Gated on availability.view; BlockedDatePolicy handles the write
+        | abilities per action. Manager holds view only and so reaches the page
+        | read-only rather than being bounced to a 403.
+        |
+        | POST rather than PUT/PATCH throughout, matching the workshops module:
+        | one verb across the admin panel is one fewer thing to get wrong.
+        */
+        Route::prefix('availability')
+            ->name('availability.')
+            ->middleware('permission:availability.view')
+            ->group(function () {
+                Route::get('/', [AvailabilityController::class, 'index'])->name('index');
+                Route::post('hours', [AvailabilityController::class, 'updateHours'])->name('hours');
+                Route::post('rules', [AvailabilityController::class, 'updateRules'])->name('rules');
+
+                Route::prefix('blocked')
+                    ->name('blocked.')
+                    ->group(function () {
+                        Route::post('/', [BlockedDateController::class, 'store'])->name('store');
+                        Route::get('{blockedDate:id}/edit', [BlockedDateController::class, 'edit'])->name('edit');
+                        Route::post('{blockedDate:id}', [BlockedDateController::class, 'update'])->name('update');
+                        Route::delete('{blockedDate:id}', [BlockedDateController::class, 'destroy'])->name('destroy');
+                    });
+            });
+
         // PHASE 9:  reservations  (list, show, approve, decline, request-info)
         // PHASE 8:  visitors
-        // PHASE 7:  availability
         // PHASE 12: payments
         // PHASE 14: vouchers
         // PHASE 16: reports

@@ -2,12 +2,23 @@
 
 namespace App\Models;
 
-use App\Models\Auth\User;
+use App\Traits\HasCreatedBy;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * A day, or part of a day, the studio cannot take bookings for: holidays,
+ * private hires, installation days.
+ *
+ * PHASE 7B: swapped its hand-written creator() for HasCreatedBy, which also
+ * fills created_by automatically — the admin should never have to send it, and
+ * a client-supplied created_by would be worth nothing anyway.
+ */
 class BlockedDate extends Model
 {
+    use HasCreatedBy;
+
     protected $fillable = ['date', 'is_full_day', 'starts_at', 'ends_at', 'reason', 'created_by'];
 
     protected function casts(): array
@@ -18,8 +29,47 @@ class BlockedDate extends Model
         ];
     }
 
-    public function creator(): BelongsTo
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeOnDate(Builder $query, string $date): Builder
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $query->whereDate('date', $date);
+    }
+
+    /** Today onward. Past blocks are history and clutter the admin list. */
+    public function scopeUpcoming(Builder $query): Builder
+    {
+        return $query->whereDate('date', '>=', CarbonImmutable::today()->toDateString());
+    }
+
+    public function scopePast(Builder $query): Builder
+    {
+        return $query->whereDate('date', '<', CarbonImmutable::today()->toDateString());
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Presentation
+    |--------------------------------------------------------------------------
+    */
+
+    public function windowLabel(): string
+    {
+        if ($this->is_full_day) {
+            return 'All day';
+        }
+
+        return CarbonImmutable::createFromTimeString($this->starts_at)->format('g:i A')
+            . ' – '
+            . CarbonImmutable::createFromTimeString($this->ends_at)->format('g:i A');
+    }
+
+    public function isPast(): bool
+    {
+        return $this->date->lessThan(CarbonImmutable::today());
     }
 }

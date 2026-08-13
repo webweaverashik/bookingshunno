@@ -80,7 +80,7 @@
                         <div class="col-md-4">
                             <label class="required form-label">Price (BDT)</label>
                             <input type="number" name="price" class="form-control form-control-solid border" min="0"
-                                step="0.01" inputmode="decimal" />
+                                step="1" inputmode="decimal" />
                             <div class="invalid-feedback d-block" data-error-for="price"></div>
                         </div>
 

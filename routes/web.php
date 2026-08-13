@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Public\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use Illuminate\Support\Facades\Mail;
@@ -41,6 +42,10 @@ Route::post('/reservation/request', [ReservationRequestController::class, 'store
     ->name('reservation.request.store');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+Route::get('availability', AvailabilityController::class)
+    ->middleware('throttle:60,1')
+    ->name('availability');
 
 /*
 |--------------------------------------------------------------------------

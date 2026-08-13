@@ -136,23 +136,108 @@
         return form.querySelector('input[name="experience"]:checked');
     }
 
-    function refreshSlots() {
-        var experience = chosenExperience();
-        if (!experience) return;
+    // PHASE 7A: start times are no longer baked into the page. Operating hours,
+    // holidays and blocked periods live in the database and the client can
+    // change them, so the list is fetched for the chosen session and date.
+    // The server re-checks all of it on submit regardless.
+    var slotRequest = 0;
 
-        var slots = config.slots[experience.value] || {};
-        var previous = el.time.value;
-
+    function setTimeOptions(slots, placeholder) {
         el.time.innerHTML = '';
-        Object.keys(slots).forEach(function (value) {
+
+        if (placeholder) {
+            var hint = document.createElement('option');
+            hint.value = '';
+            hint.textContent = placeholder;
+            el.time.appendChild(hint);
+            el.time.disabled = true;
+            return;
+        }
+
+        el.time.disabled = false;
+
+        slots.forEach(function (slot) {
             var option = document.createElement('option');
-            option.value = value;
-            option.textContent = slots[value];
+            option.value = slot.value;
+            // An unavailable slot is greyed rather than removed: a visitor who
+            // sees "6:00 PM - fully booked" understands the studio is busy,
+            // where a silently shortened list just looks broken.
+            option.textContent = slot.available
+                ? slot.label + (slot.seats_left !== null ? ' \u00b7 ' + slot.seats_left + ' left' : '')
+                : slot.label + ' \u2014 ' + slot.reason;
+            option.disabled = !slot.available;
             el.time.appendChild(option);
         });
+    }
 
-        // Keep the visitor's choice if the longer session still allows it.
-        if (previous && slots[previous]) el.time.value = previous;
+    function firstSelectable() {
+        for (var i = 0; i < el.time.options.length; i++) {
+            if (!el.time.options[i].disabled) return el.time.options[i].value;
+        }
+        return '';
+    }
+
+    function refreshSlots() {
+        var experience = chosenExperience();
+        var dateError = document.getElementById('sh-date-error');
+
+        if (!experience) return;
+
+        if (!el.date.value) {
+            setTimeOptions([], 'Choose a date first');
+            return;
+        }
+
+        var ticket = ++slotRequest;
+        setTimeOptions([], 'Checking availability\u2026');
+
+        var url = config.availability
+            + '?experience=' + encodeURIComponent(experience.value)
+            + '&date=' + encodeURIComponent(el.date.value);
+
+        fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+            .then(function (response) { return response.json(); })
+            .then(function (payload) {
+                // A slow earlier request must never overwrite a newer answer.
+                if (ticket !== slotRequest) return;
+
+                if (!payload || !payload.success) {
+                    setTimeOptions([], 'Could not load times');
+                    return;
+                }
+
+                var data = payload.data;
+
+                el.date.classList.toggle('is-invalid', !data.open);
+                if (dateError) dateError.textContent = data.open ? '' : (data.message || '');
+
+                if (!data.open) {
+                    setTimeOptions([], 'Closed that day');
+                    return;
+                }
+
+                if (!data.slots.length) {
+                    setTimeOptions([], 'No start time fits this session');
+                    return;
+                }
+
+                var previous = el.time.value;
+                setTimeOptions(data.slots, null);
+
+                var kept = false;
+                for (var i = 0; i < el.time.options.length; i++) {
+                    if (el.time.options[i].value === previous && !el.time.options[i].disabled) {
+                        kept = true;
+                        break;
+                    }
+                }
+
+                el.time.value = kept ? previous : firstSelectable();
+            })
+            .catch(function () {
+                if (ticket !== slotRequest) return;
+                setTimeOptions([], 'Could not load times');
+            });
     }
 
     function refreshTotal() {
@@ -291,18 +376,10 @@
     });
     el.people.addEventListener('input', refreshTotal);
 
-    // Sunday is closed. Say so on selection rather than after a round trip —
-    // the server checks this again regardless.
-    el.date.addEventListener('change', function () {
-        var feedback = document.getElementById('sh-date-error');
-        if (!el.date.value) return;
-
-        var day = new Date(el.date.value + 'T00:00:00').getDay();
-        var closed = config.closedDays.indexOf(day) !== -1;
-
-        el.date.classList.toggle('is-invalid', closed);
-        feedback.textContent = closed ? "We're closed on Sundays. Please choose another day." : '';
-    });
+    // PHASE 7A: the hard-coded Sunday rule is gone. Closed days, holidays and
+    // blocked periods all come back from /availability, which is the same
+    // service the validator uses, so the two can no longer disagree.
+    el.date.addEventListener('change', refreshSlots);
 
     root.addEventListener('shunno:shown', function () {
         refreshSlots();

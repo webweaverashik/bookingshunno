@@ -63,16 +63,17 @@
                     </a>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link text-muted">
+                    <a class="menu-link {{ request()->routeIs('admin.availability.*') ? 'active' : '' }}"
+                        href="{{ route('admin.availability.index') }}">
                         <span class="menu-icon"><i class="ki-outline ki-time fs-2"></i></span>
                         <span class="menu-title">Availability</span>
-                    </span>
+                    </a>
                 </div>
 
                 <div class="menu-item pt-5">
                     <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Money</span></div>
                 </div>
-                <div class="menu-item"> 
+                <div class="menu-item">
                     <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-credit-cart fs-2"></i></span>
                         <span class="menu-title">Payments</span>
