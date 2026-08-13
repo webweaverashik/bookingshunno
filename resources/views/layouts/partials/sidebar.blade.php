@@ -45,10 +45,11 @@
                     </span>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link text-muted">
+                    <a class="menu-link {{ request()->routeIs('admin.visitors.*') ? 'active' : '' }}"
+                        href="{{ route('admin.visitors.index') }}">
                         <span class="menu-icon"><i class="ki-outline ki-profile-user fs-2"></i></span>
                         <span class="menu-title">Visitors</span>
-                    </span>
+                    </a>
                 </div>
 
                 <div class="menu-item pt-5">

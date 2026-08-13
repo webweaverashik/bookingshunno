@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AvailabilityController;
 use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
@@ -41,7 +42,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 7B — Availability
+        | PHASE 7 — Availability
         |----------------------------------------------------------------------
         | Gated on availability.view; BlockedDatePolicy handles the write
         | abilities per action. Manager holds view only and so reaches the page
@@ -68,8 +69,34 @@ Route::prefix('admin')
                     });
             });
 
-        // PHASE 9:  reservations  (list, show, approve, decline, request-info)
-        // PHASE 8:  visitors
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 8 — Visitors
+        |----------------------------------------------------------------------
+        | Bound on {visitor:id}. No policy class: a policy on
+        | App\Models\Auth\User would also govern staff-user management in a
+        | later phase, and the two run on different permissions (visitors.*
+        | against users.*). Authorisation is therefore by permission name, on
+        | the routes and again in the views.
+        |
+        | Manager holds both visitors.view and visitors.update — they run
+        | day-to-day reservation operations and need to fix a mistyped phone
+        | number without waiting for an Admin.
+        */
+        Route::prefix('visitors')
+            ->name('visitors.')
+            ->middleware('permission:visitors.view')
+            ->group(function () {
+                Route::get('/', [VisitorController::class, 'index'])->name('index');
+                Route::get('list', [VisitorController::class, 'list'])->name('list');
+                Route::get('{visitor:id}', [VisitorController::class, 'show'])->name('show');
+
+                Route::middleware('permission:visitors.update')->group(function () {
+                    Route::get('{visitor:id}/edit', [VisitorController::class, 'edit'])->name('edit');
+                    Route::post('{visitor:id}', [VisitorController::class, 'update'])->name('update');
+                });
+            });
+
         // PHASE 12: payments
         // PHASE 14: vouchers
         // PHASE 16: reports

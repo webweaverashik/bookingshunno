@@ -32,17 +32,13 @@ window.Shunno = (function () {
     }
 
     /**
-     * Select2 renders its own markup and only listens for jQuery events, so
-     * setting .value on the native select silently leaves the visible control
-     * showing the previous choice. Metronic bundles jQuery; if a field was
-     * never initialised this is a no-op.
+     * Select2 renders its own markup and only redraws when the underlying
+     * <select> emits change. A native dispatch reaches it: Select2 binds with
+     * jQuery .on(), which is a real addEventListener underneath.
      */
     function syncSelects(form) {
-        if (!window.jQuery) return;
         form.querySelectorAll('select[data-control="select2"]').forEach(function (select) {
-            if (jQuery(select).data('select2')) {
-                jQuery(select).trigger('change.select2');
-            }
+            select.dispatchEvent(new Event('change', { bubbles: true }));
         });
     }
 
