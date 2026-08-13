@@ -40,3 +40,28 @@ html[data-bs-theme="dark"] table.ashik-table tbody tr:hover {
 }
 
 /* Global Design End */
+
+
+/*
+| Admin modals
+|------------------------------------------------------------------------------
+| Bootstrap's .modal-dialog-scrollable derives its height from the .modal
+| element, which Metronic's layout does not resolve to the viewport. A vh unit
+| has no such dependency, so the body scrolls and the footer stays reachable
+| whatever the surrounding layout does.
+*/
+.sh-modal-scroll .modal-content {
+      max-height: calc(100vh - 3rem);
+}
+
+.sh-modal-scroll .modal-body {
+      max-height: calc(100vh - 15rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+}
+
+/* Select2 replaces the native control, so the invalid state has to be
+   mirrored onto the rendered element. */
+.is-invalid+.select2-container .select2-selection {
+      border-color: var(--bs-danger) !important;
+}

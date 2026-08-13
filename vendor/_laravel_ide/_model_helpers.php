@@ -687,6 +687,7 @@ namespace App\Models\Auth {
      * @property string|null $remember_token
      * @property string $password
      * @property string|null $photo_url
+     * @property \App\Enums\ReservationSource $source
      * @property boolean $is_active
      * @property \Illuminate\Support\Carbon|null $email_verified_at
      * @property string|null $whatsapp
@@ -712,6 +713,7 @@ namespace App\Models\Auth {
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User whereWhatsapp($value)
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User whereEmailVerifiedAt($value)
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User whereIsActive($value)
+     * @method static \Illuminate\Database\Eloquent\Builder<User>|User whereSource($value)
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User wherePhotoUrl($value)
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User wherePassword($value)
      * @method static \Illuminate\Database\Eloquent\Builder<User>|User whereRememberToken($value)
@@ -3536,6 +3538,7 @@ namespace App\Models {
      * @method static \Illuminate\Database\Eloquent\Builder<Workshop>|Workshop query()
      * @method static \Illuminate\Database\Eloquent\Builder<Workshop>|Workshop active() {@see App\Models\Workshop::scopeActive()}
      * @method static \Illuminate\Database\Eloquent\Builder<Workshop>|Workshop ordered() {@see App\Models\Workshop::scopeOrdered()}
+     * @method static \Illuminate\Database\Eloquent\Builder<Workshop>|Workshop adminOrdered() {@see App\Models\Workshop::scopeAdminOrdered()}
      * @method static mixed select($columns)
      * @method static mixed selectSub($query, $as)
      * @method static mixed selectExpression($expression, $as)

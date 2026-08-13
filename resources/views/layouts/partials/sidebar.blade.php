@@ -56,10 +56,11 @@
                     </div>
                 </div>
                 <div class="menu-item">
-                    <span class="menu-link text-muted">
+                    <a class="menu-link {{ request()->routeIs('admin.workshops.*') ? 'active' : '' }}"
+                        href="{{ route('admin.workshops.index') }}">
                         <span class="menu-icon"><i class="ki-outline ki-color-swatch fs-2"></i></span>
                         <span class="menu-title">Workshops</span>
-                    </span>
+                    </a>
                 </div>
                 <div class="menu-item">
                     <span class="menu-link text-muted">
@@ -71,7 +72,7 @@
                 <div class="menu-item pt-5">
                     <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Money</span></div>
                 </div>
-                <div class="menu-item">
+                <div class="menu-item"> 
                     <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-credit-cart fs-2"></i></span>
                         <span class="menu-title">Payments</span>
@@ -90,8 +91,7 @@
                                 class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
                     <div class="menu-item">
-                        <a class="menu-link {{ request()->routeIs('reports.index') ? 'active' : '' }}"
-                            href="#" id="settings_link">
+                        <a class="menu-link" href="#" id="reports_link">
                             <span class="menu-icon">
                                 <i class="ki-outline ki-chart-simple-3 fs-2"></i>
                             </span>

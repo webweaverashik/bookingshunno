@@ -2,10 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Support\ExperienceCatalogue;
+use App\Models\Workshop;
 use App\Support\SessionSlots;
 use App\Support\VisitPurposes;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreReservationRequest extends FormRequest
@@ -18,12 +19,23 @@ class StoreReservationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'         => ['required', 'string', 'min:2', 'max:120'],
-            'email'        => ['required', 'string', 'email:rfc,dns', 'max:190'],
+            'name'  => ['required', 'string', 'min:2', 'max:120'],
+            'email' => ['required', 'string', 'email:rfc,dns', 'max:190'],
             // VARCHAR, never numeric: the Google Form export lost a leading
             // zero to Excel's float coercion (01406639867 -> 1.406639867E9).
-            'phone'        => ['required', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{6,20}$/'],
-            'experience'   => ['required', 'string', 'in:' . implode(',', array_column(ExperienceCatalogue::all(), 'slug'))],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{6,20}$/'],
+
+            // PHASE 6: was an in: rule built from ExperienceCatalogue. An exists
+            // rule scoped to active workshops means deactivating a session in
+            // the admin panel closes it to new requests immediately, with no
+            // deploy and no second list to keep in step.
+            'experience' => [
+                'required', 'string',
+                Rule::exists('workshops', 'slug')
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at'),
+            ],
+
             'date'         => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'time'         => ['required', 'string', 'date_format:H:i'],
             'participants' => ['required', 'integer', 'min:1', 'max:30'],
@@ -39,8 +51,9 @@ class StoreReservationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.regex'     => 'Please enter a valid phone number.',
-            'consent.accepted' => 'Please confirm before sending your request.',
+            'experience.exists'  => 'That session is not currently available. Please choose another.',
+            'phone.regex'        => 'Please enter a valid phone number.',
+            'consent.accepted'   => 'Please confirm before sending your request.',
             'website.prohibited' => 'Your request could not be sent. Please try again.',
         ];
     }
@@ -63,17 +76,45 @@ class StoreReservationRequest extends FormRequest
                 // The chosen start time must leave room for the session to
                 // finish before 9:30 PM — never trust the front end for this.
                 if ($slug && $time && ! $validator->errors()->hasAny(['experience', 'time'])) {
-                    $experience = collect(ExperienceCatalogue::all())->firstWhere('slug', $slug);
+                    $workshop = $this->workshop();
 
-                    if ($experience && ! array_key_exists($time, SessionSlots::forDuration((int) $experience['hours']))) {
+                    if (
+                        $workshop
+                        && ! array_key_exists($time, SessionSlots::forMinutes($workshop->duration_minutes))
+                    ) {
                         $validator->errors()->add(
                             'time',
                             'That start time does not leave enough room for this session. Please pick another.'
                         );
                     }
                 }
+
+                // NOT enforcing min_participants / max_participants here yet.
+                // The seeded capacities are the placeholder 12 flagged in
+                // WorkshopSeeder — rejecting a genuine 15-person group against
+                // an unconfirmed number would lose the booking. Phase 7 turns
+                // this on once the real capacities are entered in the admin
+                // panel, together with seats already taken on the date.
             },
         ];
+    }
+
+    /**
+     * Resolved once and memoised: three rules need it and the popup posts a
+     * single slug.
+     */
+    public function workshop(): ?Workshop
+    {
+        static $workshop = false;
+
+        if ($workshop === false) {
+            $workshop = Workshop::query()
+                ->active()
+                ->where('slug', $this->input('experience'))
+                ->first();
+        }
+
+        return $workshop;
     }
 
     protected function prepareForValidation(): void

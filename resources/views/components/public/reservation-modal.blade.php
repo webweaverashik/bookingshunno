@@ -1,9 +1,11 @@
 @php
-    use App\Support\ExperienceCatalogue;
+    use App\Models\Workshop;
     use App\Support\SessionSlots;
     use App\Support\VisitPurposes;
 
-    $experiences = ExperienceCatalogue::all();
+    // PHASE 6: the menu is read from the database. Workshop::menu() is cached,
+    // and the landing page has already warmed it by the time this partial runs.
+    $experiences = Workshop::menu();
 
     // Built here rather than inline below: Blade cannot balance a multi-line
     // array inside a directive's parentheses and emits broken PHP.
@@ -53,21 +55,28 @@ $reserveConfig = [
                         <legend>What would you like to do?</legend>
 
                         <div class="sh-choices" role="radiogroup" aria-describedby="sh-experience-error">
-                            @foreach ($experiences as $experience)
+                            @forelse ($experiences as $experience)
                                 <label class="sh-choice">
-                                    <input type="radio" name="experience" value="{{ $experience['slug'] }}"
-                                        data-price="{{ $experience['price'] }}" data-hours="{{ $experience['hours'] }}"
+                                    <input type="radio" name="experience" value="{{ $experience->slug }}"
+                                        data-price="{{ $experience->price }}"
+                                        data-minutes="{{ $experience->duration_minutes }}"
+                                        data-max="{{ $experience->max_participants }}"
                                         @checked($loop->first)>
                                     <span class="sh-choice__body">
-                                        <span class="sh-choice__title">{{ $experience['title'] }}</span>
-                                        <span class="sh-choice__meta">{{ $experience['medium'] }}</span>
+                                        <span class="sh-choice__title">{{ $experience->title }}</span>
+                                        <span class="sh-choice__meta">{{ $experience->medium }}</span>
                                     </span>
                                     <span class="sh-choice__price">
-                                        {{ number_format((float) $experience['price']) }}
-                                        <small>BDT &middot; {{ $experience['hours'] }}h</small>
+                                        {{ number_format((float) $experience->price) }}
+                                        <small>BDT &middot; {{ $experience->durationLabel() }}</small>
                                     </span>
                                 </label>
-                            @endforeach
+                            @empty
+                                <p class="sh-choice__empty">
+                                    No sessions are open for reservation at the moment. Please message us
+                                    on WhatsApp and we'll help directly.
+                                </p>
+                            @endforelse
                         </div>
                         <p class="invalid-feedback d-block" id="sh-experience-error" hidden></p>
                     </fieldset>
