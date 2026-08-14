@@ -27,8 +27,10 @@ class RolePermissionSeeder extends Seeder
             'reservations.approve',
             'reservations.decline',
             'reservations.request-info',
+            'reservations.escalate',        // PHASE 10A — Manager hands a decision up
             'reservations.update',
             'reservations.payment-request',
+            'reservations.cancel',          // PHASE 10A — cancel before any payment
             'reservations.cancel-paid',
             'reservations.discount-override',
 
@@ -141,24 +143,33 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         | Manager handles day-to-day reservation operations.
         |
-        | Restricted:
-        | - Payments
-        | - Payment requests
-        | - Voucher management
-        | - Capacity/date configuration
-        | - Workshop management
-        | - System settings
-        | - User management
-        | - Irreversible financial actions
+        | PHASE 10A — the client's escalation rule. Manager prepares a request
+        | and hands the decision up; Admin commits the studio to it. So:
+        |
+        |   REMOVED  reservations.approve   — approval is the commitment
+        |   ADDED    reservations.escalate  — the way to ask for one
+        |   WITHHELD reservations.cancel    — cancelling an approved visit is
+        |                                     equally a decision about a
+        |                                     commitment already made
+        |
+        | Manager keeps reservations.update, which is what lets them fix the
+        | party size and the date/time before handing the request over — that is
+        | the point of the escalation flow rather than an oversight.
+        |
+        | STILL WITH THE CLIENT: reservations.decline. The instruction named
+        | approve and cancel; declining is arguably the same kind of decision
+        | and has been left with Manager only because removing it was not asked
+        | for. If the intent is that Manager escalates EVERY outcome, delete the
+        | line below and nothing else changes.
         */
 
         $manager->syncPermissions([
 
             // Reservations
             'reservations.view',
-            'reservations.approve',
             'reservations.decline',
             'reservations.request-info',
+            'reservations.escalate',
             'reservations.update',
 
             // Visitors

@@ -22,14 +22,12 @@
 
 @section('content')
 
-    {{-- Four numbers, no more. Anything richer is Phase 16's reports. --}}
+    {{-- Four numbers, no more. Anything richer is Phase 16's reports.
+         "Escalated" earns a slot of its own from Phase 10A: it is the queue an
+         Admin is personally responsible for, and it must not hide inside a
+         general pending count. --}}
     <div class="row g-5 mb-5">
-        @foreach ([
-        ['label' => 'Awaiting review', 'value' => $stats['pending'], 'icon' => 'time', 'tone' => 'warning', 'filter' => 'pending'],
-        ['label' => 'Awaiting payment', 'value' => $stats['awaitingPayment'], 'icon' => 'wallet', 'tone' => 'info', 'filter' => 'approved'],
-        ['label' => 'Confirmed ahead', 'value' => $stats['upcoming'], 'icon' => 'calendar-tick', 'tone' => 'success', 'filter' => 'confirmed'],
-        ['label' => 'Requests this month', 'value' => $stats['thisMonth'], 'icon' => 'chart-simple', 'tone' => 'primary', 'filter' => null],
-    ] as $stat)
+        @foreach ([['label' => 'Needing a decision', 'value' => $stats['pending'], 'icon' => 'time', 'tone' => 'warning'], ['label' => 'Escalated to Admin', 'value' => $stats['escalated'], 'icon' => 'arrow-up-right', 'tone' => 'primary'], ['label' => 'Awaiting payment', 'value' => $stats['awaitingPayment'], 'icon' => 'wallet', 'tone' => 'info'], ['label' => 'Confirmed ahead', 'value' => $stats['upcoming'], 'icon' => 'calendar-tick', 'tone' => 'success']] as $stat)
             <div class="col-6 col-xl-3">
                 <div class="card h-100">
                     <div class="card-body d-flex align-items-center py-5">
@@ -68,6 +66,7 @@
 
                 <select id="reservations-status" class="form-select form-select-solid w-auto">
                     <option value="open" @selected($filters['status'] === 'open')>Still open</option>
+                    <option value="needs_decision" @selected($filters['status'] === 'needs_decision')>Needing a decision</option>
                     <option value="all" @selected($filters['status'] === 'all')>Every status</option>
                     @foreach ($statuses as $status)
                         <option value="{{ $status->value }}" @selected($filters['status'] === $status->value)>
@@ -81,6 +80,16 @@
                     @foreach ($workshops as $workshop)
                         <option value="{{ $workshop->id }}" @selected($filters['workshop'] === (string) $workshop->id)>
                             {{ $workshop->title }}
+                        </option>
+                    @endforeach
+                </select>
+
+                {{-- PHASE 10A. Page size, server-side like everything else here.
+                     The table is expected to grow; the browser never holds more
+                     than one page of it. --}}
+                <select id="reservations-per-page" class="form-select form-select-solid w-auto" aria-label="Rows per page">
+                    @foreach ($pageSizes as $size)
+                        <option value="{{ $size }}" @selected($filters['per_page'] === $size)>{{ $size }} per page
                         </option>
                     @endforeach
                 </select>
@@ -99,9 +108,15 @@
 @endsection
 
 @push('modals')
-    {{-- Both filled from their endpoints; empty until then. --}}
+    {{-- Filled from their endpoints; empty until then. --}}
     <div class="modal fade" id="reservation-modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mw-750px">
+        {{-- sh-modal-scroll, NOT Bootstrap's modal-dialog-scrollable. Phase 6
+             established that the latter does not work inside Metronic's layout:
+             it derives the body height from the .modal element through a flex
+             chain, and the wrapping <form> plus Metronic's own rules break that
+             chain, so a long body is clipped instead of scrolled. The helper in
+             admin.css uses vh units, which have no such dependency. --}}
+        <div class="modal-dialog modal-dialog-centered mw-750px sh-modal-scroll sh-modal-scroll--nofoot">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title" id="reservation-modal-title">Reservation</h3>
@@ -114,9 +129,14 @@
         </div>
     </div>
 
+    {{-- Rendered for anyone who can reach the page: which buttons appear inside
+         the drawer is decided per reservation by the policy, so a Manager simply
+         never gets a trigger for an action they cannot take. --}}
+    @include('admin.reservations.partials.decision-modal')
+
     @can('reservations.update')
         <div class="modal fade" id="reservation-edit-modal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mw-650px">
+            <div class="modal-dialog modal-dialog-centered mw-650px sh-modal-scroll">
                 <div class="modal-content">
                     <form id="reservation-form" action="">
                         @csrf

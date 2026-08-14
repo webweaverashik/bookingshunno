@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AvailabilityController;
 use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReservationController;
+use App\Http\Controllers\Admin\ReservationDecisionController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
@@ -26,16 +27,18 @@ Route::prefix('admin')
         /*
         |----------------------------------------------------------------------
         | PHASE 9 — Reservations
+        | PHASE 10 — Approval workflow
         |----------------------------------------------------------------------
         | Bound on the reference code, which is Reservation's route key: an
         | admin pasting SHN-2608-A7K3 from an email lands on the right record,
         | and the sequential id stays out of the URL.
         |
-        | Gated on reservations.view; ReservationPolicy handles the per-action
-        | abilities. Manager holds view and update.
-        |
-        | The approval routes are NOT here. Phase 10 owns approve, decline and
-        | request-more-information, each of which sends an email in Phase 11.
+        | Gated on reservations.view for the whole group; ReservationPolicy
+        | handles every per-action ability, because the decisions each depend on
+        | BOTH a permission and where the reservation currently sits. Route
+        | middleware cannot express the second half, so there is deliberately no
+        | permission middleware on the decision routes — the policy is the gate,
+        | and it is called in the controller.
         */
         Route::prefix('reservations')
             ->name('reservations.')
@@ -50,6 +53,15 @@ Route::prefix('admin')
                     Route::get('{reservation}/slots', [ReservationController::class, 'slots'])->name('slots');
                     Route::post('{reservation}', [ReservationController::class, 'update'])->name('update');
                 });
+
+                // Decisions. Authorised by ReservationPolicy inside the
+                // controller — see the note above.
+                Route::post('{reservation}/approve', [ReservationDecisionController::class, 'approve'])->name('approve');
+                Route::post('{reservation}/escalate', [ReservationDecisionController::class, 'escalate'])->name('escalate');
+                Route::post('{reservation}/decline', [ReservationDecisionController::class, 'decline'])->name('decline');
+                Route::post('{reservation}/request-info', [ReservationDecisionController::class, 'requestInfo'])->name('request-info');
+                Route::post('{reservation}/return-to-review', [ReservationDecisionController::class, 'returnToReview'])->name('return-to-review');
+                Route::post('{reservation}/cancel', [ReservationDecisionController::class, 'cancel'])->name('cancel');
             });
 
         /*
@@ -127,7 +139,6 @@ Route::prefix('admin')
                 });
             });
 
-        // PHASE 10: approve / decline / request-info
         // PHASE 12: payments
         // PHASE 14: vouchers
         // PHASE 16: reports

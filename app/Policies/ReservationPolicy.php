@@ -2,25 +2,26 @@
 
 namespace App\Policies;
 
+use App\Enums\ReservationStatus;
 use App\Models\Auth\User;
 use App\Models\Reservation;
 
 /**
- * PHASE 9 — the register.
+ * Every decision ability asks two questions and both must pass:
  *
- * Deliberately narrow: this class answers "may this person see or correct a
- * reservation", and nothing else. The approval abilities exist as permissions
- * already (reservations.approve, .decline, .request-info) but are not gated
- * here because Phase 10 owns them — and a policy method that returns true for
- * an action nothing implements is a trap for whoever writes that phase.
+ *   1. Does this person hold the permission?
+ *   2. Does the lifecycle allow this move from where the reservation is now?
  *
- * Whether a reservation is editable *at this point in its life* is a different
- * question from whether this person may edit reservations, and it lives on the
- * model as isEditable(). Conflating them would turn "this booking is already
- * paid for" into a bare 403, which tells the admin nothing.
+ * The second is delegated to ReservationStatus::canTransitionTo() rather than
+ * re-listed here. The enum is the single authority on sequencing — restating it
+ * in a policy is how a system ends up with a button that the service then
+ * refuses, which reads to the admin as a bug.
  *
- * Manager holds view and update: they run day-to-day operations and correcting
- * a mistyped participant count should not wait for an Admin.
+ * PHASE 10A: none of these method bodies changed to implement the client's
+ * escalation rule except cancel(). Approval became Admin-only by taking
+ * reservations.approve away from the Manager role in RolePermissionSeeder,
+ * which is where a question about WHO should be answered. That the policy did
+ * not need editing is the sign the permission was named at the right level.
  */
 class ReservationPolicy
 {
@@ -51,5 +52,89 @@ class ReservationPolicy
     public function overrideAvailability(User $user, Reservation $reservation): bool
     {
         return $user->can('availability.update');
+    }
+
+    /**
+     * PHASE 10A — set the total to an agreed figure.
+     *
+     * Admin only, via reservations.discount-override, which already existed for
+     * exactly this and had no user until now. Restricted to reservations that
+     * are still editable: changing the price after the visitor has been sent a
+     * payment link means the link and the record disagree, and Phase 12 owns
+     * what should happen there.
+     */
+    public function setPrice(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.discount-override')
+            && $reservation->isEditable();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Decisions
+    |--------------------------------------------------------------------------
+    */
+
+    public function approve(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.approve')
+            && $reservation->status->canTransitionTo(ReservationStatus::Approved);
+    }
+
+    public function decline(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.decline')
+            && $reservation->status->canTransitionTo(ReservationStatus::Declined);
+    }
+
+    public function requestInfo(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.request-info')
+            && $reservation->status->canTransitionTo(ReservationStatus::InfoRequested);
+    }
+
+    /**
+     * PHASE 10A — hand the decision to an Admin.
+     *
+     * Offered to anyone holding the permission, including an Admin: an Admin
+     * who wants the studio owner rather than themselves to make a particular
+     * call has the same need, and forbidding it would be arbitrary.
+     */
+    public function escalate(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.escalate')
+            && $reservation->status->canTransitionTo(ReservationStatus::Escalated);
+    }
+
+    /**
+     * The counterpart to requestInfo and escalate: the request goes back into
+     * the review queue. Same permission as requesting information — whoever may
+     * take a request out of the queue may put it back.
+     */
+    public function returnToReview(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.request-info')
+            && $reservation->status->canTransitionTo(ReservationStatus::Pending);
+    }
+
+    /**
+     * PHASE 10A — cancelling is now Admin-only at every stage.
+     *
+     * Previously this fell to reservations.update before a payment existed,
+     * which the client has since ruled out. The two permissions are both
+     * Admin-held and stay separate because they are different acts: cancelling
+     * an unpaid request is withdrawing an offer, and cancelling a paid one
+     * obliges somebody to process a refund. Phase 12 will have reason to gate
+     * on the second alone.
+     */
+    public function cancel(User $user, Reservation $reservation): bool
+    {
+        if (! $reservation->status->canTransitionTo(ReservationStatus::Cancelled)) {
+            return false;
+        }
+
+        return $reservation->isMoneyLocked()
+            ? $user->can('reservations.cancel-paid')
+            : $user->can('reservations.cancel');
     }
 }

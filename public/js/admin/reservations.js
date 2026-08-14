@@ -6,8 +6,9 @@
 |
 | Same shape as visitors.js: filters travel as query parameters, the server
 | returns rendered HTML, and one container is swapped. Nothing here builds
-| markup — including the time options, which come back from the server whenever
-| the date changes, because which times exist is an availability decision.
+| markup — including the time options and the decision buttons, both of which
+| come back from the server, because which ones exist is a policy and
+| availability decision rather than a display one.
 */
 (function () {
     'use strict';
@@ -21,6 +22,14 @@
     var status = document.getElementById('reservations-status');
     var range = document.getElementById('reservations-range');
     var workshop = document.getElementById('reservations-workshop');
+    var perPage = document.getElementById('reservations-per-page');
+
+    // Sorting is server-side, so the current sort lives here rather than in the
+    // table. Seeded from the URL so a shared link or a refresh reproduces it.
+    var sortState = (function () {
+        var params = new URLSearchParams(window.location.search);
+        return { sort: params.get('sort') || '', dir: params.get('dir') || '' };
+    })();
 
     var detailModalEl = document.getElementById('reservation-modal');
     var detailBody = document.getElementById('reservation-modal-body');
@@ -31,6 +40,15 @@
     var editBody = document.getElementById('reservation-form-body');
     var editSave = document.getElementById('reservation-save');
     var editTitle = document.getElementById('reservation-edit-title');
+
+    var decisionForm = document.getElementById('reservation-decision-form');
+    var decisionModalEl = document.getElementById('reservation-decision-modal');
+    var decisionTitle = document.getElementById('reservation-decision-title');
+    var decisionPrompt = document.getElementById('reservation-decision-prompt');
+    var decisionNote = document.getElementById('reservation-decision-note');
+    var decisionSave = document.getElementById('reservation-decision-save');
+    var decisionOverrideWrap = document.getElementById('reservation-decision-override-wrap');
+    var decisionOverride = document.getElementById('reservation-decision-override');
 
     // Set when the edit form is opened; used to refresh the time options.
     var slotsUrl = null;
@@ -48,6 +66,9 @@
         if (status) params.set('status', status.value);
         if (range) params.set('range', range.value);
         if (workshop && workshop.value !== 'all') params.set('workshop', workshop.value);
+        if (perPage) params.set('per_page', perPage.value);
+        if (sortState.sort) params.set('sort', sortState.sort);
+        if (sortState.dir) params.set('dir', sortState.dir);
         if (extra && extra.page) params.set('page', extra.page);
 
         return params.toString();
@@ -102,9 +123,15 @@
         });
     }
 
-    [status, range, workshop].forEach(function (select) {
+    [status, range, workshop, perPage].forEach(function (select) {
         if (!select) return;
         select.addEventListener('change', function () {
+            // Changing the date range changes which direction is useful —
+            // upcoming reads forwards, history backwards — so an explicit sort
+            // direction is dropped and the server's default for the new range
+            // applies. An explicit column choice is kept.
+            if (select === range) sortState.dir = '';
+
             loadList();
         });
     });
@@ -114,6 +141,18 @@
        ===================================================================== */
 
     listEl.addEventListener('click', function (event) {
+        // Sort headers. The server rendered them knowing the current sort, so
+        // each one already carries the direction it should produce next.
+        var sortHeader = event.target.closest('[data-sort]');
+
+        if (sortHeader) {
+            event.preventDefault();
+            sortState.sort = sortHeader.dataset.sort;
+            sortState.dir = sortHeader.dataset.dir;
+            loadList();
+            return;
+        }
+
         var link = event.target.closest('[data-reservations-pagination] a.page-link');
 
         if (link) {
@@ -162,6 +201,112 @@
                     '<div class="text-center text-danger py-10">Could not load this reservation.</div>';
                 Shunno.toast('error', error.message);
             });
+    }
+
+    /* =====================================================================
+       Decisions
+       ===================================================================== */
+
+    // The drawer's buttons carry their own wording and rules. Reading them here
+    // rather than hard-coding five variants means the server decides both what
+    // is offered and how it is described.
+    if (detailBody) {
+        detailBody.addEventListener('click', function (event) {
+            var trigger = event.target.closest('[data-action="decide"]');
+            if (!trigger || !decisionForm) return;
+
+            event.preventDefault();
+            openDecision(trigger.dataset);
+        });
+    }
+
+    function openDecision(data) {
+        Shunno.clearErrors(decisionForm);
+
+        decisionForm.action = data.url;
+        decisionForm.dataset.required = data.required;
+
+        decisionTitle.textContent = data.title;
+        decisionPrompt.textContent = data.prompt;
+        decisionNote.value = '';
+        decisionNote.placeholder = data.placeholder || '';
+
+        decisionSave.querySelector('.indicator-label').textContent = data.confirm;
+
+        // Only revealed for an action that says it applies — which today means
+        // approving into a slot that is no longer free, for someone who holds
+        // the ability.
+        var wantsOverride = data.override === '1';
+        decisionOverrideWrap.hidden = !wantsOverride;
+        decisionOverride.checked = false;
+
+        // The confirm button borrows the tone of the button that opened it, so
+        // a destructive decision does not arrive looking routine.
+        decisionSave.className = 'btn ' + (data.tone && data.tone.indexOf('danger') !== -1
+            ? 'btn-danger'
+            : 'btn-primary');
+
+        Shunno.modal(decisionModalEl).show();
+        window.setTimeout(function () { decisionNote.focus(); }, 250);
+    }
+
+    if (decisionForm) {
+        decisionForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            // A local check only; the server requires it again and owns the
+            // wording of the refusal.
+            if (decisionForm.dataset.required === '1' && decisionNote.value.trim() === '') {
+                Shunno.showErrors(decisionForm, { note: ['Please write something here first.'] });
+                decisionNote.focus();
+                return;
+            }
+
+            Shunno.clearErrors(decisionForm);
+            Shunno.busy(decisionSave, true);
+
+            var body = new FormData(decisionForm);
+            body.set('override', decisionOverride.checked ? '1' : '0');
+
+            // Filters travel with the decision so the refreshed list comes back
+            // under the same filters the admin was using — and a request that
+            // has just left the "still open" filter correctly disappears.
+            var query = currentQuery();
+
+            Shunno.request(decisionForm.action + (query ? '?' + query : ''), {
+                method: 'POST',
+                body: body
+            })
+                .then(function (payload) {
+                    listEl.innerHTML = payload.data.list.html;
+                    detailBody.innerHTML = payload.data.detail;
+
+                    Shunno.modal(decisionModalEl).hide();
+                    Shunno.toast('success', payload.message);
+                })
+                .catch(function (error) {
+                    if (error.handled) return;
+
+                    if (error.status === 422) {
+                        Shunno.showErrors(decisionForm, error.errors);
+                        return;
+                    }
+
+                    // 409: somebody else decided it first, or the lifecycle
+                    // refuses the move. Worth a full stop rather than a toast.
+                    if (error.status === 409) {
+                        Shunno.modal(decisionModalEl).hide();
+                        Shunno.toast('warning', error.message);
+                        loadList();
+                        return;
+                    }
+
+                    Shunno.toast('error', error.message);
+                })
+                .then(function () {
+                    Shunno.busy(decisionSave, false);
+                });
+        });
     }
 
     /* =====================================================================
@@ -234,8 +379,6 @@
             var override = editForm.querySelector('[name="override"]');
             body.set('override', override && override.checked ? '1' : '0');
 
-            // Filters travel with the update so the refreshed list comes back
-            // on the same page and under the same filters the admin was using.
             var query = currentQuery();
 
             Shunno.request(editForm.action + (query ? '?' + query : ''), {
@@ -243,7 +386,14 @@
                 body: body
             })
                 .then(function (payload) {
-                    listEl.innerHTML = payload.data.html;
+                    listEl.innerHTML = payload.data.list.html;
+
+                    // The drawer may be open behind the edit modal; keeping it
+                    // in step avoids it showing the pre-edit figures.
+                    if (detailBody && detailBody.innerHTML.trim() !== '') {
+                        detailBody.innerHTML = payload.data.detail;
+                    }
+
                     Shunno.modal(editModalEl).hide();
                     Shunno.toast('success', payload.message);
                 })

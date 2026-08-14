@@ -7,12 +7,14 @@ namespace App\Enums;
  *
  * Backed by strings, never integers: a status you can read in a database client
  * is worth more than the bytes saved, and reordering an int-backed enum
- * silently corrupts every historical row.
+ * silently corrupts every historical row. The column is VARCHAR(32), so adding
+ * a case costs no migration.
  */
 enum ReservationStatus: string
 {
     case Pending          = 'pending';
     case InfoRequested    = 'info_requested';
+    case Escalated        = 'escalated';
     case Approved         = 'approved';
     case Declined         = 'declined';
     case PaymentRequested = 'payment_requested';
@@ -26,6 +28,7 @@ enum ReservationStatus: string
         return match ($this) {
             self::Pending          => 'Pending review',
             self::InfoRequested    => 'Information requested',
+            self::Escalated        => 'Escalated to Admin',
             self::Approved         => 'Approved',
             self::Declined         => 'Declined',
             self::PaymentRequested => 'Payment requested',
@@ -41,6 +44,7 @@ enum ReservationStatus: string
     {
         return match ($this) {
             self::Pending, self::InfoRequested             => 'warning',
+            self::Escalated                                => 'primary',
             self::Approved, self::PaymentRequested         => 'info',
             self::Confirmed, self::Completed               => 'success',
             self::Declined, self::Cancelled, self::NoShow  => 'danger',
@@ -51,13 +55,19 @@ enum ReservationStatus: string
      * Transitions the system permits. ReservationService checks this before it
      * writes, so no sequence of admin clicks can produce a nonsense history.
      *
+     * Escalated sits beside Pending rather than after it: a Manager who cannot
+     * approve moves the request sideways into the Admin's queue, and the Admin
+     * has exactly the same options from there that a Manager had — including
+     * handing it back to the review queue if it turns out not to need them.
+     *
      * @return array<int,self>
      */
     public function allowedNext(): array
     {
         return match ($this) {
-            self::Pending          => [self::InfoRequested, self::Approved, self::Declined, self::Cancelled],
-            self::InfoRequested    => [self::Pending, self::Approved, self::Declined, self::Cancelled],
+            self::Pending          => [self::InfoRequested, self::Escalated, self::Approved, self::Declined, self::Cancelled],
+            self::InfoRequested    => [self::Pending, self::Escalated, self::Approved, self::Declined, self::Cancelled],
+            self::Escalated        => [self::Pending, self::InfoRequested, self::Approved, self::Declined, self::Cancelled],
             self::Approved         => [self::PaymentRequested, self::Declined, self::Cancelled],
             self::PaymentRequested => [self::Confirmed, self::Approved, self::Cancelled],
             self::Confirmed        => [self::Completed, self::NoShow, self::Cancelled],
@@ -73,6 +83,15 @@ enum ReservationStatus: string
     /** Statuses still waiting on someone. Drives the admin dashboard queue. */
     public static function open(): array
     {
-        return [self::Pending, self::InfoRequested, self::Approved, self::PaymentRequested];
+        return [self::Pending, self::InfoRequested, self::Escalated, self::Approved, self::PaymentRequested];
+    }
+
+    /**
+     * Waiting on the studio rather than on the visitor or on a payment. This is
+     * the "somebody here needs to look at this" set.
+     */
+    public static function needingDecision(): array
+    {
+        return [self::Pending, self::InfoRequested, self::Escalated];
     }
 }

@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
+use App\Events\ReservationRequested;
+use App\Events\ReservationStatusChanged;
 use App\Models\Reservation;
 use App\Models\Auth\User;
 use App\Models\VisitPurpose;
@@ -31,7 +33,7 @@ class ReservationService
     {
         $workshop = Workshop::active()->where('slug', $data['experience'])->firstOrFail();
 
-        return DB::transaction(function () use ($data, $workshop, $ip) {
+        $reservation = DB::transaction(function () use ($data, $workshop, $ip) {
             $user    = $this->resolveVisitor($data);
             $pricing = $this->pricing->forWorkshop($workshop, (int) $data['participants']);
 
@@ -83,18 +85,28 @@ class ReservationService
             $user->increment('total_reservations');
             $user->forceFill(['last_reservation_at' => now()])->save();
 
-            // PHASE 11: event(new ReservationRequested($reservation)) sends the
-            // acknowledgement email. Nothing is emailed yet.
-
             return $reservation->fresh(['items', 'purposes', 'user']);
         });
+
+        /*
+        | PHASE 11 — raised AFTER the transaction, deliberately.
+        |
+        | A listener that throws inside the transaction rolls the whole thing
+        | back, which would mean an unreachable mail server silently discarding
+        | a visitor's request. Out here the worst case is a reservation that
+        | exists with no acknowledgement email, which is recoverable and
+        | logged. The listener catches its own failures too — belt and braces,
+        | because this one matters.
+        */
+        ReservationRequested::dispatch($reservation);
+
+        return $reservation;
     }
 
     /**
-     * PHASE 9 — correct the details of a reservation without changing its
-     * status.
+     * Correct the details of a reservation without changing its status.
      *
-     * Three things have to move together and none of them is obvious from the
+     * Four things have to move together and none of them is obvious from the
      * call site, which is why this is not left to the controller:
      *
      *   1. end_time is derived from the workshop's duration, so a new start
@@ -103,9 +115,16 @@ class ReservationService
      *   2. The line item carries its own quantity and line_total. Changing
      *      participants on the reservation alone would leave the item — which
      *      is what a receipt is built from — disagreeing with the total.
-     *   3. Every change is written into the status history. The table is
+     *   3. An agreed price survives a re-price. See below.
+     *   4. Every change is written into the status history. The table is
      *      append-only and from_status equals to_status here, which reads
      *      correctly as "nothing moved, but someone touched this".
+     *
+     * Deliberately raises no event. An edit is not a decision, and emailing a
+     * visitor every time an admin fixes a typo would train them to stop
+     * reading. If the client later wants a "your booking has changed" email,
+     * that is a new event with its own rules about what is worth telling
+     * someone — not a side effect of this method.
      *
      * @param  array<string,mixed>  $changes
      */
@@ -117,8 +136,7 @@ class ReservationService
         bool $overrode = false,
     ): Reservation {
         return DB::transaction(function () use ($reservation, $changes, $actor, $note, $overrode) {
-            $item     = $reservation->items()->first();
-            $workshop = $item?->workshop;
+            $item = $reservation->items()->first();
 
             $summary = [];
 
@@ -155,7 +173,7 @@ class ReservationService
                 // Duration comes from the item's snapshot, not the live
                 // workshop: if the client shortened the session last week, this
                 // booking was still sold at the old length.
-                $minutes = (int) ($item?->duration_minutes ?: $workshop?->duration_minutes ?: 0);
+                $minutes = (int) ($item?->duration_minutes ?: 0);
 
                 $reservation->end_time = $minutes > 0
                     ? date('H:i', strtotime($changes['start_time']) + $minutes * 60)
@@ -187,6 +205,48 @@ class ReservationService
                     'quantity'   => $now,
                     'line_total' => $pricing['subtotal'],
                 ]);
+
+                /*
+                 | The agreed price is deliberately NOT cleared here.
+                 |
+                 | Two bad options and a third: clearing it silently raises the
+                 | bill on a visitor who was promised a figure, and keeping it
+                 | silently leaves a price that no longer matches the party size.
+                 | So it is kept — the agreement was made by a person and only a
+                 | person should revoke it — and the drawer shows the agreed
+                 | figure beside the recalculated one with the gap between them,
+                 | so a stale override is visible rather than merely present.
+                 */
+                if ($reservation->hasManualPrice() && $was !== $now) {
+                    $summary[] = 'agreed price of ' . number_format((float) $reservation->total_override)
+                        . ' left in place and now needs review';
+                }
+            }
+
+            /*
+            |------------------------------------------------------------------
+            | The agreed price itself
+            |------------------------------------------------------------------
+            | Only present in $changes when the caller established the actor may
+            | set it. An empty string means "remove the override and go back to
+            | the price list", which needs to be distinguishable from "not
+            | submitted", hence array_key_exists rather than isset.
+            */
+            if (array_key_exists('total_override', $changes)) {
+                $new = $changes['total_override'] === null ? null : (float) $changes['total_override'];
+                $old = $reservation->total_override === null ? null : (float) $reservation->total_override;
+
+                if ($new !== $old) {
+                    $summary[] = $new === null
+                        ? 'agreed price removed, back to ' . number_format($reservation->calculatedTotal())
+                        : 'price set to ' . number_format($new)
+                            . ' (calculated ' . number_format($reservation->calculatedTotal()) . ')';
+                }
+
+                $reservation->total_override        = $new;
+                $reservation->total_override_reason = $new === null
+                    ? null
+                    : ($changes['total_override_reason'] ?? null);
             }
 
             $reservation->save();
@@ -243,7 +303,7 @@ class ReservationService
             );
         }
 
-        return DB::transaction(function () use ($reservation, $from, $to, $actor, $note) {
+        $reservation = DB::transaction(function () use ($reservation, $from, $to, $actor, $note) {
             $reservation->status = $to;
 
             match ($to) {
@@ -268,6 +328,21 @@ class ReservationService
 
             return $reservation;
         });
+
+        /*
+        | PHASE 11 — outside the transaction, for the same reason as above.
+        |
+        | A decline is recorded the moment it is made. Whether the email
+        | announcing it went out is a separate question, and a mail failure must
+        | not undo the decision an admin has already been told succeeded.
+        |
+        | The note travels with the event rather than being read back from the
+        | history: the listener would otherwise have to guess which row it
+        | wanted, and two changes in the same second would make that a coin toss.
+        */
+        ReservationStatusChanged::dispatch($reservation, $from, $to, $actor, $note);
+
+        return $reservation;
     }
 
     /**

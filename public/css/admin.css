@@ -60,6 +60,10 @@ html[data-bs-theme="dark"] table.ashik-table tbody tr:hover {
       overscroll-behavior: contain;
 }
 
+.sh-modal-scroll--nofoot .modal-body {
+      max-height: calc(100vh - 10rem);
+}
+
 /* Select2 replaces the native control, so the invalid state has to be
    mirrored onto the rendered element. */
 .is-invalid+.select2-container .select2-selection {

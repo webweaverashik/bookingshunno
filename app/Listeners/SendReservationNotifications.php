@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Listeners;
+
+use App\Enums\ReservationMailKind;
+use App\Events\ReservationRequested;
+use App\Events\ReservationStatusChanged;
+use App\Mail\ReservationNotificationMail;
+use App\Models\Auth\User;
+use App\Models\Reservation;
+use App\Services\SettingsRepository;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
+
+/**
+ * PHASE 11 — turns reservation events into email.
+ *
+ * Deliberately NOT ShouldQueue itself. Everything it does is decide who gets
+ * what and hand a queued Mailable to the queue, which is cheap; queueing the
+ * listener as well would put a job on the queue whose only purpose is to put
+ * another job on the queue.
+ *
+ * Every send is wrapped. A mail failure must never propagate back into the
+ * request that caused it: an approval that is already in the database has
+ * happened, and turning it into a 500 would leave the admin thinking it had
+ * not. Failures are logged loudly enough to find.
+ *
+ * REGISTRATION: Laravel discovers listeners in app/Listeners automatically by
+ * the event type-hinted on their handle methods. If event discovery is ever
+ * turned off, register these two explicitly in a service provider:
+ *
+ *     Event::listen(ReservationRequested::class, [SendReservationNotifications::class, 'handleRequested']);
+ *     Event::listen(ReservationStatusChanged::class, [SendReservationNotifications::class, 'handleStatusChanged']);
+ */
+class SendReservationNotifications
+{
+    public function __construct(private readonly SettingsRepository $settings)
+    {
+    }
+
+    public function handleRequested(ReservationRequested $event): void
+    {
+        $this->sendToVisitor($event->reservation, ReservationMailKind::Received);
+    }
+
+    public function handleStatusChanged(ReservationStatusChanged $event): void
+    {
+        $kind = ReservationMailKind::forStatus($event->to);
+
+        if (! $kind) {
+            return;
+        }
+
+        // Returning a request to the review queue also lands on a status, but
+        // it is an internal tidy-up and the visitor has no reason to hear about
+        // it. forStatus() already returns null for Pending; this guard exists
+        // for the case a later phase gives Pending a template and forgets.
+        if ($kind->isInternal()) {
+            $this->sendToStaff($event->reservation, $kind, $event->note);
+
+            return;
+        }
+
+        $this->sendToVisitor($event->reservation, $kind, $event->note);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Internals
+    |--------------------------------------------------------------------------
+    */
+
+    private function sendToVisitor(Reservation $reservation, ReservationMailKind $kind, ?string $note = null): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        $email = $reservation->user?->email;
+
+        if (! $email) {
+            Log::warning('Reservation notification skipped: no visitor email.', [
+                'reservation' => $reservation->reference_code,
+                'kind'        => $kind->value,
+            ]);
+
+            return;
+        }
+
+        $this->dispatch($email, $reservation, $kind, $note);
+    }
+
+    /**
+     * Internal notifications go to every Admin.
+     *
+     * No assignee, because an escalation is not addressed to a person — the
+     * client's rule is that an Admin decides, not that a particular Admin does.
+     * Inactive accounts are excluded so a departed owner's address does not
+     * keep receiving studio business.
+     */
+    private function sendToStaff(Reservation $reservation, ReservationMailKind $kind, ?string $note = null): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        $recipients = User::query()
+            // 'Admin' as a literal, matching User::isAdmin() and the role
+            // middleware. There is no ROLE_ADMIN constant on User — only
+            // ROLE_VISITOR — and inventing one here would leave two spellings
+            // of the same role in the codebase.
+            ->role('Admin')
+            ->where('is_active', true)
+            ->pluck('email')
+            ->filter()
+            ->all();
+
+        if ($recipients === []) {
+            Log::warning('Escalation notification had no active Admin to send to.', [
+                'reservation' => $reservation->reference_code,
+            ]);
+
+            return;
+        }
+
+        $this->dispatch($recipients, $reservation, $kind, $note);
+    }
+
+    /**
+     * @param  string|array<int,string>  $to
+     */
+    private function dispatch(string|array $to, Reservation $reservation, ReservationMailKind $kind, ?string $note): void
+    {
+        try {
+            Mail::to($to)->queue(new ReservationNotificationMail($reservation, $kind, $note));
+        } catch (Throwable $e) {
+            // Reached when the queue itself is unreachable, or when
+            // QUEUE_CONNECTION=sync and the mail transport fails. Either way the
+            // reservation is already saved and the admin has been told it
+            // worked, which it did — only the email did not.
+            Log::error('Reservation notification failed to dispatch.', [
+                'reservation' => $reservation->reference_code,
+                'kind'        => $kind->value,
+                'error'       => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * A single switch that silences every outbound notification.
+     *
+     * Exists for two real situations: restoring a production database into
+     * staging, where sending is actively harmful, and the first days of go-live
+     * when the client may want the workflow running before the wording is
+     * signed off.
+     */
+    private function enabled(): bool
+    {
+        return (bool) $this->settings->get('notifications.enabled', true);
+    }
+}

@@ -38,6 +38,7 @@ class Reservation extends Model
             'subtotal'        => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'total_amount'    => 'decimal:2',
+            'total_override'  => 'decimal:2',
             'approved_at'     => 'datetime',
             'declined_at'     => 'datetime',
             'confirmed_at'    => 'datetime',
@@ -91,6 +92,12 @@ class Reservation extends Model
         return $query->where('status', ReservationStatus::Pending);
     }
 
+    /** Everything waiting on somebody here — the real "to do" count. */
+    public function scopeNeedingDecision(Builder $query): Builder
+    {
+        return $query->whereIn('status', array_column(ReservationStatus::needingDecision(), 'value'));
+    }
+
     public function scopeOnDate(Builder $query, string $date): Builder
     {
         return $query->whereDate('reserved_date', $date);
@@ -99,6 +106,10 @@ class Reservation extends Model
     /**
      * Seats already committed on a date. Anything still open counts — a slot
      * held for someone awaiting payment is not free.
+     *
+     * Escalated is NOT here, for the same reason Pending is not: an undecided
+     * request holds nothing. Adding it would let a queue of unanswered requests
+     * close the studio to everyone else.
      */
     public function scopeHoldingCapacity(Builder $query): Builder
     {
@@ -110,7 +121,7 @@ class Reservation extends Model
     }
 
     /**
-     * PHASE 9. The admin register's search box.
+     * The admin register's search box.
      *
      * Reference first and exactly, because that is what a visitor reads out
      * over the phone and a LIKE on it would put SHN-2608-A7K3 behind three
@@ -147,7 +158,7 @@ class Reservation extends Model
     }
 
     /**
-     * PHASE 9 DECISION — whether the visit itself may still be corrected.
+     * Whether the visit itself may still be corrected.
      *
      * Up to and including Approved, the date, time and party size are just
      * details of a request and fixing a typo costs nothing. From
@@ -164,6 +175,7 @@ class Reservation extends Model
         return in_array($this->status, [
             ReservationStatus::Pending,
             ReservationStatus::InfoRequested,
+            ReservationStatus::Escalated,
             ReservationStatus::Approved,
         ], true);
     }
@@ -172,6 +184,49 @@ class Reservation extends Model
     {
         return ! $this->isEditable();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Money
+    |--------------------------------------------------------------------------
+    */
+
+    /** An Admin has agreed a figure that is not the price-list figure. */
+    public function hasManualPrice(): bool
+    {
+        return $this->total_override !== null;
+    }
+
+    /** What the price list says, ignoring any agreed figure. */
+    public function calculatedTotal(): float
+    {
+        return (float) $this->subtotal - (float) $this->discount_amount;
+    }
+
+    /** What will actually be charged. */
+    public function payableTotal(): float
+    {
+        return $this->hasManualPrice()
+            ? (float) $this->total_override
+            : (float) $this->total_amount;
+    }
+
+    /**
+     * How far the agreed figure sits from the calculated one. Negative is a
+     * discount, positive a surcharge. Shown next to the price so nobody has to
+     * work it out, and so a stale override after a party-size change is
+     * obvious rather than merely present.
+     */
+    public function manualPriceDelta(): float
+    {
+        return $this->payableTotal() - $this->calculatedTotal();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Convenience
+    |--------------------------------------------------------------------------
+    */
 
     /** The session booked. Nullable only if a line item was never written. */
     public function workshop(): ?Workshop

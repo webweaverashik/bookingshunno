@@ -2,12 +2,21 @@
     The full record, rendered server-side and dropped into the drawer. HTML
     rather than JSON so status badges, money and dates keep the same Blade
     formatting as every other screen.
+
+    Decisions are deliberately only available here and not from a list row:
+    approving a request without having read the notes, the party size and the
+    visitor's history is exactly the mistake a one-click row button invites.
 --}}
 
 @php
+    use App\Enums\ReservationStatus;
+
     $item = $reservation->items->first();
     $start = \Carbon\CarbonImmutable::createFromTimeString($reservation->start_time);
     $end = \Carbon\CarbonImmutable::createFromTimeString($reservation->end_time);
+
+    $canOverride = auth()->user()->can('overrideAvailability', $reservation);
+    $escalation = $reservation->statusHistory->firstWhere('to_status', ReservationStatus::Escalated);
 @endphp
 
 <div class="d-flex align-items-start flex-wrap gap-3 mb-6">
@@ -27,6 +36,51 @@
         @endif
     </div>
 </div>
+
+{{-- PHASE 10A. An escalated request is waiting on a specific person's
+     judgement, and the reason it was escalated is the most important thing on
+     the screen for whoever opens it next. --}}
+@if ($reservation->status === ReservationStatus::Escalated)
+    <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
+        <i class="ki-outline ki-arrow-up-right fs-2 text-primary me-3"></i>
+        <div class="fs-7 text-gray-700">
+            <strong>Waiting on an Admin decision.</strong>
+            @if ($escalation)
+                <div class="mt-1">{{ $escalation->note }}</div>
+                <div class="text-muted fs-8 mt-1">
+                    Escalated by {{ $escalation->actorName() }},
+                    {{ $escalation->created_at->diffForHumans() }}
+                </div>
+            @endif
+        </div>
+    </div>
+@endif
+
+{{-- Live availability verdict. Only shown while the request is undecided —
+     re-checking a declined one tells nobody anything, and a confirmed one would
+     flag its own seats as a conflict with itself. --}}
+@if ($availability['checked'] && !$availability['ok'])
+    <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-4 mb-5">
+        <i class="ki-outline ki-information-5 fs-2 text-danger me-3"></i>
+        <div class="fs-7 text-gray-700">
+            <strong>This slot is no longer available.</strong>
+            {{ $availability['reason'] }}
+            <div class="text-muted fs-8 mt-1">
+                Move the booking with Edit, or
+                @if ($canOverride)
+                    approve it anyway if that is deliberate.
+                @else
+                    escalate it — an Admin can approve it regardless.
+                @endif
+            </div>
+        </div>
+    </div>
+@elseif ($availability['checked'])
+    <div class="d-flex align-items-center text-success fs-8 mb-5">
+        <i class="ki-outline ki-check-circle fs-4 me-2"></i>
+        The slot is still free for this party size.
+    </div>
+@endif
 
 {{-- ================= Visit ================= --}}
 <div class="border border-gray-300 border-dashed rounded p-4 mb-5">
@@ -97,7 +151,8 @@
 
         @if ($reservation->user)
             <div class="text-end">
-                <span class="badge {{ $reservation->user->total_reservations > 1 ? 'badge-light-success' : 'badge-light' }}">
+                <span
+                    class="badge {{ $reservation->user->total_reservations > 1 ? 'badge-light-success' : 'badge-light' }}">
                     {{ $reservation->user->total_reservations }}
                     {{ Str::plural('request', $reservation->user->total_reservations) }}
                 </span>
@@ -130,10 +185,44 @@
 
     <div class="separator separator-dashed my-3"></div>
 
-    <div class="d-flex justify-content-between">
-        <span class="fw-bold text-gray-800">Reservation total</span>
-        <span class="fw-bold text-gray-900 fs-5">BDT {{ number_format((float) $reservation->total_amount) }}</span>
-    </div>
+    @if ($reservation->hasManualPrice())
+        {{-- PHASE 10A. Both figures, always, and the gap between them. A single
+             number here would make an agreed price indistinguishable from the
+             price list — and would hide an override left stale by a later
+             change to the party size, which amend() deliberately does not
+             clear on the visitor's behalf. --}}
+        <div class="d-flex justify-content-between fs-7 mb-1">
+            <span class="text-muted">Calculated total</span>
+            <span class="text-muted text-decoration-line-through">
+                BDT {{ number_format($reservation->calculatedTotal()) }}
+            </span>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <span class="fw-bold text-gray-800 d-block">Agreed price</span>
+                <span class="text-muted fs-8">{{ $reservation->total_override_reason }}</span>
+            </div>
+            <div class="text-end">
+                <span class="fw-bold text-gray-900 fs-5 d-block">
+                    BDT {{ number_format($reservation->payableTotal()) }}
+                </span>
+                @if (abs($reservation->manualPriceDelta()) >= 0.01)
+                    <span class="fs-8 text-{{ $reservation->manualPriceDelta() < 0 ? 'success' : 'warning' }}">
+                        {{ $reservation->manualPriceDelta() < 0 ? '&minus;' : '+' }}
+                        BDT {{ number_format(abs($reservation->manualPriceDelta())) }}
+                    </span>
+                @endif
+            </div>
+        </div>
+    @else
+        <div class="d-flex justify-content-between">
+            <span class="fw-bold text-gray-800">Reservation total</span>
+            <span class="fw-bold text-gray-900 fs-5">
+                BDT {{ number_format((float) $reservation->total_amount) }}
+            </span>
+        </div>
+    @endif
 
     {{-- Payment figures deliberately absent until Phase 12 builds them. An
          empty "Paid: BDT 0" row would read as a fact rather than a gap. --}}
@@ -145,7 +234,7 @@
 {{-- ================= History ================= --}}
 <div class="fw-bold text-gray-800 mb-3">History</div>
 
-<div class="timeline">
+<div class="timeline mb-5">
     @forelse ($reservation->statusHistory as $entry)
         <div class="d-flex align-items-start mb-4">
             <span class="bullet bullet-vertical bg-{{ $entry->to_status->colour() }} h-40px me-4 mt-1"></span>
@@ -174,3 +263,132 @@
         <p class="text-muted fs-7">No history recorded.</p>
     @endforelse
 </div>
+
+{{-- ================= Decisions ================= --}}
+@php
+    /*
+     | Every button is gated by the policy, which asks both "may this person"
+     | and "does the lifecycle allow it from here". A Manager sees Escalate
+     | where an Admin sees Approve, because approval now needs
+     | reservations.approve and Manager no longer holds it.
+     |
+     | data-* carries what the shared decision modal needs. The JavaScript sets
+     | text and a form action from these; it does not build markup.
+     */
+    $actions = collect([
+        [
+            'ability' => 'approve',
+            'url' => route('admin.reservations.approve', $reservation),
+            'label' => 'Approve',
+            'icon' => 'check-circle',
+            'class' => 'btn-success',
+            'title' => 'Approve this request?',
+            'prompt' => 'Anything worth recording? (optional)',
+            'placeholder' => 'Confirmed the group size by phone',
+            'confirm' => 'Approve',
+            'required' => false,
+            'override' => $canOverride && $availability['checked'] && !$availability['ok'],
+        ],
+        [
+            'ability' => 'escalate',
+            'url' => route('admin.reservations.escalate', $reservation),
+            'label' => 'Escalate to Admin',
+            'icon' => 'arrow-up-right',
+            'class' => 'btn-primary',
+            'title' => 'Send this to an Admin?',
+            'prompt' => 'What does the Admin need to decide? They have not spoken to the visitor.',
+            'placeholder' => 'Group of 14 wants the pottery session on a Friday — needs a price and a staffing call',
+            'confirm' => 'Escalate',
+            'required' => true,
+            'override' => false,
+        ],
+        [
+            'ability' => 'requestInfo',
+            'url' => route('admin.reservations.request-info', $reservation),
+            'label' => 'Request more information',
+            'icon' => 'message-question',
+            'class' => 'btn-light-warning',
+            'title' => 'What do you need from the visitor?',
+            'prompt' => 'This message is what they will be asked for.',
+            'placeholder' => 'Could you confirm how many of the group are children?',
+            'confirm' => 'Send request',
+            'required' => true,
+            'override' => false,
+        ],
+        [
+            'ability' => 'returnToReview',
+            'url' => route('admin.reservations.return-to-review', $reservation),
+            'label' => 'Back to review queue',
+            'icon' => 'arrow-circle-left',
+            'class' => 'btn-light-primary',
+            'title' => 'Put this back in the queue?',
+            'prompt' => 'What changed? (optional)',
+            'placeholder' => 'Visitor replied: four adults, no children',
+            'confirm' => 'Return to queue',
+            'required' => false,
+            'override' => false,
+        ],
+        [
+            'ability' => 'decline',
+            'url' => route('admin.reservations.decline', $reservation),
+            'label' => 'Decline',
+            'icon' => 'cross-circle',
+            'class' => 'btn-light-danger',
+            'title' => 'Decline this request?',
+            'prompt' => 'Reason. The visitor will be told this.',
+            'placeholder' => 'The studio is closed that week for an exhibition install',
+            'confirm' => 'Decline',
+            'required' => true,
+            'override' => false,
+        ],
+        [
+            'ability' => 'cancel',
+            'url' => route('admin.reservations.cancel', $reservation),
+            'label' => 'Cancel',
+            'icon' => 'trash',
+            'class' => 'btn-light-danger',
+            'title' => 'Cancel this reservation?',
+            'prompt' => 'Why is it being cancelled?',
+            'placeholder' => 'Visitor called to cancel',
+            'confirm' => 'Cancel reservation',
+            'required' => true,
+            'override' => false,
+        ],
+    ])->filter(fn($action) => auth()->user()->can($action['ability'], $reservation));
+@endphp
+
+@if ($actions->isNotEmpty())
+    <div class="separator my-5"></div>
+
+    <div class="fw-bold text-gray-800 mb-1">Decision</div>
+    <div class="text-muted fs-8 mb-4">
+        {{-- PHASE 11 replaced the "nothing is emailed yet" warning that stood
+             here. Saying which decisions write to whom is worth the line: an
+             admin about to type a decline reason should know the visitor is
+             going to read it. --}}
+        Approving, declining, cancelling and asking for information all email the visitor. Escalating
+        emails the Admins instead. Whatever you write below goes into that email.
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        @foreach ($actions as $action)
+            <button type="button" class="btn btn-sm {{ $action['class'] }}" data-action="decide"
+                data-url="{{ $action['url'] }}" data-title="{{ $action['title'] }}"
+                data-prompt="{{ $action['prompt'] }}" data-placeholder="{{ $action['placeholder'] }}"
+                data-confirm="{{ $action['confirm'] }}" data-required="{{ $action['required'] ? '1' : '0' }}"
+                data-override="{{ $action['override'] ? '1' : '0' }}" data-tone="{{ $action['class'] }}">
+                <i class="ki-outline ki-{{ $action['icon'] }} fs-5"></i>
+                {{ $action['label'] }}
+            </button>
+        @endforeach
+    </div>
+@else
+    <div class="separator my-5"></div>
+    <div class="text-muted fs-7">
+        @if ($reservation->status->allowedNext() === [])
+            {{ $reservation->status->label() }} is a closed state — there is nothing further to decide here.
+        @else
+            You do not have the permissions to decide this one. An Admin does.
+        @endif
+    </div>
+@endif

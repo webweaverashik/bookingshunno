@@ -32,6 +32,20 @@ class SettingSeeder extends Seeder
             ['key' => 'availability.min_lead_hours',     'value' => '24',  'type' => 'integer', 'group' => 'availability', 'label' => 'Minimum notice (hours)'],
             ['key' => 'availability.max_advance_days',   'value' => '120', 'type' => 'integer', 'group' => 'availability', 'label' => 'How far ahead visitors may book (days)'],
             ['key' => 'availability.slot_step_minutes',  'value' => '30',  'type' => 'integer', 'group' => 'availability', 'label' => 'Start times every (minutes)'],
+
+            /*
+             | PHASE 11 — notifications
+             |
+             | Ships ON, because a reservation system that silently tells nobody
+             | anything is worse than one that occasionally sends a clumsy email.
+             |
+             | Turn it OFF for two real situations: a production database
+             | restored into staging, where sending is actively harmful, and the
+             | first days of go-live if the client wants the workflow running
+             | while the wording is still being agreed. It silences EVERY
+             | outbound reservation email, including the ones to staff.
+             */
+            ['key' => 'notifications.enabled',           'value' => '1',   'type' => 'boolean', 'group' => 'notifications', 'label' => 'Send reservation emails'],
         ];
 
         foreach ($settings as $setting) {
