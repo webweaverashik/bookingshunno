@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AvailabilityController;
 use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
@@ -21,6 +22,35 @@ Route::prefix('admin')
             clearServerCache();
             return response()->json(['success' => true]);
         })->name('clear.cache');
+
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 9 — Reservations
+        |----------------------------------------------------------------------
+        | Bound on the reference code, which is Reservation's route key: an
+        | admin pasting SHN-2608-A7K3 from an email lands on the right record,
+        | and the sequential id stays out of the URL.
+        |
+        | Gated on reservations.view; ReservationPolicy handles the per-action
+        | abilities. Manager holds view and update.
+        |
+        | The approval routes are NOT here. Phase 10 owns approve, decline and
+        | request-more-information, each of which sends an email in Phase 11.
+        */
+        Route::prefix('reservations')
+            ->name('reservations.')
+            ->middleware('permission:reservations.view')
+            ->group(function () {
+                Route::get('/', [ReservationController::class, 'index'])->name('index');
+                Route::get('list', [ReservationController::class, 'list'])->name('list');
+                Route::get('{reservation}', [ReservationController::class, 'show'])->name('show');
+
+                Route::middleware('permission:reservations.update')->group(function () {
+                    Route::get('{reservation}/edit', [ReservationController::class, 'edit'])->name('edit');
+                    Route::get('{reservation}/slots', [ReservationController::class, 'slots'])->name('slots');
+                    Route::post('{reservation}', [ReservationController::class, 'update'])->name('update');
+                });
+            });
 
         /*
         |----------------------------------------------------------------------
@@ -97,6 +127,7 @@ Route::prefix('admin')
                 });
             });
 
+        // PHASE 10: approve / decline / request-info
         // PHASE 12: payments
         // PHASE 14: vouchers
         // PHASE 16: reports

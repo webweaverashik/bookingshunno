@@ -37,13 +37,16 @@
                     <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Reservations</span>
                     </div>
                 </div>
-
-                <div class="menu-item">
-                    <span class="menu-link text-muted">
-                        <span class="menu-icon"><i class="ki-outline ki-calendar-8 fs-2"></i></span>
-                        <span class="menu-title">Reservations</span>
-                    </span>
-                </div>
+                @can('reservations.view')
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.reservations.*') ? 'active' : '' }}"
+                            href="{{ route('admin.reservations.index') }}">
+                            <span class="menu-icon"><i class="ki-outline ki-calendar-8 fs-2"></i></span>
+                            <span class="menu-title">Reservations</span>
+                        </a>
+                    </div>
+                @endcan
+                
                 <div class="menu-item">
                     <a class="menu-link {{ request()->routeIs('admin.visitors.*') ? 'active' : '' }}"
                         href="{{ route('admin.visitors.index') }}">
