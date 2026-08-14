@@ -9,6 +9,15 @@
  *
  * The server remains the authority on the slot rules, the pricing and the
  * validation. All of this only makes the form feel immediate.
+ *
+ * PHASE 7C changes:
+ *   - the native date input is replaced by ShunnoDatePicker, so closed days and
+ *     blocked dates are greyed rather than accepted and then refused;
+ *   - the participants field is bounded by the chosen session's own maximum,
+ *     not a hard-coded 30;
+ *   - availability lookups are debounced and sent with no-store, so a fiddling
+ *     visitor no longer fires a request per keystroke and never reads a stale
+ *     answer from cache.
  */
 (function () {
     'use strict';
@@ -110,9 +119,15 @@
     var modal = ShunnoModal(root);
 
     var el = {
-        date: document.getElementById('sh-date'),
+        date: document.getElementById('sh-date'),                 // hidden, carries Y-m-d
+        dateTrigger: document.getElementById('sh-date-trigger'),
+        dateLabel: document.getElementById('sh-date-label'),
+        datePanel: document.getElementById('sh-date-cal'),
+        dateError: document.getElementById('sh-date-error'),
         time: document.getElementById('sh-time'),
         people: document.getElementById('sh-participants'),
+        peopleHelp: document.getElementById('sh-participants-help'),
+        peopleError: document.getElementById('sh-participants-error'),
         submit: document.getElementById('sh-submit'),
         spinner: document.querySelector('#sh-submit .sh-spinner'),
         label: document.querySelector('#sh-submit .sh-btn__label'),
@@ -136,11 +151,104 @@
         return form.querySelector('input[name="experience"]:checked');
     }
 
-    // PHASE 7A: start times are no longer baked into the page. Operating hours,
-    // holidays and blocked periods live in the database and the client can
-    // change them, so the list is fetched for the chosen session and date.
-    // The server re-checks all of it on submit regardless.
+    function fetchJson(url) {
+        return fetch(url, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            // Availability is live. Without this a browser may reuse an earlier
+            // answer, which looks exactly like an admin's change to the opening
+            // hours having had no effect.
+            cache: 'no-store'
+        }).then(function (response) {
+            return response.json();
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Date picker
+    // -----------------------------------------------------------------------
+    var picker = window.ShunnoDatePicker({
+        trigger: el.dateTrigger,
+        label: el.dateLabel,
+        input: el.date,
+        panel: el.datePanel,
+        placeholder: 'Choose a date',
+        fetchMonth: function (month) {
+            var experience = chosenExperience();
+            if (!experience) return Promise.reject(new Error('no session'));
+
+            return fetchJson(config.calendar +
+                '?experience=' + encodeURIComponent(experience.value) +
+                '&month=' + encodeURIComponent(month)
+            ).then(function (payload) {
+                if (!payload || !payload.success) throw new Error('unavailable');
+                return payload.data;
+            });
+        },
+        onSelect: function () {
+            el.dateTrigger.classList.remove('is-invalid');
+            if (el.dateError) el.dateError.textContent = '';
+            refreshSlots();
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // Group size
+    // -----------------------------------------------------------------------
+    // The ceiling is the session's own max_participants, capped by the
+    // site-wide limit. Enforced again by AvailabilityService::check() on
+    // submit — this only saves the visitor a round trip.
+    function limitsFor(experience) {
+        var max = parseInt(experience && experience.dataset.max, 10);
+        var min = parseInt(experience && experience.dataset.min, 10);
+
+        return {
+            min: isFinite(min) && min > 0 ? min : 1,
+            max: isFinite(max) && max > 0 ? Math.min(max, config.ceiling) : config.ceiling
+        };
+    }
+
+    function applyPeopleLimits(clamp) {
+        var experience = chosenExperience();
+        if (!experience) return;
+
+        var limits = limitsFor(experience);
+        var value = parseInt(el.people.value, 10);
+
+        el.people.min = limits.min;
+        el.people.max = limits.max;
+
+        if (el.peopleHelp) {
+            el.peopleHelp.textContent = 'Up to ' + limits.max + ' for this session. ' +
+                config.discount.min + ' or more gets ' + config.discount.percent + '% off.';
+        }
+
+        // Clamped on a session change, where the number is no longer the
+        // visitor's fault; flagged rather than rewritten while they are typing.
+        if (clamp && isFinite(value) && value > limits.max) {
+            el.people.value = limits.max;
+            value = limits.max;
+        }
+
+        var over = isFinite(value) && value > limits.max;
+        var under = isFinite(value) && value < limits.min;
+
+        el.people.classList.toggle('is-invalid', over || under);
+
+        if (el.peopleError) {
+            el.peopleError.textContent = over
+                ? 'This session takes up to ' + limits.max + ' people. Message us for a larger group.'
+                : (under ? 'This session runs for ' + limits.min + ' people or more.' : '');
+        }
+
+        return !(over || under);
+    }
+
+    // -----------------------------------------------------------------------
+    // Slots
+    // -----------------------------------------------------------------------
     var slotRequest = 0;
+    var slotTimer = null;
 
     function setTimeOptions(slots, placeholder) {
         el.time.innerHTML = '';
@@ -177,9 +285,16 @@
         return '';
     }
 
+    // Debounced: changing the session reloads the calendar and the slots at
+    // once, and a visitor stepping the participant count fires several changes
+    // in a second. One request per settled state is plenty.
     function refreshSlots() {
+        window.clearTimeout(slotTimer);
+        slotTimer = window.setTimeout(loadSlots, 120);
+    }
+
+    function loadSlots() {
         var experience = chosenExperience();
-        var dateError = document.getElementById('sh-date-error');
 
         if (!experience) return;
 
@@ -195,8 +310,7 @@
             + '?experience=' + encodeURIComponent(experience.value)
             + '&date=' + encodeURIComponent(el.date.value);
 
-        fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
-            .then(function (response) { return response.json(); })
+        fetchJson(url)
             .then(function (payload) {
                 // A slow earlier request must never overwrite a newer answer.
                 if (ticket !== slotRequest) return;
@@ -208,11 +322,11 @@
 
                 var data = payload.data;
 
-                el.date.classList.toggle('is-invalid', !data.open);
-                if (dateError) dateError.textContent = data.open ? '' : (data.message || '');
+                el.dateTrigger.classList.toggle('is-invalid', !data.open);
+                if (el.dateError) el.dateError.textContent = data.open ? '' : (data.message || '');
 
                 if (!data.open) {
-                    setTimeOptions([], 'Closed that day');
+                    setTimeOptions([], 'Not available that day');
                     return;
                 }
 
@@ -266,6 +380,7 @@
         form.querySelectorAll('.is-invalid').forEach(function (node) {
             node.classList.remove('is-invalid');
         });
+        el.dateTrigger.classList.remove('is-invalid');
         form.querySelectorAll('.invalid-feedback').forEach(function (node) {
             node.textContent = '';
             if (node.id === 'sh-experience-error') node.hidden = true;
@@ -283,7 +398,13 @@
 
         Object.keys(errors).forEach(function (field) {
             var key = field.replace(/\.\d+$/, '').replace(/\[\]$/, '');
-            var input = form.querySelector('[name="' + key + '"], [name="' + key + '[]"]');
+
+            // The date input is hidden behind the picker; marking and focusing
+            // it would put the error somewhere nobody can see.
+            var input = key === 'date'
+                ? el.dateTrigger
+                : form.querySelector('[name="' + key + '"], [name="' + key + '[]"]');
+
             var feedback = document.getElementById('sh-' + key + '-error');
             var messages = errors[field];
 
@@ -301,17 +422,33 @@
         else showAlert('Please check the form and try again.');
     }
 
+    // Set once the request has been accepted. The dialog stays on screen
+    // afterwards so the visitor can read their reference, which means the
+    // submit button is still in the DOM and still bound to the form by its
+    // form= attribute — a second Enter press would post the whole thing again
+    // and create a duplicate reservation.
+    var completed = false;
+
     function setBusy(busy) {
-        el.submit.disabled = busy;
+        // `|| completed` matters: setBusy(false) runs in the settle handler
+        // AFTER succeed(), so without it the button was re-enabled a moment
+        // after being retired.
+        el.submit.disabled = busy || completed;
         el.spinner.hidden = !busy;
         el.label.textContent = busy ? 'Sending…' : 'Send request';
     }
 
     function succeed(data) {
+        completed = true;
+
         form.hidden = true;
         el.foot.hidden = true;
         if (el.intro) el.intro.hidden = true;
         el.done.hidden = false;
+
+        // Belt and braces alongside the hidden footer: neither the pointer nor
+        // the keyboard can reach a disabled button.
+        el.submit.disabled = true;
 
         el.doneRef.textContent = data.reference;
         el.doneSummary.textContent = data.experience + ' on ' + data.date + ' at ' + data.time +
@@ -322,7 +459,27 @@
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
+
+        // The request already went through. Nothing on this form should be
+        // able to send a second one.
+        if (completed) return;
+
         clearErrors();
+
+        // Cheap local checks first. Everything here is re-run on the server;
+        // this only avoids spending a submission on an answer we already know.
+        if (!el.date.value) {
+            el.dateTrigger.classList.add('is-invalid');
+            if (el.dateError) el.dateError.textContent = 'Please choose a date.';
+            el.dateTrigger.focus();
+            return;
+        }
+
+        if (applyPeopleLimits(false) === false) {
+            el.people.focus();
+            return;
+        }
+
         setBusy(true);
 
         var token = document.querySelector('meta[name="csrf-token"]');
@@ -334,6 +491,7 @@
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': token ? token.content : ''
             },
+            credentials: 'same-origin',
             body: new FormData(form)
         })
             .then(function (response) {
@@ -348,8 +506,16 @@
                     showErrors(payload.errors);
                     return;
                 }
+                if (response.status === 419) {
+                    showAlert('This page has been open a while and the security token expired. ' +
+                        'Please reload the page and send the request again.');
+                    return;
+                }
                 if (response.status === 429) {
-                    showAlert('That is a lot of requests in a short time. Please wait a moment and try again.');
+                    var wait = parseInt(response.headers.get('Retry-After'), 10);
+                    showAlert('Too many requests from this connection. Please wait ' +
+                        (isFinite(wait) && wait > 0 ? wait + ' seconds' : 'a minute') +
+                        ' and try again.');
                     return;
                 }
                 if (!response.ok || !payload || !payload.success) {
@@ -369,19 +535,29 @@
 
     form.addEventListener('change', function (event) {
         if (event.target.name === 'experience') {
+            // Which days are bookable depends on how long the session runs, so
+            // the cached months are no longer answers to the right question.
+            picker.reload();
+            applyPeopleLimits(true);
             refreshSlots();
             refreshTotal();
         }
-        if (event.target === el.people) refreshTotal();
+        if (event.target === el.people) {
+            applyPeopleLimits(false);
+            refreshTotal();
+            // Only meaningful once capacity enforcement is switched on, but
+            // then a larger group can turn an available slot unavailable.
+            refreshSlots();
+        }
     });
-    el.people.addEventListener('input', refreshTotal);
 
-    // PHASE 7A: the hard-coded Sunday rule is gone. Closed days, holidays and
-    // blocked periods all come back from /availability, which is the same
-    // service the validator uses, so the two can no longer disagree.
-    el.date.addEventListener('change', refreshSlots);
+    el.people.addEventListener('input', function () {
+        applyPeopleLimits(false);
+        refreshTotal();
+    });
 
     root.addEventListener('shunno:shown', function () {
+        applyPeopleLimits(true);
         refreshSlots();
         refreshTotal();
     });
@@ -404,6 +580,7 @@
             window.location.pathname + (query ? '?' + query : '') + window.location.hash);
     }
 
+    applyPeopleLimits(true);
     refreshSlots();
     refreshTotal();
 })();

@@ -75,6 +75,12 @@ class Reservation extends Model
         return $this->hasMany(ReservationStatusHistory::class)->latest('created_at');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereIn('status', array_column(ReservationStatus::open(), 'value'));
@@ -103,8 +109,78 @@ class Reservation extends Model
         ]);
     }
 
+    /**
+     * PHASE 9. The admin register's search box.
+     *
+     * Reference first and exactly, because that is what a visitor reads out
+     * over the phone and a LIKE on it would put SHN-2608-A7K3 behind three
+     * other rows. Everything else falls through to the visitor's own details:
+     * staff search for the person far more often than for the booking.
+     */
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $inner) use ($term) {
+            $inner->where('reference_code', 'like', $term . '%')
+                ->orWhereHas('user', function (Builder $user) use ($term) {
+                    $user->where('name', 'like', '%' . $term . '%')
+                        ->orWhere('email', 'like', '%' . $term . '%')
+                        ->orWhere('phone', 'like', '%' . $term . '%');
+                });
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | State
+    |--------------------------------------------------------------------------
+    */
+
     public function isOpen(): bool
     {
         return in_array($this->status, ReservationStatus::open(), true);
+    }
+
+    /**
+     * PHASE 9 DECISION — whether the visit itself may still be corrected.
+     *
+     * Up to and including Approved, the date, time and party size are just
+     * details of a request and fixing a typo costs nothing. From
+     * PaymentRequested onward there is a figure the visitor has been asked to
+     * pay, and quietly re-pricing underneath that is how a studio ends up
+     * taking the wrong amount of money. Phase 12 owns whatever the correct
+     * answer is there — probably reissuing the payment request — so this stops
+     * short of guessing.
+     *
+     * Notes stay editable at every status; they are not money.
+     */
+    public function isEditable(): bool
+    {
+        return in_array($this->status, [
+            ReservationStatus::Pending,
+            ReservationStatus::InfoRequested,
+            ReservationStatus::Approved,
+        ], true);
+    }
+
+    public function isMoneyLocked(): bool
+    {
+        return ! $this->isEditable();
+    }
+
+    /** The session booked. Nullable only if a line item was never written. */
+    public function workshop(): ?Workshop
+    {
+        return $this->items->first()?->workshop;
+    }
+
+    public function title(): string
+    {
+        return $this->items->first()?->title_snapshot ?? 'Visit';
     }
 }

@@ -1,19 +1,45 @@
 @php
     use App\Models\Workshop;
+    use App\Services\AvailabilityService;
     use App\Services\SettingsRepository;
     use App\Support\VisitPurposes;
 
     $experiences = Workshop::menu();
     $settings = app(SettingsRepository::class);
+    $availability = app(AvailabilityService::class);
+
+    $ceiling = (int) $settings->get('reservation.max_participants', 30);
+
+    /*
+     | PHASE 7C: the copy under the date field used to read "Monday to Saturday.
+     | We're closed on Sundays." — true when it was typed, and silently wrong
+     | from the moment the client edited the hours in the Phase 7B screen. It is
+     | derived from operating_hours now, so the two cannot disagree.
+     */
+    $week = $availability->weekSummary();
+    $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    $closedNames = collect($week['closed_days'])->map(fn(int $day) => $dayNames[$day] . 's');
+    $windowLabel =
+        $week['opens_at'] && $week['closes_at']
+            ? \Carbon\CarbonImmutable::createFromTimeString($week['opens_at'])->format('g:i A') .
+                ' to ' .
+                \Carbon\CarbonImmutable::createFromTimeString($week['closes_at'])->format('g:i A')
+            : null;
+
+    $dateHelp = $closedNames->isEmpty() ? 'Open every day' : 'Closed ' . $closedNames->join(', ', ' and ');
+    $dateHelp .= $windowLabel ? '. Sessions run ' . $windowLabel . '.' : '.';
 
     // Built here rather than inline below: Blade cannot balance a multi-line
     // array inside a directive's parentheses and emits broken PHP.
-$reserveConfig = [
-    'endpoint' => route('reservation.request.store'),
-    'availability' => route('availability'),
-    'discount' => [
-        'min' => (int) $settings->get('group_discount.min_participants', 4),
-        'percent' => (int) $settings->get('group_discount.percentage', 10),
+    $reserveConfig = [
+        'endpoint' => route('reservation.request.store'),
+        'availability' => route('availability'),
+        'calendar' => route('availability.calendar'),
+        'ceiling' => $ceiling,
+        'discount' => [
+            'min' => (int) $settings->get('group_discount.min_participants', 4),
+            'percent' => (int) $settings->get('group_discount.percentage', 10),
         ],
     ];
 @endphp
@@ -54,11 +80,13 @@ $reserveConfig = [
 
                         <div class="sh-choices" role="radiogroup" aria-describedby="sh-experience-error">
                             @forelse ($experiences as $experience)
+                                @php $limits = $availability->participantLimits($experience); @endphp
                                 <label class="sh-choice">
                                     <input type="radio" name="experience" value="{{ $experience->slug }}"
                                         data-price="{{ $experience->price }}"
                                         data-minutes="{{ $experience->duration_minutes }}"
-                                        data-max="{{ $experience->max_participants }}" @checked($loop->first)>
+                                        data-min="{{ $limits['min'] }}" data-max="{{ $limits['max'] }}"
+                                        @checked($loop->first)>
                                     <span class="sh-choice__body">
                                         <span class="sh-choice__title">{{ $experience->title }}</span>
                                         <span class="sh-choice__meta">{{ $experience->medium }}</span>
@@ -83,12 +111,33 @@ $reserveConfig = [
 
                         <div class="sh-grid2">
                             <div>
-                                <label class="form-label" for="sh-date">Preferred date</label>
-                                <input class="form-control" type="date" id="sh-date" name="date"
-                                    min="{{ now()->toDateString() }}" required
-                                    aria-describedby="sh-date-help sh-date-error">
-                                <p class="form-text" id="sh-date-help">Monday to Saturday. We're closed on Sundays.</p>
-                                <p class="invalid-feedback" id="sh-date-error"></p>
+                                {{-- PHASE 7C: <input type="date"> cannot grey out a day, so it
+                                     offered Sundays, blocked holidays and days too short for the
+                                     chosen session, and the visitor learned the truth only on
+                                     submit. The value still posts as `date` in Y-m-d from the
+                                     hidden input; the button is what a person sees. --}}
+                                <label class="form-label" for="sh-date-trigger">Preferred date</label>
+
+                                <div class="sh-datefield">
+                                    <button type="button" class="form-control sh-datefield__trigger is-empty"
+                                        id="sh-date-trigger" aria-haspopup="dialog" aria-expanded="false"
+                                        aria-describedby="sh-date-help sh-date-error">
+                                        <span id="sh-date-label">Choose a date</span>
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                            stroke-linecap="round" aria-hidden="true">
+                                            <rect x="3" y="5" width="18" height="16" rx="2" />
+                                            <path d="M8 3v4M16 3v4M3 10h18" />
+                                        </svg>
+                                    </button>
+
+                                    <input type="hidden" id="sh-date" name="date" value="">
+
+                                    <div class="sh-cal" id="sh-date-cal" role="dialog" aria-label="Choose a date"
+                                        hidden></div>
+                                </div>
+
+                                <p class="form-text" id="sh-date-help">{{ $dateHelp }}</p>
+                                <p class="invalid-feedback d-block" id="sh-date-error"></p>
                             </div>
 
                             <div>
@@ -97,19 +146,22 @@ $reserveConfig = [
                                     aria-describedby="sh-time-help sh-time-error"></select>
                                 <p class="form-text" id="sh-time-help">Times shown are the ones long enough for the
                                     session you picked.</p>
-                                <p class="invalid-feedback" id="sh-time-error"></p>
+                                <p class="invalid-feedback d-block" id="sh-time-error"></p>
                             </div>
 
                             <div>
                                 <label class="form-label" for="sh-participants">How many people?</label>
+                                {{-- max is a starting value only; the script narrows it to the
+                                     chosen session's own limit, and AvailabilityService::check()
+                                     enforces it again on submit. --}}
                                 <input class="form-control" type="number" id="sh-participants" name="participants"
-                                    value="1" min="1" max="30" inputmode="numeric" required
+                                    value="1" min="1" max="{{ $ceiling }}" inputmode="numeric" required
                                     aria-describedby="sh-participants-help sh-participants-error">
                                 <p class="form-text" id="sh-participants-help">
                                     {{ $settings->get('group_discount.min_participants', 4) }} or more gets
                                     {{ $settings->get('group_discount.percentage', 10) }}% off.
                                 </p>
-                                <p class="invalid-feedback" id="sh-participants-error"></p>
+                                <p class="invalid-feedback d-block" id="sh-participants-error"></p>
                             </div>
                         </div>
                     </fieldset>
@@ -218,8 +270,9 @@ $reserveConfig = [
     </div>
 </div>
 
-{{-- Server-generated config the popup needs. Slots are derived per session
-     duration so a 4-hour booking can never be offered an 8pm start.
+{{-- Server-generated config the popup needs. Slots and bookable days are both
+     derived per session duration, so a 4-hour booking can never be offered an
+     8pm start or a day with no room left in it.
      JSON_HEX_TAG stops a stray "</script>" from ever breaking out. --}}
 <script type="application/json" id="sh-reserve-config">
     {!! json_encode($reserveConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}

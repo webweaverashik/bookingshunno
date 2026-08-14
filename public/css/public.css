@@ -2106,3 +2106,422 @@ a {
 body.sh-modal-open {
   overflow: hidden
 }
+
+
+/* =============================================================================
+   PHASE 7C — date picker
+   -----------------------------------------------------------------------------
+   APPEND THIS TO THE END OF public/css/public.css. Nothing above it changes.
+
+   Same palette variables as the rest of the file. No Bootstrap classes are
+   needed here beyond .form-control, which the trigger borrows so it lines up
+   with the other fields in the dialog.
+   ============================================================================= */
+
+.sh-datefield {
+  position: relative;
+}
+
+.sh-datefield__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sh-datefield__trigger.is-empty {
+  color: var(--sh-mute);
+}
+
+.sh-datefield__trigger svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+  color: var(--sh-clay);
+}
+
+.sh-datefield__trigger:focus-visible {
+  outline: none;
+  border-color: var(--sh-cyan);
+  box-shadow: 0 0 0 3px rgba(42, 74, 99, .15);
+}
+
+.sh-datefield__trigger.is-invalid {
+  border-color: #B3261E;
+}
+
+/* --- the panel --------------------------------------------------------- */
+
+.sh-cal {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + .4rem);
+  left: 0;
+  width: min(20rem, calc(100vw - 3rem));
+  padding: .9rem;
+  background: #fff;
+  border: 1px solid var(--sh-line);
+  border-radius: var(--sh-r-sm);
+  box-shadow: 0 18px 40px var(--sh-glow);
+}
+
+.sh-cal[hidden] {
+  display: none;
+}
+
+.sh-cal__state {
+  margin: 0;
+  padding: 2rem .5rem;
+  text-align: center;
+  font-size: .85rem;
+  color: var(--sh-mute);
+}
+
+.sh-cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .6rem;
+}
+
+.sh-cal__month {
+  font-family: var(--sh-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sh-ink);
+}
+
+.sh-cal__nav {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--sh-line);
+  border-radius: 50%;
+  background: var(--sh-cream);
+  color: var(--sh-ink);
+  cursor: pointer;
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.sh-cal__nav:hover:not(:disabled) {
+  border-color: var(--sh-cyan);
+  color: var(--sh-cyan);
+}
+
+.sh-cal__nav:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.sh-cal__weekdays,
+.sh-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.sh-cal__weekdays {
+  margin-bottom: .3rem;
+}
+
+.sh-cal__weekdays span {
+  text-align: center;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--sh-clay);
+}
+
+.sh-cal__blank {
+  aspect-ratio: 1;
+}
+
+.sh-cal__day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--sh-cream);
+  color: var(--sh-ink);
+  font-family: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+.sh-cal__day:hover:not(:disabled) {
+  background: var(--sh-sand);
+  border-color: var(--sh-cyan);
+}
+
+.sh-cal__day:focus-visible {
+  outline: 2px solid var(--sh-cyan);
+  outline-offset: 1px;
+}
+
+.sh-cal__day.is-today {
+  font-weight: 700;
+  border-color: var(--sh-clay);
+}
+
+.sh-cal__day.is-selected {
+  background: var(--sh-cyan);
+  border-color: var(--sh-cyan);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Closed, blocked, or no room left for the chosen session. Struck through
+   rather than merely faded, so it reads as unavailable and not as low
+   contrast. The reason is on the title and the aria-label. */
+.sh-cal__day.is-blocked,
+.sh-cal__day:disabled {
+  background: transparent;
+  color: var(--sh-clay);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.sh-cal__note {
+  margin: .7rem 0 0;
+  font-size: .72rem;
+  line-height: 1.5;
+  color: var(--sh-mute);
+}
+
+.sh-cal__clear {
+  margin-top: .5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: .78rem;
+  color: var(--sh-cyan);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The dialog scrolls; on a short screen an absolutely positioned panel can
+   fall off the bottom. Below this width it opens as a sheet under the field
+   instead, which the dialog can scroll to. */
+@media (max-width: 575.98px) {
+  .sh-cal {
+    position: static;
+    width: 100%;
+    margin-top: .5rem;
+    box-shadow: none;
+  }
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.sh-datefield {
+  position: relative;
+}
+
+.sh-datefield__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.sh-datefield__trigger.is-empty {
+  color: var(--sh-mute);
+}
+
+.sh-datefield__trigger svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+  color: var(--sh-clay);
+}
+
+.sh-datefield__trigger:focus-visible {
+  outline: none;
+  border-color: var(--sh-cyan);
+  box-shadow: 0 0 0 3px rgba(42, 74, 99, .15);
+}
+
+.sh-datefield__trigger.is-invalid {
+  border-color: #B3261E;
+}
+
+/* --- the panel --------------------------------------------------------- */
+
+.sh-cal {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + .4rem);
+  left: 0;
+  width: min(20rem, calc(100vw - 3rem));
+  padding: .9rem;
+  background: #fff;
+  border: 1px solid var(--sh-line);
+  border-radius: var(--sh-r-sm);
+  box-shadow: 0 18px 40px var(--sh-glow);
+}
+
+.sh-cal[hidden] {
+  display: none;
+}
+
+.sh-cal__state {
+  margin: 0;
+  padding: 2rem .5rem;
+  text-align: center;
+  font-size: .85rem;
+  color: var(--sh-mute);
+}
+
+.sh-cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .6rem;
+}
+
+.sh-cal__month {
+  font-family: var(--sh-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sh-ink);
+}
+
+.sh-cal__nav {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--sh-line);
+  border-radius: 50%;
+  background: var(--sh-cream);
+  color: var(--sh-ink);
+  cursor: pointer;
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.sh-cal__nav:hover:not(:disabled) {
+  border-color: var(--sh-cyan);
+  color: var(--sh-cyan);
+}
+
+.sh-cal__nav:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.sh-cal__weekdays,
+.sh-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.sh-cal__weekdays {
+  margin-bottom: .3rem;
+}
+
+.sh-cal__weekdays span {
+  text-align: center;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--sh-clay);
+}
+
+.sh-cal__blank {
+  aspect-ratio: 1;
+}
+
+.sh-cal__day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--sh-cream);
+  color: var(--sh-ink);
+  font-family: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+.sh-cal__day:hover:not(:disabled) {
+  background: var(--sh-sand);
+  border-color: var(--sh-cyan);
+}
+
+.sh-cal__day:focus-visible {
+  outline: 2px solid var(--sh-cyan);
+  outline-offset: 1px;
+}
+
+.sh-cal__day.is-today {
+  font-weight: 700;
+  border-color: var(--sh-clay);
+}
+
+.sh-cal__day.is-selected {
+  background: var(--sh-cyan);
+  border-color: var(--sh-cyan);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Closed, blocked, or no room left for the chosen session. Struck through
+   rather than merely faded, so it reads as unavailable and not as low
+   contrast. The reason is on the title and the aria-label. */
+.sh-cal__day.is-blocked,
+.sh-cal__day:disabled {
+  background: transparent;
+  color: var(--sh-clay);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.sh-cal__note {
+  margin: .7rem 0 0;
+  font-size: .72rem;
+  line-height: 1.5;
+  color: var(--sh-mute);
+}
+
+.sh-cal__clear {
+  margin-top: .5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: .78rem;
+  color: var(--sh-cyan);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The dialog scrolls; on a short screen an absolutely positioned panel can
+   fall off the bottom. Below this width it opens as a sheet under the field
+   instead, which the dialog can scroll to. */
+@media (max-width: 575.98px) {
+  .sh-cal {
+    position: static;
+    width: 100%;
+    margin-top: .5rem;
+    box-shadow: none;
+  }
+}

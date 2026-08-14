@@ -57,6 +57,7 @@
     <x-public.footer />
 
     <script src="{{ asset('js/public.js') }}" defer></script>
+    <script src="{{ asset('js/datepicker.js') }}" defer></script>
     <script src="{{ asset('js/reservation.js') }}" defer></script>
     @stack('scripts')
 </body>

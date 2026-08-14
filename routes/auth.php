@@ -32,13 +32,20 @@ Route::controller(PasswordController::class)
 | Login OTP (two-step verification)
 |--------------------------------------------------------------------------
 | Step 2 of login. The pending user is carried in the guest session, so
-| these stay outside the `auth` middleware. Verify/resend are throttled.
+| these stay outside the `auth` middleware.
+|
+| PHASE 7C: named limiters rather than throttle:10,1 / throttle:5,1. The inline
+| form keys on domain and IP with no route in the key, so these two shared a
+| bucket with the reservation form and with each other — a visitor who had been
+| browsing the public site could arrive at the OTP screen already throttled.
 */
 Route::get('/login/otp', [AuthController::class, 'showOtp'])->name('login.otp');
+
 Route::post('/login/otp', [AuthController::class, 'verifyOtp'])
-    ->middleware('throttle:10,1')->name('login.otp.verify');
+    ->middleware('throttle:otp')->name('login.otp.verify');
+
 Route::post('/login/otp/resend', [AuthController::class, 'resendOtp'])
-    ->middleware('throttle:5,1')->name('login.otp.resend');
+    ->middleware('throttle:otp-resend')->name('login.otp.resend');
 
 /*
 |--------------------------------------------------------------------------
