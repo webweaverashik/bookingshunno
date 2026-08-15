@@ -132,6 +132,14 @@ img {
     letter-spacing: 0.02em;
 }
 
+/* Belt and braces with the height attribute on the img itself — Outlook on
+   Windows ignores CSS dimensions on images, so neither alone is enough. */
+.logo {
+    height: 40px;
+    max-width: 190px;
+    border: none;
+}
+
 /* Body */
 
 .body {

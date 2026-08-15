@@ -50,7 +50,14 @@ body {
     border-bottom: 1px solid var(--pay-line);
 }
 
-.pay-studio { font-weight: 700; letter-spacing: 0.01em; }
+/* Height-constrained, width auto — one file, square or wide. If the image
+   fails, the alt text inherits these weights and still reads as a heading. */
+.pay-logo {
+    height: 40px;
+    width: auto;
+    max-width: 190px;
+    font-weight: 700;
+}
 
 .pay-ref {
     font-size: 12.5px;

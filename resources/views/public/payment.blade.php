@@ -27,7 +27,9 @@
     <main class="pay">
 
         <header class="pay-head">
-            <div class="pay-studio">{{ config('app.name') }}</div>
+            {{-- Logo with the studio name as its alt text, so a blocked or
+                 missing image degrades to the name rather than to nothing. --}}
+            <img src="{{ asset('img/shunno-logo.png') }}" alt="{{ config('app.name') }}" class="pay-logo">
             <div class="pay-ref">{{ $payment->reference }}</div>
         </header>
 

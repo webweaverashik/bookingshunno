@@ -65,9 +65,13 @@ body {
     align-items: flex-start;
 }
 
+/* Constrained on height, not width, so one file works whether the logo is
+   square or a wide wordmark. max-width stops an unexpectedly long one from
+   pushing the receipt reference off the right edge. */
 .slip-mark {
-    width: 44px;
-    height: 44px;
+    height: 46px;
+    width: auto;
+    max-width: 200px;
     object-fit: contain;
 }
 

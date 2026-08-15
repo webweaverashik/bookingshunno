@@ -31,8 +31,12 @@
 
         <header class="slip-head">
             <div class="slip-studio">
-                <img src="{{ asset('img/shunno-mark.png') }}" alt="" class="slip-mark"
-                    onerror="this.style.display='none'">
+                {{-- Height-constrained with auto width so the same file works
+                     whether the logo is square or wide. The onerror keeps a
+                     missing file from leaving a broken-image icon on a document
+                     somebody is about to print. --}}
+                <img src="{{ asset('img/shunno-logo.png') }}" alt="{{ config('app.name') }}"
+                    class="slip-mark" onerror="this.style.display='none'">
                 <div>
                     <div class="slip-studio-name">{{ config('app.name') }}</div>
                     <div class="slip-studio-meta">

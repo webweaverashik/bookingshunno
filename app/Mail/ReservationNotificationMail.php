@@ -50,7 +50,7 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
      *
      *     php artisan vendor:publish --tag=laravel-mail
      */
-    public string $theme = 'shunno';
+    public $theme = 'shunno';
 
     /**
      * @param  string|null  $note  The decision note — the reason for a decline,
