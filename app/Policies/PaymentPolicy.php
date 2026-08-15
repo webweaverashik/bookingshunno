@@ -19,10 +19,11 @@ use App\Models\Payment;
  * "trust a gateway callback" — a genuinely different act from "a human says
  * this money arrived", and one worth being able to grant separately.
  *
- * Manager holds payments.view only, so they reach the register read-only. That
- * is deliberate and useful: whoever is on the floor needs to see whether a
- * visitor arriving tonight has paid, without being able to assert that they
- * have.
+ * PHASE 12C: Manager now holds payments.update-status as well, on the client's
+ * instruction that they may take payment offline. No method here changed — the
+ * seeder answered it, as in 10A and 10B. Manager still cannot approve, decline
+ * or cancel a reservation; recording money that arrived is a fact, not a
+ * decision about whether the studio wants the booking.
  */
 class PaymentPolicy
 {

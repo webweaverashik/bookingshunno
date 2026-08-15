@@ -3,6 +3,8 @@
 namespace App\Mail;
 
 use App\Enums\ReservationMailKind;
+use App\Models\Payment;
+use App\Models\PaymentTransaction;
 use App\Models\Reservation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,6 +38,21 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
     use SerializesModels;
 
     /**
+     * PHASE 12C — the Shunno mail theme.
+     *
+     * Set here rather than in config/mail.php so it applies to reservation mail
+     * only. LoginOtpMail is a functional message that should stay plain, and
+     * anything Laravel itself sends — a failed-job notification, a password
+     * reset — has no business wearing the studio's identity.
+     *
+     * Requires resources/views/vendor/mail/html/themes/shunno.css, which means
+     * the mail views must have been published:
+     *
+     *     php artisan vendor:publish --tag=laravel-mail
+     */
+    public string $theme = 'shunno';
+
+    /**
      * @param  string|null  $note  The decision note — the reason for a decline,
      *                             the question being asked, what the Admin is
      *                             being asked to decide. Passed in rather than
@@ -48,6 +65,24 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
         public Reservation $reservation,
         public ReservationMailKind $kind,
         public ?string $note = null,
+
+        /*
+         | PHASE 12C. Null for every kind except the two payment ones, which
+         | cannot be rendered without it — an amount, a deadline and a link do
+         | not exist on a reservation.
+         |
+         | Optional rather than a second Mailable class because the alternative
+         | is duplicating the envelope, the reply-to rule, the theme and the
+         | queue behaviour, and then keeping two copies of them in step.
+         */
+        public ?Payment $payment = null,
+
+        /*
+         | The specific receipt this email is about. Passed rather than read as
+         | "the latest" at send time: these are queued, and two payments landing
+         | close together would otherwise both link to whichever arrived second.
+         */
+        public ?PaymentTransaction $transaction = null,
     ) {
     }
 
@@ -76,6 +111,8 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
                 'reservation' => $this->reservation,
                 'note'        => $this->note,
                 'contact'     => config('shunno.contact'),
+                'payment'     => $this->payment,
+                'transaction' => $this->transaction,
             ],
         );
     }

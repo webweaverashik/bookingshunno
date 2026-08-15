@@ -20,6 +20,16 @@ class UserSeeder extends Seeder
         ]);
         $superAdmin->assignRole('Admin');
 
+        // Super Admin
+        $superAdmin = User::create([
+            'name'     => 'Shunno Admin',
+            'email'    => 'webweaverashik@gmail.com',
+            'phone'    => '01899999999',
+            'password' => Hash::make('pa$$word#123'),
+            'source'   => ReservationSource::Admin,
+        ]);
+        $superAdmin->assignRole('Admin');
+
         // Manager
         $manager = User::create([
             'name'     => 'Rahman',

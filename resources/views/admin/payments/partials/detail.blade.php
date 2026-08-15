@@ -267,12 +267,12 @@
 
     <div class="fw-bold text-gray-800 mb-1">Actions</div>
     <div class="text-muted fs-8 mb-4">
-        {{-- PHASE 12B replaces this line once the visitor-facing portal and the
-             payment emails exist. Saying so is better than an empty space that
-             leaves an admin wondering whether a link was ever sent. --}}
-        Nothing has been emailed to the visitor yet — the payment page and its emails arrive in the
-        next phase. Send them the reference and take payment however you normally would, then record
-        it here.
+        {{-- PHASE 12C. The visitor has a link and has been emailed it, so the
+             thing an admin needs to know here is what recording a payment will
+             SEND, not that nothing was sent. --}}
+        The visitor was emailed a payment link when this request was created.
+        Recording a payment emails them a receipt, and confirms the reservation once the full amount
+        is in.
     </div>
 
     <div class="d-flex flex-wrap gap-2">

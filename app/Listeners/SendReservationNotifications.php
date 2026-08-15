@@ -3,10 +3,14 @@
 namespace App\Listeners;
 
 use App\Enums\ReservationMailKind;
+use App\Events\PaymentReceived;
+use App\Events\PaymentRequested;
 use App\Events\ReservationRequested;
 use App\Events\ReservationStatusChanged;
 use App\Mail\ReservationNotificationMail;
 use App\Models\Auth\User;
+use App\Models\Payment;
+use App\Models\PaymentTransaction;
 use App\Models\Reservation;
 use App\Services\SettingsRepository;
 use Illuminate\Support\Facades\Log;
@@ -65,14 +69,63 @@ class SendReservationNotifications
         $this->sendToVisitor($event->reservation, $kind, $event->note);
     }
 
+    /**
+     * PHASE 12C — the payment link.
+     *
+     * Raised by PaymentService rather than derived from the status change,
+     * because the email needs the amount and the deadline. The corresponding
+     * status, PaymentRequested, is mapped to null in
+     * ReservationMailKind::forStatus() precisely so this does not double up.
+     */
+    public function handlePaymentRequested(PaymentRequested $event): void
+    {
+        $this->sendToVisitor(
+            $event->payment->reservation,
+            ReservationMailKind::PaymentRequested,
+            $event->payment->note,
+            $event->payment,
+        );
+    }
+
+    /**
+     * PHASE 12C — the receipt.
+     *
+     * Sent for every settlement, whether the gateway confirmed it or a member
+     * of staff wrote it down. A visitor who paid cash at the counter should
+     * still get their payslip by email.
+     */
+    public function handlePaymentReceived(PaymentReceived $event): void
+    {
+        $this->sendToVisitor(
+            $event->payment->reservation,
+            ReservationMailKind::PaymentReceived,
+            $event->transaction->note,
+            $event->payment,
+            $event->transaction,
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Internals
     |--------------------------------------------------------------------------
     */
 
-    private function sendToVisitor(Reservation $reservation, ReservationMailKind $kind, ?string $note = null): void
-    {
+    private function sendToVisitor(
+        ?Reservation $reservation,
+        ReservationMailKind $kind,
+        ?string $note = null,
+        ?Payment $payment = null,
+        ?PaymentTransaction $transaction = null,
+    ): void {
+        // Nullable now that payments can raise this. A payment whose
+        // reservation was hard-deleted has nobody to write to, and the cascade
+        // means that should be impossible — but a null here would otherwise be
+        // a fatal in a queued job rather than a line in the log.
+        if (! $reservation) {
+            return;
+        }
+
         if (! $this->enabled()) {
             return;
         }
@@ -88,7 +141,7 @@ class SendReservationNotifications
             return;
         }
 
-        $this->dispatch($email, $reservation, $kind, $note);
+        $this->dispatch($email, $reservation, $kind, $note, $payment, $transaction);
     }
 
     /**
@@ -130,10 +183,16 @@ class SendReservationNotifications
     /**
      * @param  string|array<int,string>  $to
      */
-    private function dispatch(string|array $to, Reservation $reservation, ReservationMailKind $kind, ?string $note): void
-    {
+    private function dispatch(
+        string|array $to,
+        Reservation $reservation,
+        ReservationMailKind $kind,
+        ?string $note,
+        ?Payment $payment = null,
+        ?PaymentTransaction $transaction = null,
+    ): void {
         try {
-            Mail::to($to)->queue(new ReservationNotificationMail($reservation, $kind, $note));
+            Mail::to($to)->queue(new ReservationNotificationMail($reservation, $kind, $note, $payment, $transaction));
         } catch (Throwable $e) {
             // Reached when the queue itself is unreachable, or when
             // QUEUE_CONNECTION=sync and the mail transport fails. Either way the

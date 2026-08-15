@@ -1,0 +1,241 @@
+/*
+|------------------------------------------------------------------------------
+| Visitor payment portal
+|------------------------------------------------------------------------------
+| Loaded only by resources/views/public/payment.blade.php, which is a standalone
+| document. It therefore defines its own reset rather than depending on
+| public.css — a payment page that inherits half a stylesheet and renders wrong
+| is a page people abandon.
+|
+| Palette shared with the payslip on purpose. A visitor goes email -> this page
+| -> receipt, and all three should look like the same studio.
+|
+| No build step, per the project rules. Plain CSS from public/.
+*/
+
+:root {
+    --pay-ink: #1c1a17;
+    --pay-muted: #6b6660;
+    --pay-line: #dcd7cf;
+    --pay-paper: #fff;
+    --pay-wash: #f7f4ef;
+    --pay-accent: #2b6b52;
+    --pay-warn: #9a6a1f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 28px 16px 56px;
+    background: var(--pay-wash);
+    color: var(--pay-ink);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.pay { max-width: 620px; margin: 0 auto; }
+
+/* ---------- Head ---------- */
+
+.pay-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 14px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--pay-line);
+}
+
+.pay-studio { font-weight: 700; letter-spacing: 0.01em; }
+
+.pay-ref {
+    font-size: 12.5px;
+    color: var(--pay-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Lede and terminal states ---------- */
+
+.pay-lede h1,
+.pay-state h1 { margin: 0 0 6px; font-size: 25px; line-height: 1.25; }
+
+.pay-lede p,
+.pay-state p { margin: 0; color: var(--pay-muted); }
+
+.pay-lede { margin-bottom: 24px; }
+
+.pay-state {
+    margin-bottom: 24px;
+    padding: 22px 24px;
+    background: var(--pay-paper);
+    border-radius: 5px;
+    border-left: 3px solid var(--pay-accent);
+}
+
+/* A withdrawn request is not a failure and should not look like one — the
+   visitor did nothing wrong. Muted, not red. */
+.pay-state--off { border-left-color: var(--pay-line); }
+.pay-state--done { border-left-color: var(--pay-accent); }
+
+/* ---------- Cards ---------- */
+
+.pay-card {
+    background: var(--pay-paper);
+    border: 1px solid var(--pay-line);
+    border-radius: 5px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+}
+
+.pay-card h2 {
+    margin: 0 0 14px;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--pay-muted);
+    font-weight: 600;
+}
+
+/* ---------- Visit details ---------- */
+
+.pay-dl { margin: 0; display: flex; flex-wrap: wrap; gap: 18px 32px; }
+.pay-dl > div { min-width: 130px; }
+.pay-dl dt {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pay-muted);
+}
+.pay-dl dd { margin: 2px 0 0; font-weight: 600; }
+
+/* ---------- Money ---------- */
+
+.pay-table { width: 100%; border-collapse: collapse; }
+
+.pay-table td {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--pay-line);
+    font-size: 14px;
+}
+
+.pay-table td:first-child { color: var(--pay-muted); }
+
+.pay-table td:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.pay-table tr:last-child td { border-bottom: 0; }
+
+/* The figure the visitor is actually being asked for. */
+.pay-table__due td {
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--pay-ink);
+}
+
+.pay-note { margin: 14px 0 0; font-size: 13px; color: var(--pay-muted); }
+.pay-note--quote {
+    padding-left: 12px;
+    border-left: 2px solid var(--pay-line);
+    font-style: italic;
+}
+
+.pay-deadline { margin: 16px 0 0; font-size: 14px; }
+.pay-deadline.is-late { color: var(--pay-warn); }
+
+/* ---------- Payment options ---------- */
+
+.pay-card--actions { background: var(--pay-paper); }
+
+.pay-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--pay-line);
+}
+
+.pay-option:last-of-type { border-bottom: 0; }
+
+.pay-option__title { display: block; font-weight: 600; }
+
+.pay-option__sub {
+    display: block;
+    font-size: 12.5px;
+    color: var(--pay-muted);
+}
+
+.pay-option button {
+    flex-shrink: 0;
+    padding: 10px 20px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 3px;
+    border: 0;
+    background: var(--pay-ink);
+    color: #fff;
+    cursor: pointer;
+}
+
+/* Inert until Phase 13/14. Styled as visibly unavailable rather than merely
+   greyed, so nobody clicks twice wondering whether it registered. */
+.pay-option.is-pending button {
+    background: transparent;
+    color: var(--pay-muted);
+    border: 1px dashed var(--pay-line);
+    cursor: not-allowed;
+}
+
+/* ---------- Receipts ---------- */
+
+.pay-receipt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--pay-line);
+}
+
+.pay-receipt:last-child { border-bottom: 0; }
+.pay-receipt__ref { display: block; font-weight: 600; font-size: 14px; }
+.pay-receipt__meta { display: block; font-size: 12.5px; color: var(--pay-muted); }
+.pay-receipt__right { text-align: right; }
+
+.pay-receipt__amount {
+    display: block;
+    font-weight: 700;
+    color: var(--pay-accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.pay-receipt__right a { font-size: 12.5px; color: var(--pay-muted); }
+
+/* ---------- Foot ---------- */
+
+.pay-foot {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--pay-muted);
+}
+
+.pay-foot p { margin: 0 0 6px; }
+.pay-foot__small { font-size: 11.5px; }
+
+a { color: var(--pay-accent); }
+
+@media (max-width: 520px) {
+    body { padding: 18px 12px 40px; }
+    .pay-card, .pay-state { padding: 18px 16px; }
+    .pay-option { flex-direction: column; align-items: flex-start; }
+    .pay-option button { width: 100%; }
+}

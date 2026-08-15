@@ -292,11 +292,8 @@
                 Request payment
             </button>
             <div class="text-muted fs-8 mt-2">
-                {{-- PHASE 12B replaces this once the visitor's payment page and its
-                     emails exist. Better to say so than to leave an admin assuming
-                     a link went out. --}}
-                Creates the request and moves this to <strong>Payment requested</strong>. The visitor is
-                not emailed yet — that arrives with the payment page in the next phase.
+                Creates the request, moves this to <strong>Payment requested</strong>, and emails the
+                visitor a link to pay.
             </div>
         </div>
     @endcan

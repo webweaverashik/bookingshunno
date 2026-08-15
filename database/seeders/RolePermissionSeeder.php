@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -103,7 +102,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
-                'name' => $permission,
+                'name'       => $permission,
                 'guard_name' => 'web',
             ]);
         }
@@ -115,17 +114,17 @@ class RolePermissionSeeder extends Seeder
         */
 
         $admin = Role::firstOrCreate([
-            'name' => 'Admin',
+            'name'       => 'Admin',
             'guard_name' => 'web',
         ]);
 
         $manager = Role::firstOrCreate([
-            'name' => 'Manager',
+            'name'       => 'Manager',
             'guard_name' => 'web',
         ]);
 
         $visitor = Role::firstOrCreate([
-            'name' => 'Visitor',
+            'name'       => 'Visitor',
             'guard_name' => 'web',
         ]);
 
@@ -197,8 +196,28 @@ class RolePermissionSeeder extends Seeder
             // Workshops - view only
             'workshops.view',
 
-            // Payments - view only
+            /*
+             | Payments.
+             |
+             | PHASE 12C added payments.update-status, on the client's
+             | instruction that a Manager may take payment offline. That is not
+             | a reversal of the 10A/10B rule — recording money is not a
+             | judgement. Approving, declining and cancelling are decisions
+             | about the studio's business and stay with Admin; whether 1,500
+             | taka arrived in the till is a fact, and the person holding it is
+             | the one who knows.
+             |
+             | It does mean a Manager can move a reservation to Confirmed, since
+             | settling a request in full does that. That follows mechanically
+             | from the payment rather than from anyone's opinion, so it belongs
+             | with whoever took the money.
+             |
+             | payments.verify stays with Admin. Phase 13 gives it a meaning —
+             | trusting a gateway callback — and that is a different act from
+             | writing down cash.
+             */
             'payments.view',
+            'payments.update-status',
 
             // Gift vouchers - view only
             'vouchers.view',

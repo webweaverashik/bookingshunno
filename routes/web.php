@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
+use App\Http\Controllers\Public\PaymentPortalController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use App\Http\Controllers\PayslipController;
 use Illuminate\Support\Facades\Mail;
@@ -88,6 +89,18 @@ Route::middleware('throttle:availability')
 | established why: the inline `throttle:n,m` keys on domain and IP only, so two
 | routes using it share one counter.
 */
+/*
+| The payment portal. Same token, same reasoning as the payslip below: the URL
+| is the credential and the page is read-only, so a forwarded link exposes
+| nothing the visitor did not already have in their email.
+|
+| Phase 13 attaches the gateway to the Pay button and Phase 14 attaches voucher
+| redemption. Both are inert here and say so on the page.
+*/
+Route::get('pay/{token}', [PaymentPortalController::class, 'show'])
+    ->middleware('throttle:payslip')
+    ->name('payment.portal');
+
 Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class, 'visitor'])
     ->middleware('throttle:payslip')
     ->name('payslip');

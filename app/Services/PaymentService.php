@@ -7,6 +7,8 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Enums\ReservationStatus;
+use App\Events\PaymentReceived;
+use App\Events\PaymentRequested as PaymentRequestedEvent;
 use App\Models\Auth\User;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
@@ -198,6 +200,18 @@ class PaymentService
                 ),
             );
 
+            /*
+             | PHASE 12C — dispatched INSIDE the transaction, unlike a textbook
+             | afterCommit, and for the same reason transition() is called from
+             | in here: SendReservationNotifications catches every Throwable
+             | itself and only logs, so a mail failure cannot roll this back.
+             | The reverse ordering — commit, then email — would risk a payment
+             | request that exists with nobody told about it, which is worse
+             | than an email about a request that failed to save, because the
+             | latter cannot happen while the listener swallows its own errors.
+             */
+            PaymentRequestedEvent::dispatch($payment);
+
             return $payment->fresh(['reservation.user', 'requestedBy']);
         });
     }
@@ -324,6 +338,10 @@ class PaymentService
                     $line . sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
                 );
 
+                // Every receipt gets an email, part payment included — the
+                // visitor needs the payslip and needs to know what is left.
+                PaymentReceived::dispatch($payment, $transaction);
+
                 return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
             }
 
@@ -350,6 +368,8 @@ class PaymentService
                     $line . " The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
                 );
             }
+
+            PaymentReceived::dispatch($payment, $transaction);
 
             return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
         });
