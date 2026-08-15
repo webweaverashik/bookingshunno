@@ -77,12 +77,15 @@
                 <div class="menu-item pt-5">
                     <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Money</span></div>
                 </div>
-                <div class="menu-item">
-                    <span class="menu-link text-muted">
-                        <span class="menu-icon"><i class="ki-outline ki-credit-cart fs-2"></i></span>
-                        <span class="menu-title">Payments</span>
-                    </span>
-                </div>
+                @can('payments.view')
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.payments.*') ? 'active' : '' }}"
+                            href="{{ route('admin.payments.index') }}">
+                            <span class="menu-icon"><i class="ki-outline ki-credit-cart fs-2"></i></span>
+                            <span class="menu-title">Payments</span>
+                        </a>
+                    </div>
+                @endcan
                 <div class="menu-item">
                     <span class="menu-link text-muted">
                         <span class="menu-icon"><i class="ki-outline ki-gift fs-2"></i></span>

@@ -1,0 +1,340 @@
+/*
+|------------------------------------------------------------------------------
+| Payslip
+|------------------------------------------------------------------------------
+| Standalone. Loaded by resources/views/payslips/show.blade.php and by nothing
+| else, so it defines its own reset rather than depending on public.css or on
+| Metronic — the same document is served to a visitor and to staff, and it must
+| not inherit whichever of those happened to load first.
+|
+| Sized for A4 with generous margins, because this gets printed. Colours are
+| kept to what survives a monochrome office printer: the layout carries the
+| meaning, the colour only reinforces it.
+|
+| No build step, per the project rules. Plain CSS, served from public/.
+*/
+
+:root {
+    --slip-ink: #1c1a17;
+    --slip-muted: #6b6660;
+    --slip-line: #dcd7cf;
+    --slip-paper: #ffffff;
+    --slip-wash: #f7f4ef;
+    --slip-accent: #2b6b52;
+    --slip-warn: #9a6a1f;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 32px 16px;
+    background: var(--slip-wash);
+    color: var(--slip-ink);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+.slip {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 44px 48px;
+    background: var(--slip-paper);
+    border: 1px solid var(--slip-line);
+    border-radius: 4px;
+}
+
+/* ---------- Head ---------- */
+
+.slip-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--slip-ink);
+}
+
+.slip-studio {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.slip-mark {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.slip-studio-name {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.slip-studio-meta {
+    font-size: 11.5px;
+    color: var(--slip-muted);
+    line-height: 1.5;
+}
+
+.slip-title {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.slip-title-main {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+.slip-ref {
+    font-size: 19px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+
+.slip-date {
+    font-size: 11.5px;
+    color: var(--slip-muted);
+}
+
+/* ---------- The figure ---------- */
+
+.slip-amount {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+    margin: 28px 0;
+    padding: 20px 24px;
+    background: var(--slip-wash);
+    border-left: 3px solid var(--slip-accent);
+}
+
+.slip-amount-label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--slip-muted);
+}
+
+.slip-amount-value {
+    font-size: 27px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.slip-amount-channel {
+    margin-left: auto;
+    font-size: 11.5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--slip-line);
+    color: var(--slip-muted);
+    white-space: nowrap;
+}
+
+.slip-channel--gateway {
+    color: var(--slip-accent);
+    border-color: currentColor;
+}
+
+/* ---------- Parties ---------- */
+
+.slip-grid {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 28px;
+}
+
+.slip-grid > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.slip-grid h2 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--slip-muted);
+    font-weight: 600;
+}
+
+.slip-grid p {
+    margin: 0 0 4px;
+    font-size: 13px;
+    color: var(--slip-muted);
+}
+
+.slip-strong {
+    color: var(--slip-ink) !important;
+    font-weight: 600;
+    font-size: 14px !important;
+}
+
+/* ---------- Summary ---------- */
+
+.slip-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+}
+
+.slip-table td {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--slip-line);
+    font-size: 13.5px;
+}
+
+.slip-table td:first-child {
+    color: var(--slip-muted);
+}
+
+.slip-table td:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.slip-row--paid td {
+    font-weight: 700;
+    color: var(--slip-ink);
+    border-bottom-width: 2px;
+    border-bottom-color: var(--slip-ink);
+}
+
+.slip-row--balance td {
+    color: var(--slip-warn);
+}
+
+/* ---------- Notes and foot ---------- */
+
+.slip-notes p {
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.slip-muted {
+    color: var(--slip-muted);
+    font-style: italic;
+}
+
+.slip-foot {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--slip-line);
+    font-size: 11px;
+    color: var(--slip-muted);
+}
+
+.slip-internal {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--slip-wash);
+    border-left: 2px solid var(--slip-line);
+}
+
+/* ---------- Actions ---------- */
+
+.slip-actions {
+    margin-top: 28px;
+    text-align: center;
+}
+
+.slip-actions button {
+    padding: 11px 26px;
+    font: inherit;
+    font-weight: 600;
+    color: #fff;
+    background: var(--slip-ink);
+    border: 0;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.slip-actions button:hover {
+    background: var(--slip-accent);
+}
+
+/* ---------- Print ---------- */
+
+@media print {
+    /* The wash and the border are screen affordances; on paper they waste
+       toner and make the sheet look like a screenshot of a webpage. */
+    body {
+        background: #fff;
+        padding: 0;
+        font-size: 12px;
+    }
+
+    .slip {
+        max-width: none;
+        border: 0;
+        padding: 0;
+        border-radius: 0;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    /* Backgrounds are dropped by default in most print engines, so the
+       highlighted figure is given a rule instead of relying on the fill. */
+    .slip-amount {
+        background: none;
+        padding: 14px 0;
+        border-left: 0;
+        border-top: 1px solid #000;
+        border-bottom: 1px solid #000;
+    }
+
+    .slip-internal {
+        background: none;
+    }
+
+    .slip-table {
+        page-break-inside: avoid;
+    }
+}
+
+@page {
+    size: A4;
+    margin: 18mm;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 620px) {
+    body {
+        padding: 12px 8px;
+    }
+
+    .slip {
+        padding: 24px 20px;
+    }
+
+    .slip-head,
+    .slip-grid {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .slip-title {
+        text-align: left;
+    }
+
+    .slip-amount-channel {
+        margin-left: 0;
+    }
+}

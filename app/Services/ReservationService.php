@@ -282,6 +282,31 @@ class ReservationService
     }
 
     /**
+     * PHASE 12A — write a line into the history without changing anything.
+     *
+     * amend() was the obvious candidate and is the wrong one: it prefixes every
+     * entry with "Edited", which is true when someone corrected a date and a
+     * lie when a payment arrived. The audit trail is the record the studio will
+     * read back when a figure is disputed, so what it says about who did what
+     * has to stay accurate.
+     *
+     * Raises no event and touches no column on the reservation itself. That is
+     * the whole point — the caller has already changed something ELSE (a
+     * payment, a voucher) and needs the reservation's timeline to mention it.
+     */
+    public function note(Reservation $reservation, ?User $actor, string $note): Reservation
+    {
+        $reservation->statusHistory()->create([
+            'from_status' => $reservation->status,
+            'to_status'   => $reservation->status,
+            'changed_by'  => $actor?->id,
+            'note'        => $note,
+        ]);
+
+        return $reservation;
+    }
+
+    /**
      * Move a reservation to a new status, refusing transitions the lifecycle
      * does not allow, and recording who did it.
      */

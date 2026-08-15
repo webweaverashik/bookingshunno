@@ -224,11 +224,82 @@
         </div>
     @endif
 
-    {{-- Payment figures deliberately absent until Phase 12 builds them. An
-         empty "Paid: BDT 0" row would read as a fact rather than a gap. --}}
-    <div class="text-muted fs-8 mt-3">
-        Nothing has been requested or received yet — payment handling arrives in a later phase.
-    </div>
+    {{-- ================= Payments (Phase 12A) ================= --}}
+    @php
+        $latestPayment = $reservation->latestPayment();
+        $paid = $reservation->amountPaid();
+        $outstanding = $reservation->outstandingTotal();
+    @endphp
+
+    @if ($latestPayment)
+        <div class="separator separator-dashed my-3"></div>
+
+        <div class="d-flex justify-content-between fs-7 mb-1">
+            <span class="text-muted">
+                {{ $latestPayment->type->describe($latestPayment->percentage) }} requested
+                <span class="badge badge-light-{{ $latestPayment->status->colour() }} fs-8 ms-1">
+                    {{ $latestPayment->status->label() }}
+                </span>
+            </span>
+            <span class="text-gray-800">BDT {{ number_format((float) $latestPayment->amount_due) }}</span>
+        </div>
+
+        <div class="d-flex justify-content-between fs-7 mb-1">
+            <span class="text-muted">Received</span>
+            <span class="{{ $paid > 0 ? 'text-success fw-semibold' : 'text-muted' }}">
+                BDT {{ number_format($paid) }}
+            </span>
+        </div>
+
+        <div class="d-flex justify-content-between fs-7">
+            <span class="text-muted">Outstanding on the visit</span>
+            <span class="{{ $outstanding > 0 ? 'text-gray-800 fw-semibold' : 'text-success fw-semibold' }}">
+                BDT {{ number_format($outstanding) }}
+            </span>
+        </div>
+
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-3">
+            <span class="text-muted fs-8">
+                {{ $latestPayment->reference }}
+                @if ($latestPayment->isOpen())
+                    &middot;
+                    <span class="{{ $latestPayment->isOverdue() ? 'text-danger fw-semibold' : '' }}">
+                        due {{ $latestPayment->due_at->format('j M, g:i A') }}{{ $latestPayment->isOverdue() ? ' — overdue' : '' }}
+                    </span>
+                @endif
+            </span>
+
+            {{-- Recording and withdrawing live on the payments register, not
+                 here. One screen owns the money actions, which keeps the audit
+                 trail and the error messages in one place rather than
+                 duplicated across two drawers that would drift. --}}
+            @can('payments.view')
+                <a class="fs-8 ms-auto"
+                    href="{{ route('admin.payments.index', ['q' => $latestPayment->reference, 'status' => 'all']) }}">
+                    Open in Payments
+                </a>
+            @endcan
+        </div>
+    @else
+        <div class="text-muted fs-8 mt-3">Nothing has been requested or received yet.</div>
+    @endif
+
+    @can('requestPayment', $reservation)
+        <div class="mt-4">
+            <button type="button" class="btn btn-sm btn-primary" data-action="request-payment"
+                data-url="{{ route('admin.payments.create', $reservation) }}">
+                <i class="ki-outline ki-credit-cart fs-5"></i>
+                Request payment
+            </button>
+            <div class="text-muted fs-8 mt-2">
+                {{-- PHASE 12B replaces this once the visitor's payment page and its
+                     emails exist. Better to say so than to leave an admin assuming
+                     a link went out. --}}
+                Creates the request and moves this to <strong>Payment requested</strong>. The visitor is
+                not emailed yet — that arrives with the payment page in the next phase.
+            </div>
+        </div>
+    @endcan
 </div>
 
 {{-- ================= History ================= --}}
@@ -355,6 +426,32 @@
             'override' => false,
         ],
     ])->filter(fn($action) => auth()->user()->can($action['ability'], $reservation));
+
+    /*
+     | PHASE 10B — who each VISIBLE decision writes to, derived rather than
+     | stated.
+     |
+     | The paragraph below used to name approving, declining and cancelling
+     | unconditionally. A Manager can now do none of the three, so it described
+     | three buttons that were not on screen — which reads as a bug to the
+     | person who cannot find them.
+     |
+     | Grouping earns its keep for an Admin too. "Back to review queue" emails
+     | nobody, and that is worth knowing before you reach for it instead of
+     | asking the visitor for information.
+     */
+    $audience = [
+        'approve' => 'visitor',
+        'decline' => 'visitor',
+        'cancel' => 'visitor',
+        'requestInfo' => 'visitor',
+        'escalate' => 'staff',
+        'returnToReview' => 'silent',
+    ];
+
+    $notify = $actions
+        ->groupBy(fn($action) => $audience[$action['ability']] ?? 'silent')
+        ->map(fn($group) => $group->pluck('label')->join(', '));
 @endphp
 
 @if ($actions->isNotEmpty())
@@ -365,9 +462,24 @@
         {{-- PHASE 11 replaced the "nothing is emailed yet" warning that stood
              here. Saying which decisions write to whom is worth the line: an
              admin about to type a decline reason should know the visitor is
-             going to read it. --}}
-        Approving, declining, cancelling and asking for information all email the visitor. Escalating
-        emails the Admins instead. Whatever you write below goes into that email.
+             going to read it. PHASE 10B made it reflect what is on screen. --}}
+        @if ($notify->has('visitor'))
+            <span class="fw-semibold text-gray-700">Emails the visitor:</span> {{ $notify['visitor'] }}.
+        @endif
+
+        @if ($notify->has('staff'))
+            <span class="fw-semibold text-gray-700">Emails the Admins:</span> {{ $notify['staff'] }}.
+        @endif
+
+        @if ($notify->has('silent'))
+            <span class="fw-semibold text-gray-700">Tells nobody:</span> {{ $notify['silent'] }}.
+        @endif
+
+        @if ($notify->has('visitor') || $notify->has('staff'))
+            Whatever you write below goes into that email.
+        @else
+            Nothing here sends an email.
+        @endif
     </div>
 
     <div class="d-flex flex-wrap gap-2">

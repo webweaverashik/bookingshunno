@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use App\Enums\ReservationSource;
 use App\Enums\ReservationStatus;
 use App\Models\Auth\User;
@@ -74,6 +75,15 @@ class Reservation extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(ReservationStatusHistory::class)->latest('created_at');
+    }
+
+    /**
+     * PHASE 12A. Newest first, because the register and the drawer both want
+     * "the current request" far more often than the first one ever sent.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class)->latest('id');
     }
 
     /*
@@ -220,6 +230,61 @@ class Reservation extends Model
     public function manualPriceDelta(): float
     {
         return $this->payableTotal() - $this->calculatedTotal();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Money — payments (Phase 12A)
+    |--------------------------------------------------------------------------
+    | These read the payments RELATION, so callers must have loaded it. That is
+    | deliberate rather than lazy-loading per call: the drawer and the register
+    | both eager-load, and a helper that quietly fired a query per row would
+    | turn the reservation list into an N+1 the moment someone used it there.
+    */
+
+    /** The request currently awaiting payment, if there is one. */
+    public function openPayment(): ?Payment
+    {
+        return $this->payments->first(fn (Payment $payment) => $payment->isOpen());
+    }
+
+    /** The most recent request of any status — what the drawer shows. */
+    public function latestPayment(): ?Payment
+    {
+        return $this->payments->first();
+    }
+
+    /**
+     * Everything actually received, across every request.
+     *
+     * Cancelled requests are excluded because cancel() refuses to run once
+     * money has been taken, so a cancelled request has never received any. The
+     * filter is here anyway: it costs nothing and it means this figure stays
+     * correct if a later phase ever allows cancelling a refunded request.
+     */
+    public function amountPaid(): float
+    {
+        return (float) $this->payments
+            ->reject(fn (Payment $payment) => $payment->status === PaymentStatus::Cancelled)
+            ->sum(fn (Payment $payment) => (float) $payment->amount_paid);
+    }
+
+    /**
+     * What the visitor still owes on the visit as a whole.
+     *
+     * The brief's "Remaining Amount". Reads the LIVE total rather than a
+     * payment's snapshot, because this answers "what is owed now" — the
+     * snapshot answers "what were they told", and the drawer shows both when
+     * they disagree.
+     */
+    public function outstandingTotal(): float
+    {
+        return max(0, $this->payableTotal() - $this->amountPaid());
+    }
+
+    public function isFullyPaid(): bool
+    {
+        return $this->outstandingTotal() < 0.01 && $this->amountPaid() > 0;
     }
 
     /*

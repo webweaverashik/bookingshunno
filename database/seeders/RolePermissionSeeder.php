@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -102,7 +103,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
-                'name'       => $permission,
+                'name' => $permission,
                 'guard_name' => 'web',
             ]);
         }
@@ -114,17 +115,17 @@ class RolePermissionSeeder extends Seeder
         */
 
         $admin = Role::firstOrCreate([
-            'name'       => 'Admin',
+            'name' => 'Admin',
             'guard_name' => 'web',
         ]);
 
         $manager = Role::firstOrCreate([
-            'name'       => 'Manager',
+            'name' => 'Manager',
             'guard_name' => 'web',
         ]);
 
         $visitor = Role::firstOrCreate([
-            'name'       => 'Visitor',
+            'name' => 'Visitor',
             'guard_name' => 'web',
         ]);
 
@@ -152,22 +153,36 @@ class RolePermissionSeeder extends Seeder
         |                                     equally a decision about a
         |                                     commitment already made
         |
+        | PHASE 10B — the client has now closed the question 10A left open:
+        |
+        |   REMOVED  reservations.decline   — a refusal is a decision about the
+        |                                     studio's business, and the visitor
+        |                                     is emailed the reason. It belongs
+        |                                     with whoever answers for it.
+        |
+        | Manager now holds no ability that ENDS a reservation. Everything they
+        | can do either keeps it moving (update, request-info, return-to-review)
+        | or hands it to someone who can finish it (escalate). Approve, decline
+        | and cancel — the three terminal acts — are Admin's alone.
+        |
         | Manager keeps reservations.update, which is what lets them fix the
         | party size and the date/time before handing the request over — that is
         | the point of the escalation flow rather than an oversight.
         |
-        | STILL WITH THE CLIENT: reservations.decline. The instruction named
-        | approve and cancel; declining is arguably the same kind of decision
-        | and has been left with Manager only because removing it was not asked
-        | for. If the intent is that Manager escalates EVERY outcome, delete the
-        | line below and nothing else changes.
+        | Worth noting what this also closed: Declined is reachable from
+        | Approved, so a Manager previously had a route to undo an approval they
+        | were never allowed to make. That is gone as a side effect.
+        |
+        | Nothing else changed to implement this. The policy is permission-driven
+        | and the drawer renders only the actions the policy allows, so deleting
+        | one line here removes the button, blocks the route and updates the
+        | drawer's help text together.
         */
 
         $manager->syncPermissions([
 
             // Reservations
             'reservations.view',
-            'reservations.decline',
             'reservations.request-info',
             'reservations.escalate',
             'reservations.update',

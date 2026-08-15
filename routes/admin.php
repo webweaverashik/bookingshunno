@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin\AvailabilityController;
 use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ReservationController;
+use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
@@ -139,7 +141,56 @@ Route::prefix('admin')
                 });
             });
 
-        // PHASE 12: payments
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 12A — Payments
+        |----------------------------------------------------------------------
+        | Gated on payments.view for the whole group; PaymentPolicy handles the
+        | write abilities per action, because record and cancel both depend on
+        | the payment still being open as well as on a permission — which route
+        | middleware cannot express.
+        |
+        | Manager holds payments.view and nothing else, so they reach the
+        | register read-only. That is useful rather than incidental: whoever is
+        | on the floor needs to see whether tonight's visitor has paid.
+        |
+        | Two identifiers in play. These routes bind on {payment:reference} —
+        | PAY-2608-K4RT, the code read out over the phone. The visitor's own
+        | payment page in Phase 12B binds on the token instead, which is the
+        | long random string and is never shown in the admin panel.
+        |
+        | 'list' is registered before {payment} so the literal wins; same
+        | ordering as the reservations group.
+        */
+        Route::prefix('payments')
+            ->name('payments.')
+            ->middleware('permission:payments.view')
+            ->group(function () {
+                Route::get('/', [PaymentController::class, 'index'])->name('index');
+                Route::get('list', [PaymentController::class, 'list'])->name('list');
+
+                // Requesting payment is about a RESERVATION, so it binds on the
+                // reservation and is authorised by ReservationPolicy. It lives
+                // here rather than in the reservations group because everything
+                // it touches is a payment.
+                Route::get('request/{reservation}', [PaymentController::class, 'create'])->name('create');
+                Route::post('request/{reservation}', [PaymentController::class, 'store'])->name('store');
+
+                /*
+                 | PHASE 12B — the payslip, staff copy.
+                 |
+                 | Registered BEFORE the bare {payment:reference} show route so
+                 | the literal segment is not swallowed by it. Same reasoning as
+                 | 'list' above.
+                 */
+                Route::get('{payment:reference}/receipts/{transaction:reference}', [PayslipController::class, 'staff'])
+                    ->name('payslip');
+
+                Route::get('{payment:reference}', [PaymentController::class, 'show'])->name('show');
+                Route::post('{payment:reference}/record', [PaymentController::class, 'record'])->name('record');
+                Route::post('{payment:reference}/cancel', [PaymentController::class, 'cancel'])->name('cancel');
+            });
+
         // PHASE 14: vouchers
         // PHASE 16: reports
     });

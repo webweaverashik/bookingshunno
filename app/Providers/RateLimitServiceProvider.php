@@ -67,5 +67,23 @@ class RateLimitServiceProvider extends ServiceProvider
 
         RateLimiter::for('otp-resend', fn (Request $request) => Limit::perMinute(3)
             ->by('otp-resend:' . $request->ip()));
+
+        /*
+        | PHASE 12B — the visitor's payslip.
+        |
+        | Keyed on the TOKEN as well as the IP. The token is the credential, so
+        | the thing worth rate limiting is attempts against one, not traffic
+        | from one address: a household behind a single NAT looking at their own
+        | receipts should not throttle each other, while anyone walking a token
+        | space hits the wall on the first few misses.
+        |
+        | Generous per minute because a receipt gets refreshed, printed, and
+        | opened again from the email; tight per hour because nobody legitimately
+        | needs a hundred views of one document in an afternoon.
+        */
+        RateLimiter::for('payslip', fn (Request $request) => [
+            Limit::perMinute(20)->by('payslip:' . $request->route('token') . '|' . $request->ip()),
+            Limit::perHour(60)->by('payslip-hour:' . $request->ip()),
+        ]);
     }
 }

@@ -168,6 +168,12 @@ trait RendersReservations
             'purposes',
             'statusHistory.changedBy',
             'approver',
+
+            // PHASE 12A. The drawer's money block reads the payments COLLECTION
+            // through Reservation::latestPayment() and amountPaid(), which
+            // deliberately do not lazy-load — so it has to be eager-loaded here
+            // or those helpers see nothing.
+            'payments',
         ]);
 
         return view('admin.reservations.partials.detail', [

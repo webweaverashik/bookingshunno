@@ -134,6 +134,14 @@
          never gets a trigger for an action they cannot take. --}}
     @include('admin.reservations.partials.decision-modal')
 
+    {{-- PHASE 12A. Rendered for anyone holding the permission; whether the
+         trigger appears inside a given reservation's drawer is decided per
+         reservation by ReservationPolicy::requestPayment(), which also checks
+         the reservation is actually sitting at Approved. --}}
+    @can('reservations.payment-request')
+        @include('admin.payments.partials.request-modal')
+    @endcan
+
     @can('reservations.update')
         <div class="modal fade" id="reservation-edit-modal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered mw-650px sh-modal-scroll">
@@ -176,4 +184,9 @@
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
     <script src="{{ asset('js/admin/reservations.js') }}"></script>
+    {{-- Second half of payments.js — the request-payment modal. It guards on
+         the elements it needs, so on this page the register half is inert. --}}
+    @can('reservations.payment-request')
+        <script src="{{ asset('js/admin/payments.js') }}"></script>
+    @endcan
 @endpush

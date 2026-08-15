@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\ReservationRequestController;
+use App\Http\Controllers\PayslipController;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
@@ -69,6 +70,27 @@ Route::middleware('throttle:availability')
         Route::get('availability/calendar', [AvailabilityController::class, 'calendar'])
             ->name('availability.calendar');
     });
+
+/*
+|--------------------------------------------------------------------------
+| PHASE 12B — the visitor's payslip
+|--------------------------------------------------------------------------
+| No login. The 48-character token on the payment IS the credential, which is
+| how payment links work everywhere — the alternative is asking somebody to
+| authenticate before they can look at a receipt for money they have already
+| paid.
+|
+| Nothing here reveals more than the visitor already holds in their own email,
+| and the page is read-only: there is no action on it that could be taken by
+| whoever the link was forwarded to.
+|
+| Throttled on its own named limiter rather than the inline form. PHASE 7C
+| established why: the inline `throttle:n,m` keys on domain and IP only, so two
+| routes using it share one counter.
+*/
+Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class, 'visitor'])
+    ->middleware('throttle:payslip')
+    ->name('payslip');
 
 /*
 |--------------------------------------------------------------------------

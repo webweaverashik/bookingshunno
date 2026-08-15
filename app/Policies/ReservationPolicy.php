@@ -22,6 +22,14 @@ use App\Models\Reservation;
  * reservations.approve away from the Manager role in RolePermissionSeeder,
  * which is where a question about WHO should be answered. That the policy did
  * not need editing is the sign the permission was named at the right level.
+ *
+ * PHASE 10B: declining became Admin-only the same way, and again no method body
+ * changed. It is tempting to add `&& ! $user->hasRole('Manager')` to decline()
+ * as a belt-and-braces measure; that would be a mistake. It puts a second,
+ * divergent answer to "who may decline" in a second file, so the day the client
+ * adds a Supervisor role the two disagree and the policy silently wins. The
+ * role-to-permission map has one home. This file only ever asks whether the
+ * permission is held and whether the lifecycle allows the move.
  */
 class ReservationPolicy
 {
@@ -69,6 +77,26 @@ class ReservationPolicy
             && $reservation->isEditable();
     }
 
+    /**
+     * PHASE 12A — ask the visitor for money.
+     *
+     * Admin only, and again by permission rather than by role check.
+     * reservations.payment-request has existed since Phase 5 and has had no
+     * user until now; Manager was never given it, which is the right answer
+     * under the rule 10A and 10B established — sending a payment link commits
+     * the studio to a price and a deadline, and that is a decision.
+     *
+     * The lifecycle half matters as much as the permission: this is false for
+     * anything not sitting at Approved, so the button cannot appear on a
+     * request that has not been approved yet or on one already awaiting
+     * payment. PaymentService re-checks it under a lock regardless.
+     */
+    public function requestPayment(User $user, Reservation $reservation): bool
+    {
+        return $user->can('reservations.payment-request')
+            && $reservation->status->canTransitionTo(ReservationStatus::PaymentRequested);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Decisions
@@ -81,6 +109,15 @@ class ReservationPolicy
             && $reservation->status->canTransitionTo(ReservationStatus::Approved);
     }
 
+    /**
+     * PHASE 10B — Admin only, via the seeder.
+     *
+     * The visitor is emailed the reason verbatim, which is the argument for
+     * restricting it: declining is not just a status, it is the studio telling
+     * someone no in its own voice. A Manager who thinks a request should be
+     * refused escalates with that reasoning in the note, and the Admin declines
+     * with it.
+     */
     public function decline(User $user, Reservation $reservation): bool
     {
         return $user->can('reservations.decline')
