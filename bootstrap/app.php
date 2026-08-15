@@ -38,12 +38,32 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
-        // PHASE 13: SSLCommerz posts its IPN server-to-server and carries no
-        // session, so that one route has to be CSRF-exempt. Restrict it by
-        // gateway IP at the same time — an unauthenticated, unprotected
-        // endpoint that marks payments as received is not something to leave
-        // open.
-        // $middleware->validateCsrfTokens(except: ['payment/ipn']);
+        /*
+        | PHASE 13 — SSLCommerz callbacks.
+        |
+        | All four arrive as POST from another domain. The three browser ones
+        | are redirects with no session and therefore no token; the IPN is
+        | server-to-server with no browser at all.
+        |
+        | The exemption is safe because none of these endpoints is TRUSTED. All
+        | a callback does is name a tran_id we issued ourselves before the
+        | visitor left; whether money changed hands is answered by
+        | SslCommerzService::validate() over a separate connection, checking
+        | status, tran_id, amount and currency. Forging a callback gets an
+        | attacker a failed validation and a log line.
+        |
+        | That is also why there is no IP allowlist here. It would be a second,
+        | weaker line of defence that breaks quietly the day SSLCommerz changes
+        | a server, and it would tempt somebody later into treating a
+        | "trusted-IP" callback as proof of payment. The validation call is the
+        | control.
+        */
+        $middleware->validateCsrfTokens(except: [
+            'payment/gateway/success',
+            'payment/gateway/fail',
+            'payment/gateway/cancel',
+            'payment/gateway/ipn',
+        ]);
 
         // Production sits behind a proxy. Without this, $request->ip() records
         // the proxy for every visitor, which breaks both the per-IP rate

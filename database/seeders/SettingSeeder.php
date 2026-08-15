@@ -14,6 +14,18 @@ class SettingSeeder extends Seeder
             ['key' => 'group_discount.percentage',       'value' => '10', 'type' => 'integer', 'group' => 'pricing', 'label' => 'Group discount (%)'],
             ['key' => 'booking_fee_percentage',          'value' => '50', 'type' => 'integer', 'group' => 'payment', 'label' => 'Booking fee (%)'],
             ['key' => 'payment_deadline_hours',          'value' => '48', 'type' => 'integer', 'group' => 'payment', 'label' => 'Hours to pay after approval'],
+
+            /*
+             | PHASE 13 — the operational switch for online payment.
+             |
+             | Separate from the SSLCommerz credentials, which live in .env and
+             | only in .env. This one answers "should we be offering online
+             | payment right now" — a question the studio needs to answer on a
+             | bad afternoon without waiting for a deploy. Turning it off hides
+             | the Pay online button; requests, deadlines and offline recording
+             | all carry on.
+             */
+            ['key' => 'payments.online_enabled',         'value' => '1',  'type' => 'boolean', 'group' => 'payment', 'label' => 'Accept payment online'],
             ['key' => 'cafe_credit.entry_fee_coupon',    'value' => '50', 'type' => 'integer', 'group' => 'credit',  'label' => 'Cafe coupon with entry fee (BDT)'],
             ['key' => 'cafe_credit.per_participant',     'value' => '1',  'type' => 'boolean', 'group' => 'credit',  'label' => 'Issue cafe coupon per participant'],
             ['key' => 'reservation.max_participants',    'value' => '30', 'type' => 'integer', 'group' => 'general', 'label' => 'Largest group accepted online'],

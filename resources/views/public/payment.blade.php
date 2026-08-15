@@ -33,6 +33,17 @@
             <div class="pay-ref">{{ $payment->reference }}</div>
         </header>
 
+        {{-- Set by the gateway controller on the way back. Kept above the fold:
+             somebody returning from a failed payment needs to know that before
+             they read the amount again. --}}
+        @if (session('payment_success'))
+            <div class="pay-flash pay-flash--ok">{{ session('payment_success') }}</div>
+        @endif
+
+        @if (session('payment_error'))
+            <div class="pay-flash pay-flash--bad">{{ session('payment_error') }}</div>
+        @endif
+
         @if ($withdrawn)
             {{-- Rendered rather than 404'd. A visitor following an old link needs
                  to know what happened, not to be told the page does not exist. --}}
@@ -158,13 +169,31 @@
                     explains itself; a button that looks live and does nothing is
                     worse than either.
                 --}}
-                <div class="pay-option is-pending">
-                    <div>
-                        <span class="pay-option__title">Pay online</span>
-                        <span class="pay-option__sub">bKash, Nagad, card or internet banking</span>
+                {{--
+                    A real form, POSTing to our own route. The redirect to
+                    SSLCommerz happens server-side after a session is opened, so
+                    the gateway URL is never built in the browser and the amount
+                    is never something the page could be edited to change.
+                --}}
+                @if ($canPayOnline)
+                    <form method="POST" action="{{ route('payment.gateway.start', $payment->token) }}"
+                        class="pay-option">
+                        @csrf
+                        <div>
+                            <span class="pay-option__title">Pay online</span>
+                            <span class="pay-option__sub">bKash, Nagad, card or internet banking</span>
+                        </div>
+                        <button type="submit">Pay BDT {{ number_format($payment->outstanding()) }}</button>
+                    </form>
+                @else
+                    <div class="pay-option is-pending">
+                        <div>
+                            <span class="pay-option__title">Pay online</span>
+                            <span class="pay-option__sub">Temporarily unavailable</span>
+                        </div>
+                        <button type="button" disabled>Unavailable</button>
                     </div>
-                    <button type="button" disabled>Opening shortly</button>
-                </div>
+                @endif
 
                 <div class="pay-option is-pending">
                     <div>
@@ -175,8 +204,14 @@
                 </div>
 
                 <p class="pay-note">
-                    Online payment is being switched on. In the meantime, reply to the email we sent you or
-                    call us on {{ $contact['phone'] ?? '' }} and we will take payment directly.
+                    @if ($canPayOnline)
+                        Payments are handled by SSLCommerz. You will be taken to their secure page and
+                        brought back here afterwards.
+                    @else
+                        Online payment is unavailable just now. Please call us on
+                        {{ $contact['phone'] ?? '' }} or reply to the email we sent you, and we will take
+                        payment directly.
+                    @endif
                 </p>
             </section>
         @endunless

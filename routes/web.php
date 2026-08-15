@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Public\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
+use App\Http\Controllers\Public\PaymentGatewayController;
 use App\Http\Controllers\Public\PaymentPortalController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use App\Http\Controllers\PayslipController;
@@ -100,6 +101,35 @@ Route::middleware('throttle:availability')
 Route::get('pay/{token}', [PaymentPortalController::class, 'show'])
     ->middleware('throttle:payslip')
     ->name('payment.portal');
+
+/*
+| SSLCommerz. Four of these five are entered by somebody with no session,
+| carrying data we did not write.
+|
+| start() is ours and keeps the web middleware. The three browser callbacks come
+| back as POST from another domain with no CSRF token, and the IPN arrives
+| server-to-server with no browser at all — all four are exempted in
+| bootstrap/app.php. The exemption is safe precisely because none of them are
+| trusted: they name an attempt, and SslCommerzService::validate() decides over
+| a separate connection whether it was paid.
+|
+| Named `payment.gateway.*` and built with route() inside the initiation
+| payload, so these URLs are registered with SSLCommerz from one place.
+*/
+Route::prefix('payment/gateway')->name('payment.gateway.')->group(function () {
+    // POST, not GET. Opening a checkout session creates a database row and
+    // calls out to SSLCommerz, so it must not be reachable by a link, a
+    // prefetch, or a refresh.
+    Route::post('start/{token}', [PaymentGatewayController::class, 'start'])
+        ->middleware('throttle:payslip')
+        ->name('start');
+
+    Route::match(['get', 'post'], 'success', [PaymentGatewayController::class, 'success'])->name('success');
+    Route::match(['get', 'post'], 'fail', [PaymentGatewayController::class, 'fail'])->name('fail');
+    Route::match(['get', 'post'], 'cancel', [PaymentGatewayController::class, 'cancel'])->name('cancel');
+
+    Route::post('ipn', [PaymentGatewayController::class, 'ipn'])->name('ipn');
+});
 
 Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class, 'visitor'])
     ->middleware('throttle:payslip')

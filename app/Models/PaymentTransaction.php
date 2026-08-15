@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PaymentChannel;
 use App\Enums\PaymentMethod;
+use App\Enums\TransactionStatus;
 use App\Models\Auth\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,11 +30,13 @@ class PaymentTransaction extends Model
     {
         return [
             'channel'         => PaymentChannel::class,
+            'status'          => TransactionStatus::class,
             'method'          => PaymentMethod::class,
             'amount'          => 'decimal:2',
             'balance_after'   => 'decimal:2',
             'gateway_payload' => 'array',
             'received_at'     => 'datetime',
+            'validated_at'    => 'datetime',
         ];
     }
 
@@ -53,6 +56,20 @@ class PaymentTransaction extends Model
     }
 
     /**
+     * PHASE 13 — a settled attempt, as opposed to one still in flight or one
+     * that failed. Only these render a payslip and only these moved money.
+     */
+    public function scopeReceipts(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('status', TransactionStatus::Success);
+    }
+
+    public function isReceipt(): bool
+    {
+        return $this->status === TransactionStatus::Success;
+    }
+
+    /**
      * Whether this receipt settled the request outright.
      *
      * Drives the payslip's wording: "paid in full" against "part payment
@@ -61,7 +78,9 @@ class PaymentTransaction extends Model
      */
     public function settledInFull(): bool
     {
-        return (float) $this->balance_after < 0.01;
+        // Null balance_after means an attempt that never settled, so it cannot
+        // have settled anything in full. Phase 13 made the column nullable.
+        return $this->balance_after !== null && (float) $this->balance_after < 0.01;
     }
 
     /** The payslip's own title. */

@@ -6,6 +6,7 @@ use App\Enums\PaymentChannel;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Enums\TransactionStatus;
 use App\Enums\ReservationStatus;
 use App\Events\PaymentReceived;
 use App\Events\PaymentRequested as PaymentRequestedEvent;
@@ -15,6 +16,7 @@ use App\Models\PaymentTransaction;
 use App\Models\Reservation;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -248,56 +250,13 @@ class PaymentService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $payment->isOpen()) {
-                throw new RuntimeException(
-                    "This payment request is {$payment->status->label()} — nothing further can be recorded against it."
-                );
-            }
-
-            if ($amount <= 0) {
-                throw new RuntimeException('The amount received has to be more than zero.');
-            }
-
-            // Poisha comparison, not float. 4999.995 rounds to a figure that is
-            // "greater than" 4999.99 in floating point often enough to matter
-            // when somebody types the outstanding amount exactly.
-            $outstandingPoisha = (int) round($payment->outstanding() * 100);
-            $amountPoisha      = (int) round($amount * 100);
-
-            if ($amountPoisha > $outstandingPoisha) {
-                throw new RuntimeException(sprintf(
-                    'That is more than the BDT %s still outstanding on this request.',
-                    number_format($payment->outstanding()),
-                ));
-            }
-
-            $paidPoisha = (int) round((float) $payment->amount_paid * 100) + $amountPoisha;
-            $settled    = $paidPoisha >= (int) round((float) $payment->amount_due * 100);
-            $balance    = ($outstandingPoisha - $amountPoisha) / 100;
-
-            $payment->forceFill([
-                'amount_paid'       => $paidPoisha / 100,
-                'method'            => $method,
-                'gateway_reference' => $reference,
-                'recorded_by'       => $actor->id,
-                'status'            => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
-                'paid_at'           => $settled ? ($paidAt ?? CarbonImmutable::now()) : null,
-            ])->save();
+            $this->guardCollectable($payment, $amount);
 
             /*
-             | PHASE 12B — the receipt.
-             |
-             | Written for EVERY settlement, manual or gateway, because the
-             | client requires a payslip in both cases and a payslip needs its
-             | own amount, method and moment. The columns stamped on the payment
-             | above are now a denormalised copy of this row; before 12B they
-             | were the only record, which meant a second part payment silently
-             | overwrote the first one's method.
-             |
-             | balance_after is snapshotted rather than derived. A receipt the
-             | visitor is holding must say the same thing next month, and
-             | recomputing "still to come" at render time would rewrite it the
-             | moment anything else moved.
+             | PHASE 12B — the receipt. PHASE 13 moved the money arithmetic out
+             | into applySettlement(), which the gateway path also uses, so that
+             | a card payment and a cash payment cannot drift apart in how they
+             | credit a request.
              */
             $transaction = new PaymentTransaction();
 
@@ -306,73 +265,287 @@ class PaymentService
                 'payment_id'         => $payment->id,
                 'channel'            => PaymentChannel::forMethod($method),
                 'method'             => $method,
-                'status'             => 'success',
-                'amount'             => $amountPoisha / 100,
-                'balance_after'      => $balance,
+                'status'             => TransactionStatus::Success,
+                'amount'             => round($amount, 2),
                 'external_reference' => $reference,
                 'note'               => $note,
                 'received_at'        => $paidAt ?? CarbonImmutable::now(),
                 'recorded_by'        => $actor->id,
             ])->save();
 
-            $reservation = $payment->reservation()->lockForUpdate()->firstOrFail();
+            return $this->applySettlement($payment, $transaction, $actor);
+        });
+    }
 
-            $line = sprintf(
-                'BDT %s received by %s against %s. Receipt %s.%s%s',
-                number_format($amount),
-                $method->label(),
-                $payment->reference,
-                $transaction->reference,
-                $reference ? " Ref {$reference}." : '',
-                $note ? ' ' . $note : '',
+    /**
+     * PHASE 13 — credit a settled attempt to its request.
+     *
+     * The single place money moves, whichever way it arrived. Assumes the
+     * transaction row already exists and is genuinely settled: record() writes
+     * one and calls straight through, and the gateway path validates first and
+     * then calls the same method. Everything downstream of "money is real" —
+     * the running total, the request status, the reservation transition, the
+     * receipt's snapshot, the visitor's email — happens here, once.
+     *
+     * @param  User|null  $actor  Null for a gateway settlement, where nobody
+     *                            asserted anything; the history line says the
+     *                            gateway did it.
+     */
+    private function applySettlement(Payment $payment, PaymentTransaction $transaction, ?User $actor): Payment
+    {
+        $amount = (float) $transaction->amount;
+
+        // Poisha throughout, never floats. 4999.995 compares as "greater than"
+        // 4999.99 in floating point often enough to matter when somebody pays
+        // the outstanding amount exactly.
+        $outstandingPoisha = (int) round($payment->outstanding() * 100);
+        $amountPoisha      = (int) round($amount * 100);
+        $paidPoisha        = (int) round((float) $payment->amount_paid * 100) + $amountPoisha;
+        $settled           = $paidPoisha >= (int) round((float) $payment->amount_due * 100);
+
+        $payment->forceFill([
+            'amount_paid'       => $paidPoisha / 100,
+            'method'            => $transaction->method,
+            'gateway_reference' => $transaction->external_reference,
+            'recorded_by'       => $actor?->id,
+            'status'            => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
+            'paid_at'           => $settled ? ($transaction->received_at ?? CarbonImmutable::now()) : null,
+        ])->save();
+
+        // balance_after is snapshotted rather than derived. A receipt the
+        // visitor is holding must say the same thing next month, and
+        // recomputing "still to come" at render time would rewrite it the
+        // moment anything else moved.
+        $transaction->forceFill([
+            'balance_after' => max(0, $outstandingPoisha - $amountPoisha) / 100,
+        ])->save();
+
+        $reservation = $payment->reservation()->lockForUpdate()->firstOrFail();
+
+        $line = sprintf(
+            'BDT %s received by %s against %s. Receipt %s.%s%s',
+            number_format($amount),
+            $transaction->method->label(),
+            $payment->reference,
+            $transaction->reference,
+            $transaction->external_reference ? " Ref {$transaction->external_reference}." : '',
+            $transaction->note ? ' ' . $transaction->note : '',
+        );
+
+        if (! $settled) {
+            // Part paid. The reservation stays where it is — it is not
+            // confirmed until the amount asked for has actually arrived — and
+            // the history says how much is left so nobody has to work it out
+            // from two other rows.
+            $this->reservations->note(
+                $reservation,
+                $actor,
+                $line . sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
             );
 
-            if (! $settled) {
-                // Part paid. The reservation stays where it is — it is not
-                // confirmed until the amount asked for has actually arrived —
-                // and the history says how much is left so nobody has to work
-                // it out from two other rows.
-                $this->reservations->note(
-                    $reservation,
-                    $actor,
-                    $line . sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
-                );
-
-                // Every receipt gets an email, part payment included — the
-                // visitor needs the payslip and needs to know what is left.
-                PaymentReceived::dispatch($payment, $transaction);
-
-                return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
-            }
-
-            if ($reservation->status->canTransitionTo(ReservationStatus::Confirmed)) {
-                $this->reservations->transition(
-                    $reservation,
-                    ReservationStatus::Confirmed,
-                    $actor,
-                    $line,
-                );
-            } else {
-                /*
-                 | Money arrived against a reservation that is no longer waiting
-                 | for it — cancelled while the visitor was at the ATM, most
-                 | likely. The receipt is still recorded, because it happened
-                 | and pretending otherwise loses real money from the books, but
-                 | the status is left alone and the history says so plainly.
-                 | Somebody has a refund to process and this is how they find
-                 | out.
-                 */
-                $this->reservations->note(
-                    $reservation,
-                    $actor,
-                    $line . " The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
-                );
-            }
-
+            // Every receipt gets an email, part payment included — the visitor
+            // needs the payslip and needs to know what is left.
             PaymentReceived::dispatch($payment, $transaction);
 
             return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
+        }
+
+        if ($reservation->status->canTransitionTo(ReservationStatus::Confirmed)) {
+            $this->reservations->transition(
+                $reservation,
+                ReservationStatus::Confirmed,
+                $actor,
+                $line,
+            );
+        } else {
+            /*
+             | Money arrived against a reservation that is no longer waiting for
+             | it — cancelled while the visitor was at the gateway, most likely.
+             | The receipt is still recorded, because it happened and pretending
+             | otherwise loses real money from the books, but the status is left
+             | alone and the history says so plainly. Somebody has a refund to
+             | process and this is how they find out.
+             */
+            $this->reservations->note(
+                $reservation,
+                $actor,
+                $line . " The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
+            );
+        }
+
+        PaymentReceived::dispatch($payment, $transaction);
+
+        return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
+    }
+
+    /**
+     * PHASE 13 — the shared guard for anything about to take money.
+     *
+     * Run under the row lock in every caller. Throws rather than returning
+     * false because each message is something a person needs to READ: an admin
+     * typing a figure, or a visitor who has just been told their payment could
+     * not start.
+     */
+    private function guardCollectable(Payment $payment, float $amount): void
+    {
+        if (! $payment->isOpen()) {
+            throw new RuntimeException(
+                "This payment request is {$payment->status->label()} — nothing further can be recorded against it."
+            );
+        }
+
+        if ($amount <= 0) {
+            throw new RuntimeException('The amount received has to be more than zero.');
+        }
+
+        if ((int) round($amount * 100) > (int) round($payment->outstanding() * 100)) {
+            throw new RuntimeException(sprintf(
+                'That is more than the BDT %s still outstanding on this request.',
+                number_format($payment->outstanding()),
+            ));
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gateway (Phase 13)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Open an attempt before sending the visitor to SSLCommerz.
+     *
+     * The row has to exist FIRST. Its reference becomes the tran_id, which is
+     * what every callback quotes back — so a response can always be tied to
+     * exactly one attempt, and a repeated callback is recognisable as a repeat
+     * rather than a second payment. Creating the row afterwards, from whatever
+     * the callback claims, is how a gateway integration ends up crediting the
+     * same money twice.
+     *
+     * Always for the FULL outstanding amount. Part payment is something the
+     * studio agrees with somebody face to face; a checkout page where a visitor
+     * types their own figure is a different feature and nobody has asked for it.
+     */
+    public function beginGatewayAttempt(Payment $payment): PaymentTransaction
+    {
+        return DB::transaction(function () use ($payment) {
+            $payment = Payment::whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
+
+            $amount = $payment->outstanding();
+
+            $this->guardCollectable($payment, $amount);
+
+            $attempt = new PaymentTransaction();
+
+            $attempt->forceFill([
+                'reference'  => $this->generateTransactionReference(),
+                'payment_id' => $payment->id,
+                'channel'    => PaymentChannel::Gateway,
+                'method'     => PaymentMethod::Sslcommerz,
+                'status'     => TransactionStatus::Initiated,
+                'amount'     => round($amount, 2),
+
+                // Both null until it succeeds. A row with no received_at is not
+                // a receipt, and the payslip route will not render one.
+                'received_at'   => null,
+                'balance_after' => null,
+            ])->save();
+
+            return $attempt;
         });
+    }
+
+    /**
+     * Credit an attempt that SSLCommerz has confirmed, server to server.
+     *
+     * IDEMPOTENT, and that is the whole point. SSLCommerz fires both a browser
+     * redirect and a server-side IPN for the same payment, sometimes seconds
+     * apart and sometimes in either order, and it will retry the IPN if we are
+     * slow to answer. Every one of those paths lands here. The lock plus the
+     * status check means the first caller settles it and the rest quietly get
+     * the same answer.
+     *
+     * @param  array<string,mixed>  $validation  The payload from
+     *                                           SslCommerzService::validate().
+     *                                           Never anything the browser sent.
+     */
+    public function settleGatewayAttempt(PaymentTransaction $attempt, array $validation): Payment
+    {
+        return DB::transaction(function () use ($attempt, $validation) {
+            $attempt = PaymentTransaction::whereKey($attempt->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $payment = Payment::whereKey($attempt->payment_id)->lockForUpdate()->firstOrFail();
+
+            // Already done. Not an error — it is the second callback arriving,
+            // which is normal and expected.
+            if ($attempt->status === TransactionStatus::Success) {
+                return $payment;
+            }
+
+            $attempt->forceFill([
+                'status'               => TransactionStatus::Success,
+                'external_reference'   => $validation['bank_tran_id'] ?? ($validation['val_id'] ?? null),
+                'gateway_val_id'       => $validation['val_id'] ?? null,
+                'gateway_bank_tran_id' => $validation['bank_tran_id'] ?? null,
+                'gateway_card_type'    => $validation['card_type'] ?? null,
+                'gateway_payload'      => $validation,
+                'validated_at'         => CarbonImmutable::now(),
+                'received_at'          => CarbonImmutable::now(),
+            ])->save();
+
+            /*
+             | Guarded AFTER the attempt is marked settled, deliberately.
+             |
+             | If the request was withdrawn or already paid while the visitor
+             | was on the gateway's page, the money still arrived and the record
+             | of it must survive — losing it would mean a visitor is out of
+             | pocket with nothing in our books. So the attempt keeps its
+             | Success and its payload, and applySettlement is simply skipped;
+             | the payment's own note trail already covers the refund case for
+             | money that lands against a dead reservation.
+             */
+            if (! $payment->isOpen()) {
+                Log::warning('A gateway payment settled against a request that was no longer open.', [
+                    'payment' => $payment->reference,
+                    'attempt' => $attempt->reference,
+                    'status'  => $payment->status->value,
+                ]);
+
+                return $payment;
+            }
+
+            return $this->applySettlement($payment, $attempt, null);
+        });
+    }
+
+    /**
+     * Close an attempt that did not result in money.
+     *
+     * Kept rather than deleted. "Three declined attempts on Tuesday" is the
+     * answer to a support call that silence cannot give, and a visitor
+     * insisting their card went through is unanswerable without it.
+     */
+    public function failGatewayAttempt(
+        PaymentTransaction $attempt,
+        TransactionStatus $status,
+        ?string $reason = null,
+        ?array $payload = null,
+    ): PaymentTransaction {
+        if ($attempt->status !== TransactionStatus::Initiated) {
+            // A late fail callback after a successful IPN. Ignore it — the
+            // money is real and this would otherwise undo it.
+            return $attempt;
+        }
+
+        $attempt->forceFill([
+            'status'          => $status,
+            'failure_reason'  => $reason,
+            'gateway_payload' => $payload,
+        ])->save();
+
+        return $attempt;
     }
 
     /**

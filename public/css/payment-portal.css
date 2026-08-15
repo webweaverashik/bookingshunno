@@ -90,6 +90,33 @@ body {
 
 /* ---------- Cards ---------- */
 
+/* Flash messages from the gateway round trip. Above the fold on purpose —
+   somebody returning from a failed payment needs to read this before they see
+   the amount again. */
+.pay-flash {
+    padding: 14px 18px;
+    border-radius: 4px;
+    margin-bottom: 18px;
+    font-size: 14px;
+}
+
+.pay-flash--ok {
+    background: #eaf3ee;
+    color: #1f5340;
+    border-left: 3px solid var(--pay-accent);
+}
+
+.pay-flash--bad {
+    background: #f7eeea;
+    color: #7d3122;
+    border-left: 3px solid #9a3b28;
+}
+
+/* The Pay button is a form now, so it needs the row layout the div had. */
+form.pay-option {
+    margin: 0;
+}
+
 .pay-card {
     background: var(--pay-paper);
     border: 1px solid var(--pay-line);

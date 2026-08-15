@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Public;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\SslCommerzService;
 use Illuminate\View\View;
 
 /**
@@ -28,6 +29,10 @@ use Illuminate\View\View;
  */
 class PaymentPortalController extends Controller
 {
+    public function __construct(private readonly SslCommerzService $gateway)
+    {
+    }
+
     public function show(string $token): View
     {
         $payment = Payment::where('token', $token)
@@ -53,6 +58,15 @@ class PaymentPortalController extends Controller
              | check with the studio, which is honest without slamming a door
              | the client never asked to be shut.
              */
+            /*
+             | PHASE 13. Two separate reasons the Pay button might not appear,
+             | and the page says which: the studio has switched online payment
+             | off for now, or it was never configured. Staff can still take
+             | payment by hand either way, so the message points at the phone
+             | rather than at an error.
+             */
+            'canPayOnline' => $this->gateway->isAvailable(),
+
             'settled'   => $payment->status === PaymentStatus::Paid,
             'withdrawn' => $payment->status === PaymentStatus::Cancelled,
             'overdue'   => $payment->isOverdue(),
