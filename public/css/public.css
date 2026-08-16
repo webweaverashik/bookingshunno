@@ -1605,7 +1605,8 @@ a {
 }
 
 /* Bootstrap form controls, warmed up */
-.sh-modal .form-label {
+.sh-modal .form-label,
+.sh-form .form-label {
   font-size: .85rem;
   font-weight: 600;
   margin-bottom: .35rem;
@@ -1613,7 +1614,9 @@ a {
 }
 
 .sh-modal .form-control,
-.sh-modal .form-select {
+.sh-modal .form-select,
+.sh-form .form-control,
+.sh-form .form-select {
   background: #fff;
   border-color: var(--sh-line);
   border-radius: var(--sh-r-sm);
@@ -1623,24 +1626,30 @@ a {
 }
 
 .sh-modal .form-control:focus,
-.sh-modal .form-select:focus {
+.sh-modal .form-select:focus,
+.sh-form .form-control:focus,
+.sh-form .form-select:focus {
   border-color: var(--sh-cyan);
   box-shadow: 0 0 0 3px rgba(42, 74, 99, .15);
 }
 
-.sh-modal .form-text {
+.sh-modal .form-text,
+.sh-form .form-text {
   font-size: .78rem;
   color: var(--sh-mute);
   margin: .35rem 0 0
 }
 
-.sh-modal .invalid-feedback {
+.sh-modal .invalid-feedback,
+.sh-form .invalid-feedback {
   font-size: .8rem;
   margin-top: .3rem
 }
 
 .sh-modal .form-control.is-invalid,
-.sh-modal .form-select.is-invalid {
+.sh-modal .form-select.is-invalid,
+.sh-form .form-control.is-invalid,
+.sh-form .form-select.is-invalid {
   border-color: #B3261E;
   background-image: none
 }

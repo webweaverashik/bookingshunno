@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureVisitor;
 use App\Http\Middleware\IsLoggedIn;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
@@ -27,11 +28,26 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Admin panel. routes/web.php stays public-only.
             Route::middleware('web')->group(base_path('routes/admin.php'));
+
+            /*
+            | PHASE 15 — the returning visitor's own pages, at /visits.
+            |
+            | Loaded after admin.php so that if the two ever registered the same
+            | path the admin one would win, which is the safer way round.
+            */
+            Route::middleware('web')->group(base_path('routes/visitor.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'isLoggedIn'         => IsLoggedIn::class,
+
+            /*
+            | PHASE 15. Deliberately NOT reusing 'auth' or 'isLoggedIn': both
+            | bounce a guest to route('login'), the staff password screen, which
+            | a visitor has no password for.
+            */
+            'visitor'            => EnsureVisitor::class,
 
             'role'               => RoleMiddleware::class,
             'permission'         => PermissionMiddleware::class,

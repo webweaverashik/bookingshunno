@@ -99,18 +99,31 @@
                     </div>
                 @endcan
 
-                @role('Admin')
+                {{-- PHASE 16. Moved out of the Admin-only block and onto its
+                     own permission: Manager holds reports.view and reports.export,
+                     because whoever runs the floor is the person asked how last
+                     month went. @role('Admin') here would have hidden a screen
+                     the seeder had already granted them. --}}
+                @can('reports.view')
                     <div class="menu-item pt-5">
                         <div class="menu-content"><span
-                                class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
+                                class="menu-heading fw-bold text-uppercase fs-7">Insight</span></div>
                     </div>
                     <div class="menu-item">
-                        <a class="menu-link" href="#" id="reports_link">
+                        <a class="menu-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
+                            href="{{ route('admin.reports.index') }}">
                             <span class="menu-icon">
                                 <i class="ki-outline ki-chart-simple-3 fs-2"></i>
                             </span>
                             <span class="menu-title">Reports</span>
                         </a>
+                    </div>
+                @endcan
+
+                @role('Admin')
+                    <div class="menu-item pt-5">
+                        <div class="menu-content"><span
+                                class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
                     <div class="menu-item">
                         <a class="menu-link {{ request()->routeIs('settings.*', 'backup') ? 'active' : '' }}"

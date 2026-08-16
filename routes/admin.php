@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
@@ -244,5 +245,42 @@ Route::prefix('admin')
                 Route::post('{voucher:code}/cancel', [VoucherController::class, 'cancel'])->name('cancel');
             });
 
-        // PHASE 16: reports
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 16 — reports and CSV export
+        |----------------------------------------------------------------------
+        | Gated on reports.view for the whole group, with reports.export as a
+        | second gate on the download alone. Both are held by Admin and Manager,
+        | and the split is not decoration: a page of rows on a screen and the
+        | client's entire visitor list as a file on somebody's laptop are
+        | different acts, and separating them means the client can withdraw one
+        | without withdrawing the other.
+        |
+        | No policy class. Nothing here writes, and every row shown is one the
+        | register already shows to the same person — a policy would be ceremony
+        | around a read.
+        |
+        | {report} is a plain string validated against the ReportType enum in
+        | the controller rather than a route constraint, so an unknown report
+        | 404s in one place and the enum stays the only list of them.
+        |
+        | No literal-before-placeholder problem here, unlike the reservations
+        | and payments groups: 'list' and 'export' sit UNDER the report segment
+        | rather than beside it, so the paths differ in length and cannot
+        | collide. The bare /reports path falls through to the reservations
+        | report via the controller's default argument.
+        */
+        Route::prefix('reports')
+            ->name('reports.')
+            ->middleware('permission:reports.view')
+            ->group(function () {
+                Route::get('/', [ReportController::class, 'index'])->name('index');
+
+                Route::get('{report}', [ReportController::class, 'index'])->name('show');
+                Route::get('{report}/list', [ReportController::class, 'list'])->name('list');
+
+                Route::get('{report}/export', [ReportController::class, 'export'])
+                    ->middleware('permission:reports.export')
+                    ->name('export');
+            });
     });

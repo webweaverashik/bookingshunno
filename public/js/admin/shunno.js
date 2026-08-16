@@ -189,6 +189,104 @@ window.Shunno = (function () {
         });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Date fields
+    |--------------------------------------------------------------------------
+    | Flatpickr comes in plugins.bundle.js with the rest of Metronic. Nothing is
+    | loaded here — this only ATTACHES it to the fields that ask for it, which
+    | Metronic does not do on its own (it auto-initialises Select2, tooltips and
+    | popovers, but not date pickers).
+    |
+    | THIS ALSO FIXES A LIVE BUG. Phase 14B gave the gift-voucher expiry field
+    | the class `shunno-datepicker` and a comment saying Flatpickr, per the
+    | project convention — and nothing anywhere ever called it. That field has
+    | been a bare text input since it shipped, accepting whatever anyone typed
+    | and relying on the server to reject it. Scanning on DOM ready from here
+    | catches it and every field added after it.
+    |
+    | One house configuration, in one place:
+    |
+    |   the input SUBMITS Y-m-d          what every date column and Form Request
+    |                                    in the application already expects
+    |   the input SHOWS  j M Y           what a person reads without decoding
+    |
+    | altInput is what makes those two different things. Flatpickr hides the
+    | real field and puts a readable one beside it, so nothing downstream has to
+    | parse "14 Aug 2026".
+    */
+    function datepickers(root, options) {
+        var scope = root || document;
+
+        if (typeof window.flatpickr !== 'function') {
+            // Bundle not loaded on this page. The fields stay plain text inputs
+            // and the server still validates them, so this degrades rather than
+            // breaking.
+            return [];
+        }
+
+        var fields = Array.prototype.slice.call(scope.querySelectorAll('.shunno-datepicker'));
+
+        return fields.map(function (field) {
+            // Re-initialising a field would stack two calendars on it. Flatpickr
+            // records its instance on the element, so this is the reliable check.
+            if (field._flatpickr) {
+                return field._flatpickr;
+            }
+
+            return window.flatpickr(field, Object.assign({
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'j M Y',
+                allowInput: false,
+
+                // Reads the field's own attributes, so a min or max date is set
+                // in Blade beside the input rather than in a JS lookup table
+                // that has to be kept in step with it.
+                minDate: field.dataset.minDate || null,
+                maxDate: field.dataset.maxDate || null,
+                defaultDate: field.value || null,
+            }, options || {}));
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Change events, with or without Select2
+    |--------------------------------------------------------------------------
+    | The gap the Phase 6 rule works around, closed properly.
+    |
+    | Metronic auto-initialises anything carrying data-control="select2", and
+    | Select2 announces a selection by calling jQuery's .trigger('change'). That
+    | does NOT reach a listener added with addEventListener — jQuery only runs
+    | its own handlers plus a native method of the same name, and elements have
+    | no native .change(). So a Select2 filter bound the ordinary way is simply
+    | dead, which is why every short filter dropdown in this panel is a plain
+    | form-select.
+    |
+    | That rule is right for a three-option dropdown, which gains nothing from a
+    | search box. It is wrong for a fourteen-option one. This binds through
+    | jQuery when the field is a Select2 and natively otherwise, so the choice
+    | between them can be made on whether a search box helps rather than on
+    | which one the event happens to survive.
+    */
+    function onChange(el, handler) {
+        if (!el) return;
+
+        var isSelect2 = el.getAttribute('data-control') === 'select2';
+
+        if (isSelect2 && window.jQuery) {
+            window.jQuery(el).on('change', function () {
+                handler.call(el);
+            });
+            return;
+        }
+
+        el.addEventListener('change', function () {
+            handler.call(el);
+        });
+    }
+
     /** Bootstrap modal instance for an element or selector. */
     function modal(target) {
         var el = typeof target === 'string' ? document.querySelector(target) : target;
@@ -214,11 +312,29 @@ window.Shunno = (function () {
         syncSelects(form);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Startup
+    |--------------------------------------------------------------------------
+    | One scan for date fields when the document is ready. Modal contents are
+    | rendered by Blade into @stack('modals') at page load rather than injected
+    | later, so this catches them too — a modal that is merely hidden is still
+    | in the DOM. Anything that builds fields dynamically should call
+    | Shunno.datepickers(container) itself.
+    */
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { datepickers(); });
+    } else {
+        datepickers();
+    }
+
     return {
         request: request,
         showErrors: showErrors,
         clearErrors: clearErrors,
         syncSelects: syncSelects,
+        datepickers: datepickers,
+        onChange: onChange,
         toast: toast,
         busy: busy,
         confirm: confirm,

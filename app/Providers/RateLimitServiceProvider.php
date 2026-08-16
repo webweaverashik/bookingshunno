@@ -100,6 +100,40 @@ class RateLimitServiceProvider extends ServiceProvider
             Limit::perHour(20)->by('voucher-hour:' . $request->ip()),
         ]);
 
+        /*
+        | PHASE 15 — the visitor's passwordless sign-in.
+        |
+        | Three buckets, all separate from the staff ones above. Sharing 'otp'
+        | between the two audiences would mean a visitor on a café's wifi could
+        | exhaust the allowance a member of staff needs to get into the panel —
+        | the same class of failure Phase 7C fixed, just between modules rather
+        | than routes.
+        |
+        | 'visitor-login' is keyed on the ADDRESS as well as the IP, because the
+        | thing being protected is one person's inbox: without the address in
+        | the key, one attacker could spray codes at fifty different visitors
+        | from one machine inside the same limit. Tighter per hour than the
+        | staff equivalent, because every attempt sends an email and a mailbox
+        | full of codes nobody asked for is its own kind of harm.
+        */
+        RateLimiter::for('visitor-login', fn (Request $request) => [
+            Limit::perMinute(3)->by('vlogin:' . strtolower((string) $request->input('email')) . '|' . $request->ip()),
+            Limit::perHour(10)->by('vlogin-hour:' . $request->ip()),
+        ]);
+
+        /*
+        | Guessing at the code itself. OtpService already voids a code after
+        | five wrong tries, so this is the second wall: it stops somebody
+        | burning through five, asking for a fresh code, and starting again.
+        */
+        RateLimiter::for('visitor-otp', fn (Request $request) => [
+            Limit::perMinute(6)->by('votp:' . $request->ip()),
+            Limit::perHour(30)->by('votp-hour:' . $request->ip()),
+        ]);
+
+        RateLimiter::for('visitor-otp-resend', fn (Request $request) => Limit::perMinute(2)
+            ->by('votp-resend:' . $request->ip()));
+
         RateLimiter::for('payslip', fn (Request $request) => [
             Limit::perMinute(20)->by('payslip:' . $request->route('token') . '|' . $request->ip()),
             Limit::perHour(60)->by('payslip-hour:' . $request->ip()),
