@@ -231,8 +231,20 @@ class RolePermissionSeeder extends Seeder
              */
             'communications.resend',
 
-            // Gift vouchers - view only
+            /*
+             | Vouchers.
+             |
+             | PHASE 14B added vouchers.redeem. The café credit rule requires
+             | it: a visitor standing at the counter with a coupon needs
+             | whoever is on the floor to honour it, and making that Admin-only
+             | would leave somebody waiting while a manager phones the owner
+             | about 300 taka of coffee.
+             |
+             | Creating and cancelling stay with Admin. Both give away or take
+             | back the studio's money, which is the line 10A and 10B drew.
+             */
             'vouchers.view',
+            'vouchers.redeem',
 
             // Reports
             'reports.view',

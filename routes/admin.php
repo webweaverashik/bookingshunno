@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ReservationController;
+use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
@@ -208,6 +209,40 @@ Route::prefix('admin')
                     ->name('resend');
             });
 
-        // PHASE 14: vouchers
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 14B — vouchers
+        |----------------------------------------------------------------------
+        | Gated on vouchers.view for the group; VoucherPolicy handles the write
+        | abilities per action, because redeem and cancel both depend on the
+        | voucher's state as well as on a permission — something route
+        | middleware cannot express.
+        |
+        | Manager holds vouchers.view and vouchers.redeem. That is the café
+        | credit rule: somebody at the counter with a coupon needs whoever is on
+        | the floor to be able to honour it. Creating and cancelling stay with
+        | Admin — both give away or take back the studio's money.
+        |
+        | 'list' and 'lookup' are registered before {voucher:code} so the
+        | literal segments win, as in the reservations and payments groups.
+        */
+        Route::prefix('vouchers')
+            ->name('vouchers.')
+            ->middleware('permission:vouchers.view')
+            ->group(function () {
+                Route::get('/', [VoucherController::class, 'index'])->name('index');
+                Route::get('list', [VoucherController::class, 'list'])->name('list');
+
+                // The counter workflow. Read-only by design — it answers
+                // "is this good" without spending anything.
+                Route::get('lookup', [VoucherController::class, 'lookup'])->name('lookup');
+
+                Route::post('/', [VoucherController::class, 'store'])->name('store');
+
+                Route::get('{voucher:code}', [VoucherController::class, 'show'])->name('show');
+                Route::post('{voucher:code}/redeem', [VoucherController::class, 'redeem'])->name('redeem');
+                Route::post('{voucher:code}/cancel', [VoucherController::class, 'cancel'])->name('cancel');
+            });
+
         // PHASE 16: reports
     });

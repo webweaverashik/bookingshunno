@@ -5,6 +5,7 @@ use App\Http\Controllers\Public\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\PaymentGatewayController;
 use App\Http\Controllers\Public\PaymentPortalController;
+use App\Http\Controllers\Public\VoucherRedemptionController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use App\Http\Controllers\PayslipController;
 use Illuminate\Support\Facades\Mail;
@@ -130,6 +131,26 @@ Route::prefix('payment/gateway')->name('payment.gateway.')->group(function () {
 
     Route::post('ipn', [PaymentGatewayController::class, 'ipn'])->name('ipn');
 });
+
+/*
+| PHASE 14C — spending a voucher against a payment request.
+|
+| Two steps: check() validates and previews, apply() commits. The split exists
+| because a voucher is single use and all or nothing, so a visitor about to
+| forfeit the unused part has to be told before they click.
+|
+| Same token, same reasoning as everything else here — the URL is the credential.
+| Throttled harder than the read-only pages: this is the one public endpoint that
+| takes a code and tells you whether it is real, which is exactly the shape of
+| thing worth guessing at.
+*/
+Route::post('pay/{token}/voucher', [VoucherRedemptionController::class, 'check'])
+    ->middleware('throttle:voucher-attempt')
+    ->name('payment.voucher.check');
+
+Route::post('pay/{token}/voucher/apply', [VoucherRedemptionController::class, 'apply'])
+    ->middleware('throttle:voucher-attempt')
+    ->name('payment.voucher.apply');
 
 Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class, 'visitor'])
     ->middleware('throttle:payslip')

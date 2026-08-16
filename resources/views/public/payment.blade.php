@@ -195,13 +195,78 @@
                     </div>
                 @endif
 
-                <div class="pay-option is-pending">
-                    <div>
-                        <span class="pay-option__title">Redeem a gift voucher</span>
-                        <span class="pay-option__sub">If you were given one</span>
+                {{--
+                    PHASE 14C — voucher redemption, in two steps.
+
+                    The second step is not ceremony. A voucher is single use and
+                    all or nothing, so a 2,000 taka gift against a 1,500 taka
+                    request loses 500 — and taking that in one click without
+                    saying so would be a trap. The confirmation panel below spells
+                    it out before anything is spent.
+
+                    No JavaScript anywhere in this page, so this is two plain form
+                    posts. A checkout that quietly stops working when a script
+                    fails to load is worse than one extra page render.
+                --}}
+                @if (session('voucher_preview'))
+                    @php($preview = session('voucher_preview'))
+
+                    <div class="pay-voucher-confirm">
+                        <div class="pay-voucher-confirm__head">
+                            <span class="pay-voucher-confirm__code">{{ $preview['code'] }}</span>
+                            <span class="pay-voucher-confirm__value">
+                                BDT {{ number_format($preview['value']) }}
+                            </span>
+                        </div>
+
+                        <p>
+                            This will pay <strong>BDT {{ number_format($preview['applies']) }}</strong>
+                            towards your reservation.
+                        </p>
+
+                        @if ($preview['forfeit'] > 0)
+                            {{-- The whole reason this step exists. Stated before the
+                                 button, in taka, not buried in small print. --}}
+                            <p class="pay-voucher-confirm__warn">
+                                Your voucher is worth more than you owe. Vouchers are used once, in one
+                                go, so the remaining
+                                <strong>BDT {{ number_format($preview['forfeit']) }}</strong>
+                                will be lost. You may prefer to keep this one for a larger booking.
+                            </p>
+                        @endif
+
+                        @if ($preview['remaining'] > 0)
+                            <p>
+                                <strong>BDT {{ number_format($preview['remaining']) }}</strong> will still
+                                be left to pay, which you can do online straight afterwards.
+                            </p>
+                        @endif
+
+                        <form method="POST" action="{{ route('payment.voucher.apply', $payment->token) }}">
+                            @csrf
+                            <input type="hidden" name="code" value="{{ $preview['code'] }}">
+                            <button type="submit" class="pay-voucher-confirm__go">
+                                Use this voucher
+                            </button>
+                        </form>
                     </div>
-                    <button type="button" disabled>Opening shortly</button>
-                </div>
+                @else
+                    <form method="POST" action="{{ route('payment.voucher.check', $payment->token) }}"
+                        class="pay-option pay-option--voucher">
+                        @csrf
+                        <div>
+                            <span class="pay-option__title">Redeem a gift voucher</span>
+                            <span class="pay-option__sub">If you were given one</span>
+                            {{-- Uppercased and spellcheck off: these codes are read
+                                 off a card, and a browser helpfully autocorrecting
+                                 GIFT-2608-K4RT is not help. --}}
+                            <input type="text" name="code" class="pay-voucher-code"
+                                placeholder="GIFT-2608-K4RT" autocomplete="off" spellcheck="false"
+                                autocapitalize="characters" maxlength="24">
+                        </div>
+                        <button type="submit">Apply</button>
+                    </form>
+                @endif
 
                 <p class="pay-note">
                     @if ($canPayOnline)

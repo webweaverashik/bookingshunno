@@ -14,6 +14,7 @@ use App\Models\Auth\User;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\Reservation;
+use App\Models\Voucher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -567,6 +568,81 @@ class PaymentService
         ])->save();
 
         return $attempt;
+    }
+
+    /**
+     * PHASE 14C — settle a request, in whole or in part, with a voucher.
+     *
+     * ORDER MATTERS. The voucher is redeemed FIRST, inside this transaction,
+     * because that is the operation with a lock on it and the one that must not
+     * happen twice. A visitor double-submitting the form has both requests reach
+     * VoucherService::redeem(); the second finds a row already marked Redeemed
+     * and throws, and this whole transaction — receipt included — rolls back.
+     * Crediting the payment first and redeeming afterwards would let two
+     * receipts exist for one coupon.
+     *
+     * SINGLE USE, ALL OR NOTHING, per the client's decision. A 2,000 taka
+     * voucher against a 1,500 taka request settles the 1,500 and forfeits the
+     * rest — so the portal makes the visitor confirm that in words before it
+     * gets here. The amount recorded is capped at what is outstanding, because
+     * a receipt for more than was owed would put the payment into a state
+     * guardCollectable() exists to prevent.
+     *
+     * @throws RuntimeException when the voucher cannot be used, or the request
+     *                          cannot take it.
+     */
+    public function settleWithVoucher(Payment $payment, Voucher $voucher, ?User $actor = null): Payment
+    {
+        return DB::transaction(function () use ($payment, $voucher, $actor) {
+            $payment = Payment::whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
+
+            $reservation = $payment->reservation;
+
+            // Checked before the voucher is spent, so a request that has since
+            // been withdrawn does not burn somebody's coupon on the way to
+            // being refused.
+            if (! $payment->isOpen()) {
+                throw new RuntimeException(
+                    "This payment request is {$payment->status->label()} and cannot take a voucher."
+                );
+            }
+
+            $amount = min((float) $voucher->value, $payment->outstanding());
+
+            $this->guardCollectable($payment, $amount);
+
+            // Redeems under its own lock and re-checks type, expiry and any
+            // workshop restriction. Throws with a message meant for the visitor.
+            $this->vouchers->redeem($voucher, $actor, $reservation, sprintf(
+                'Applied to %s (%s).',
+                $payment->reference,
+                $reservation?->reference_code ?? 'reservation',
+            ));
+
+            $transaction = new PaymentTransaction();
+
+            $transaction->forceFill([
+                'reference'          => $this->generateTransactionReference(),
+                'payment_id'         => $payment->id,
+                'channel'            => PaymentChannel::Voucher,
+                'method'             => PaymentMethod::Voucher,
+                'status'             => TransactionStatus::Success,
+                'amount'             => round($amount, 2),
+                'external_reference' => $voucher->code,
+                'note'               => sprintf(
+                    'Voucher %s worth BDT %s.%s',
+                    $voucher->code,
+                    number_format((float) $voucher->value),
+                    (float) $voucher->value > $amount
+                        ? ' BDT ' . number_format((float) $voucher->value - $amount) . ' of it was not needed and is now spent.'
+                        : '',
+                ),
+                'received_at'        => CarbonImmutable::now(),
+                'recorded_by'        => $actor?->id,
+            ])->save();
+
+            return $this->applySettlement($payment, $transaction, $actor);
+        });
     }
 
     /**

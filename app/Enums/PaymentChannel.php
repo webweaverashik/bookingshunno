@@ -22,11 +22,18 @@ enum PaymentChannel: string
     case Manual  = 'manual';
     case Gateway = 'gateway';
 
+    // PHASE 14C. A third channel rather than folding vouchers into Manual,
+    // because no money moved. A voucher settlement is the studio honouring a
+    // promise it already made, and a payments report counting it as cash taken
+    // would overstate the till by the value of every coupon redeemed.
+    case Voucher = 'voucher';
+
     public function label(): string
     {
         return match ($this) {
             self::Manual  => 'Recorded at the studio',
             self::Gateway => 'Paid online',
+            self::Voucher => 'Paid with a voucher',
         };
     }
 
@@ -36,6 +43,7 @@ enum PaymentChannel: string
         return match ($this) {
             self::Manual  => 'Recorded by studio staff.',
             self::Gateway => 'Verified with the payment gateway.',
+            self::Voucher => 'Settled by redeeming a voucher.',
         };
     }
 
@@ -44,6 +52,7 @@ enum PaymentChannel: string
         return match ($this) {
             self::Manual  => 'info',
             self::Gateway => 'success',
+            self::Voucher => 'primary',
         };
     }
 
@@ -56,6 +65,10 @@ enum PaymentChannel: string
      */
     public static function forMethod(PaymentMethod $method): self
     {
-        return $method->isManual() ? self::Manual : self::Gateway;
+        return match ($method) {
+            PaymentMethod::Sslcommerz => self::Gateway,
+            PaymentMethod::Voucher    => self::Voucher,
+            default                   => self::Manual,
+        };
     }
 }

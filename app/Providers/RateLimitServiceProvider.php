@@ -81,6 +81,25 @@ class RateLimitServiceProvider extends ServiceProvider
         | opened again from the email; tight per hour because nobody legitimately
         | needs a hundred views of one document in an afternoon.
         */
+        /*
+        | PHASE 14C — guessing at voucher codes.
+        |
+        | Tighter than anything else public, because this is the only endpoint
+        | that takes a code and answers whether it is real. A code is twelve
+        | characters from a 32-symbol alphabet, so guessing one is hopeless at
+        | any sane rate — but "hopeless" depends entirely on the rate, and an
+        | unthrottled endpoint turns it into an afternoon's work.
+        |
+        | Keyed on IP alone rather than IP plus token. Somebody working through
+        | the code space would otherwise simply spread the attempts across the
+        | payment links they hold, and the point is to slow the ATTACKER, not
+        | the request.
+        */
+        RateLimiter::for('voucher-attempt', fn (Request $request) => [
+            Limit::perMinute(5)->by('voucher:' . $request->ip()),
+            Limit::perHour(20)->by('voucher-hour:' . $request->ip()),
+        ]);
+
         RateLimiter::for('payslip', fn (Request $request) => [
             Limit::perMinute(20)->by('payslip:' . $request->route('token') . '|' . $request->ip()),
             Limit::perHour(60)->by('payslip-hour:' . $request->ip()),

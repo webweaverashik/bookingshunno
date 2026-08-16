@@ -86,12 +86,18 @@
                         </a>
                     </div>
                 @endcan
-                <div class="menu-item">
-                    <span class="menu-link text-muted">
-                        <span class="menu-icon"><i class="ki-outline ki-gift fs-2"></i></span>
-                        <span class="menu-title">Gift vouchers</span>
-                    </span>
-                </div>
+                @can('vouchers.view')
+                    <div class="menu-item">
+                        <a class="menu-link {{ request()->routeIs('admin.vouchers.*') ? 'active' : '' }}"
+                            href="{{ route('admin.vouchers.index') }}">
+                            <span class="menu-icon"><i class="ki-outline ki-gift fs-2"></i></span>
+                            {{-- "Vouchers", not "Gift vouchers": this screen holds
+                                 café credit too, and the narrower label would send
+                                 staff looking elsewhere for coupons. --}}
+                            <span class="menu-title">Vouchers</span>
+                        </a>
+                    </div>
+                @endcan
 
                 @role('Admin')
                     <div class="menu-item pt-5">
