@@ -141,4 +141,8 @@
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
     <script src="{{ asset('js/admin/payments.js') }}"></script>
+    {{-- PHASE 13B — message history, resend, and copying the payment link.
+         Delegated from the document, so it works inside drawers that the other
+         scripts replace wholesale. --}}
+    <script src="{{ asset('js/admin/communications.js') }}"></script>
 @endpush

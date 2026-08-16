@@ -44,6 +44,12 @@ class PayslipController extends Controller
         // and not a silently different document.
         abort_unless($transaction->payment_id === $payment->id, 404);
 
+        // PHASE 13. Only a settled attempt is a receipt. A failed or in-flight
+        // one has no amount received, no balance and no moment — rendering a
+        // payslip for it would produce a document asserting a payment that
+        // never happened.
+        abort_unless($transaction->isReceipt(), 404);
+
         return $this->render($payment, $transaction, staff: true);
     }
 
@@ -60,6 +66,7 @@ class PayslipController extends Controller
         $payment = Payment::where('token', $token)->firstOrFail();
 
         abort_unless($transaction->payment_id === $payment->id, 404);
+        abort_unless($transaction->isReceipt(), 404);
 
         return $this->render($payment, $transaction, staff: false);
     }

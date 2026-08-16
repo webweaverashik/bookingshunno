@@ -2,10 +2,10 @@
 
 use App\Http\Controllers\Admin\AvailabilityController;
 use App\Http\Controllers\Admin\BlockedDateController;
+use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ReservationController;
-use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
 use App\Http\Controllers\Admin\VisitorController;
 use App\Http\Controllers\Admin\WorkshopController;
@@ -176,19 +176,36 @@ Route::prefix('admin')
                 Route::get('request/{reservation}', [PaymentController::class, 'create'])->name('create');
                 Route::post('request/{reservation}', [PaymentController::class, 'store'])->name('store');
 
-                /*
-                 | PHASE 12B — the payslip, staff copy.
-                 |
-                 | Registered BEFORE the bare {payment:reference} show route so
-                 | the literal segment is not swallowed by it. Same reasoning as
-                 | 'list' above.
-                 */
-                Route::get('{payment:reference}/receipts/{transaction:reference}', [PayslipController::class, 'staff'])
-                    ->name('payslip');
-
                 Route::get('{payment:reference}', [PaymentController::class, 'show'])->name('show');
                 Route::post('{payment:reference}/record', [PaymentController::class, 'record'])->name('record');
                 Route::post('{payment:reference}/cancel', [PaymentController::class, 'cancel'])->name('cancel');
+            });
+
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 13B — communications
+        |----------------------------------------------------------------------
+        | Two list endpoints rather than one filtered one: a reservation drawer
+        | wants everything ever sent about the booking, a payment drawer wants
+        | only what concerns that request, and merging them would make the
+        | payment drawer responsible for excluding approval emails.
+        |
+        | Authorised per action by CommunicationPolicy — resending depends on
+        | the message as well as the person, since internal mail can never be
+        | repeated whoever asks.
+        */
+        Route::prefix('communications')
+            ->name('communications.')
+            ->group(function () {
+                Route::get('reservation/{reservation}', [CommunicationController::class, 'forReservation'])
+                    ->name('reservation');
+
+                Route::get('payment/{payment:reference}', [CommunicationController::class, 'forPayment'])
+                    ->name('payment');
+
+                Route::post('{communication}/resend', [CommunicationController::class, 'resend'])
+                    ->middleware('throttle:6,1')
+                    ->name('resend');
             });
 
         // PHASE 14: vouchers

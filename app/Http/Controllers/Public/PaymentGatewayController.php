@@ -40,8 +40,7 @@ class PaymentGatewayController extends Controller
     public function __construct(
         private readonly SslCommerzService $gateway,
         private readonly PaymentService $payments,
-    ) {
-    }
+    ) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -58,13 +57,34 @@ class PaymentGatewayController extends Controller
                 'Online payment is unavailable at the moment. Please contact the studio and we will take payment directly.');
         }
 
+        $attempt = null;
+
         try {
-            $attempt  = $this->payments->beginGatewayAttempt($payment);
+            $attempt = $this->payments->beginGatewayAttempt($payment);
             $redirect = $this->gateway->initiate($payment, $attempt, (float) $attempt->amount);
         } catch (RuntimeException $e) {
+            /*
+             | beginGatewayAttempt() commits its own transaction, so by the time
+             | initiate() throws the attempt row already exists. Without this it
+             | would sit at Initiated for ever: clutter in the drawer, and — as
+             | the first version of this code proved — a row that later code
+             | mistakes for a receipt because it is in the transactions list.
+             |
+             | Closed here rather than left to the stale-attempt sweep, because
+             | we already KNOW it failed and why. A guess a week later is worse
+             | than the reason we are holding right now.
+             */
+            if ($attempt) {
+                $this->payments->failGatewayAttempt(
+                    $attempt,
+                    TransactionStatus::Failed,
+                    'The gateway session could not be opened.',
+                );
+            }
+
             // Covers both a request that is no longer collectable and a gateway
-            // that would not open a session. The visitor gets the message; the
-            // detail is already in the log.
+            // that would not start. The visitor gets the message; the detail is
+            // already in the log.
             return back()->with('payment_error', $e->getMessage());
         }
 
@@ -140,7 +160,7 @@ class PaymentGatewayController extends Controller
         if (! $attempt) {
             Log::warning('SSLCommerz IPN for an unknown transaction.', [
                 'tran_id' => $request->input('tran_id'),
-                'ip'      => $request->ip(),
+                'ip' => $request->ip(),
             ]);
 
             return response('Unknown transaction', 200);

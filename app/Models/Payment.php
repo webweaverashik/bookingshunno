@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Enums\TransactionStatus;
 use App\Models\Auth\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -141,6 +142,26 @@ class Payment extends Model
     | Money
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * PHASE 13 — the settled transactions, which are the only real receipts.
+     *
+     * Added because three separate templates independently filtered the
+     * transactions list and one of them forgot, which is how a null
+     * received_at reached a ->format() call on the visitor's own payment page.
+     * A named method is harder to forget than a closure that has to be
+     * remembered at every call site.
+     *
+     * Reads the loaded COLLECTION rather than querying, so callers keep the
+     * eager load they already have and a list of payments does not become an
+     * N+1.
+     */
+    public function receipts(): \Illuminate\Support\Collection
+    {
+        return $this->transactions->filter(
+            fn (PaymentTransaction $transaction) => $transaction->status === TransactionStatus::Success
+        );
+    }
 
     /** What is still owed against THIS request. */
     public function outstanding(): float

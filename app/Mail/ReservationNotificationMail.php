@@ -10,7 +10,9 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
+use App\Listeners\LogMailDelivery;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 
 /**
@@ -49,6 +51,13 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
      * the mail views must have been published:
      *
      *     php artisan vendor:publish --tag=laravel-mail
+     *
+     * UNTYPED, and it must stay untyped. Illuminate\Mail\Mailable declares
+     * `public $theme;` with no type, and PHP does not allow a subclass to add
+     * one to an inherited property — doing so is a fatal error raised when the
+     * class is LOADED, before any code in it runs. That also puts it out of
+     * reach of the try/catch in SendReservationNotifications, which can only
+     * catch throwables, not a compile-time declaration failure.
      */
     public $theme = 'shunno';
 
@@ -83,7 +92,39 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
          | close together would otherwise both link to whichever arrived second.
          */
         public ?PaymentTransaction $transaction = null,
+
+        /*
+         | PHASE 13B. The communications row this message belongs to, stamped
+         | into the outgoing headers so LogMailDelivery can flip it to Sent when
+         | the transport accepts it — which happens in the queue worker, in a
+         | different process, minutes later.
+         |
+         | An id rather than the model: SerializesModels would reload it in the
+         | worker for no reason, and the header only ever needs the number.
+         */
+        public ?int $communicationId = null,
     ) {
+    }
+
+    /**
+     * PHASE 13B — the correlation header.
+     *
+     * Matching a delivery back to a log row on recipient and subject would
+     * break the first time two identical emails went to one address, which is
+     * precisely what a resend is. An explicit id cannot be ambiguous.
+     *
+     * X- prefixed and carrying nothing but an integer, so it leaks no visitor
+     * data to anything that inspects the message in transit.
+     */
+    public function headers(): Headers
+    {
+        if ($this->communicationId === null) {
+            return new Headers();
+        }
+
+        return new Headers(text: [
+            LogMailDelivery::HEADER => (string) $this->communicationId,
+        ]);
     }
 
     public function envelope(): Envelope

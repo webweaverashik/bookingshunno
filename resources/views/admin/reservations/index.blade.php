@@ -184,6 +184,10 @@
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
     <script src="{{ asset('js/admin/reservations.js') }}"></script>
+    {{-- PHASE 13B — message history, resend, and copying the payment link.
+         Delegated from the document, so it works inside drawers that the other
+         scripts replace wholesale. --}}
+    <script src="{{ asset('js/admin/communications.js') }}"></script>
     {{-- Second half of payments.js — the request-payment modal. It guards on
          the elements it needs, so on this page the register half is inert. --}}
     @can('reservations.payment-request')

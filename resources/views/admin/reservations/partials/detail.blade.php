@@ -224,6 +224,17 @@
         </div>
     @endif
 
+    {{-- ================= Messages (Phase 13B) ================= --}}
+    <div class="d-flex align-items-center justify-content-between gap-2 mt-4">
+        <span class="text-muted fs-8">Emails sent about this reservation</span>
+        <button type="button" class="btn btn-sm btn-light" data-action="load-messages"
+            data-url="{{ route('admin.communications.reservation', $reservation) }}"
+            data-target="#reservation-messages-{{ $reservation->id }}">
+            Show
+        </button>
+    </div>
+    <div id="reservation-messages-{{ $reservation->id }}" data-messages-list class="mt-3" hidden></div>
+
     {{-- ================= Payments (Phase 12A) ================= --}}
     @php
         $latestPayment = $reservation->latestPayment();

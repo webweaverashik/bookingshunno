@@ -64,6 +64,9 @@ class RolePermissionSeeder extends Seeder
             'payments.verify',
             'payments.update-status',
 
+            // PHASE 13B — repeating an email the visitor was already sent.
+            'communications.resend',
+
             // ---------------------------------------------------------------
             // Gift Vouchers
             // ---------------------------------------------------------------
@@ -218,6 +221,15 @@ class RolePermissionSeeder extends Seeder
              */
             'payments.view',
             'payments.update-status',
+
+            /*
+             | PHASE 13B. Resending is a Manager job too. Repeating a message
+             | the visitor was already sent is not a decision about the
+             | studio's business — the content, the recipient and the
+             | reservation are all unchanged. Whoever is on the phone to
+             | somebody saying "I never got it" is the right person to fix it.
+             */
+            'communications.resend',
 
             // Gift vouchers - view only
             'vouchers.view',

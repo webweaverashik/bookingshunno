@@ -198,12 +198,31 @@
     </div>
 @endif
 
-{{-- ================= Receipts (Phase 12B) ================= --}}
-@if ($payment->transactions->isNotEmpty())
+{{-- ================= Receipts (Phase 12B, corrected in 13) =================
+
+     Split into two lists, because they are two different things.
+
+     A RECEIPT is money that arrived. It has an amount, a moment and a balance,
+     and it renders a payslip.
+
+     An ATTEMPT that failed, was abandoned, or is still open has none of those —
+     received_at and balance_after are both null on it by design. Phase 13 added
+     those rows and this block was still assuming every row was a receipt, which
+     is what put a ->format() call on a null.
+
+     The failed ones are shown rather than hidden. "Three declined attempts on
+     Tuesday" is the answer to a support call that silence cannot give.
+--}}
+@php
+    $receipts = $payment->receipts();
+    $attempts = $payment->transactions->reject(fn($t) => $t->isReceipt());
+@endphp
+
+@if ($receipts->isNotEmpty())
     <div class="border border-gray-300 border-dashed rounded p-4 mb-5">
         <div class="fw-bold text-gray-800 mb-3">Receipts</div>
 
-        @foreach ($payment->transactions as $receipt)
+        @foreach ($receipts as $receipt)
             <div class="d-flex align-items-start flex-wrap gap-2 {{ !$loop->last ? 'border-bottom border-gray-300 border-dashed pb-3 mb-3' : '' }}">
                 <div class="flex-grow-1">
                     <div class="d-flex align-items-center flex-wrap gap-2">
@@ -214,7 +233,7 @@
                     </div>
                     <div class="text-muted fs-8">
                         {{ $receipt->method->label() }}
-                        &middot; {{ $receipt->received_at->format('j M Y, g:i A') }}
+                        &middot; {{ $receipt->received_at?->format('j M Y, g:i A') ?? '—' }}
                         @if ($receipt->external_reference)
                             &middot; {{ $receipt->external_reference }}
                         @endif
@@ -240,10 +259,36 @@
         <div class="text-muted fs-8 mt-3">
             The visitor's copy of the most recent receipt:
             <a target="_blank"
-                href="{{ route('payslip', ['token' => $payment->token, 'transaction' => $payment->transactions->first()]) }}">
+                href="{{ route('payslip', ['token' => $payment->token, 'transaction' => $receipts->first()]) }}">
                 open it
             </a>
         </div>
+    </div>
+@endif
+
+{{-- Attempts that never became money. Muted on purpose — this is diagnostic
+     detail for staff, not part of the payment's story. --}}
+@if ($attempts->isNotEmpty())
+    <div class="border border-gray-300 border-dashed rounded p-4 mb-5">
+        <div class="fw-bold text-gray-800 mb-3">Online attempts</div>
+
+        @foreach ($attempts as $attempt)
+            <div class="d-flex align-items-start flex-wrap gap-2 {{ !$loop->last ? 'mb-2' : '' }}">
+                <div class="flex-grow-1">
+                    <span class="text-gray-700 fs-8">{{ $attempt->reference }}</span>
+                    <span class="badge badge-light-{{ $attempt->status->colour() }} fs-8 ms-1">
+                        {{ $attempt->status->label() }}
+                    </span>
+                    <span class="text-muted fs-8 d-block">
+                        Started {{ $attempt->created_at->format('j M Y, g:i A') }}
+                        @if ($attempt->failure_reason)
+                            &middot; {{ $attempt->failure_reason }}
+                        @endif
+                    </span>
+                </div>
+                <div class="text-muted fs-8">BDT {{ number_format((float) $attempt->amount) }}</div>
+            </div>
+        @endforeach
     </div>
 @endif
 
@@ -258,6 +303,46 @@
     <div class="mb-5">
         <div class="text-muted fs-8">Withdrawn because</div>
         <div class="text-gray-700 fs-7">{{ $payment->cancellation_reason }}</div>
+    </div>
+@endif
+
+{{-- ================= Messages (Phase 13B) ================= --}}
+<div class="border border-gray-300 border-dashed rounded p-4 mb-5">
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <span class="fw-bold text-gray-800">Emails about this payment</span>
+        <button type="button" class="btn btn-sm btn-light" data-action="load-messages"
+            data-url="{{ route('admin.communications.payment', $payment) }}"
+            data-target="#payment-messages-{{ $payment->id }}">
+            Show
+        </button>
+    </div>
+
+    {{-- Loaded on demand. Most drawer opens never ask this question, and a
+         query on every one of them to answer it would be a cost paid always
+         for a benefit felt rarely. --}}
+    <div id="payment-messages-{{ $payment->id }}" data-messages-list hidden></div>
+</div>
+
+{{-- The visitor's payment link, for when the email did not arrive and somebody
+     wants to send it over WhatsApp instead. Shown only while the request is
+     open: a link to a settled or withdrawn request is at best confusing.
+
+     The token is a credential, so this is a copy button rather than printed
+     text — it keeps the URL out of screenshots and shoulder-surfing range while
+     still being one click to share. --}}
+@if ($payment->isOpen())
+    <div class="border border-gray-300 border-dashed rounded p-4 mb-5">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <div>
+                <span class="fw-bold text-gray-800 d-block">Payment link</span>
+                <span class="text-muted fs-8">Personal to this visitor — send it to them, not to anyone else.</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-light-primary" data-action="copy-payment-link"
+                data-link="{{ route('payment.portal', $payment->token) }}">
+                <i class="ki-outline ki-copy fs-5"></i>
+                Copy link
+            </button>
+        </div>
     </div>
 @endif
 

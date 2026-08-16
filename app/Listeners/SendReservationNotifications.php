@@ -7,15 +7,13 @@ use App\Events\PaymentReceived;
 use App\Events\PaymentRequested;
 use App\Events\ReservationRequested;
 use App\Events\ReservationStatusChanged;
-use App\Mail\ReservationNotificationMail;
 use App\Models\Auth\User;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\Reservation;
+use App\Services\CommunicationLogger;
 use App\Services\SettingsRepository;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Throwable;
 
 /**
  * PHASE 11 — turns reservation events into email.
@@ -39,8 +37,10 @@ use Throwable;
  */
 class SendReservationNotifications
 {
-    public function __construct(private readonly SettingsRepository $settings)
-    {
+    public function __construct(
+        private readonly SettingsRepository $settings,
+        private readonly CommunicationLogger $log,
+    ) {
     }
 
     public function handleRequested(ReservationRequested $event): void
@@ -191,19 +191,14 @@ class SendReservationNotifications
         ?Payment $payment = null,
         ?PaymentTransaction $transaction = null,
     ): void {
-        try {
-            Mail::to($to)->queue(new ReservationNotificationMail($reservation, $kind, $note, $payment, $transaction));
-        } catch (Throwable $e) {
-            // Reached when the queue itself is unreachable, or when
-            // QUEUE_CONNECTION=sync and the mail transport fails. Either way the
-            // reservation is already saved and the admin has been told it
-            // worked, which it did — only the email did not.
-            Log::error('Reservation notification failed to dispatch.', [
-                'reservation' => $reservation->reference_code,
-                'kind'        => $kind->value,
-                'error'       => $e->getMessage(),
-            ]);
-        }
+        /*
+         | PHASE 13B — handed to CommunicationLogger rather than to Mail
+         | directly. It writes the log row first so the id can be stamped into
+         | the message, and it owns the try/catch that used to live here. One
+         | class sends every reservation email, first time and resend alike, so
+         | the two cannot drift.
+         */
+        $this->log->send($to, $reservation, $kind, $note, $payment, $transaction);
     }
 
     /**

@@ -216,16 +216,30 @@
             </section>
         @endunless
 
-        {{-- ============ Receipts ============ --}}
-        @if ($payment->transactions->isNotEmpty())
+        {{-- ============ Receipts ============
+
+             RECEIPTS ONLY, and the filter is not cosmetic. Since Phase 13 the
+             transactions list also holds gateway attempts that failed, were
+             abandoned, or are still in flight; those have a null received_at
+             and a null balance_after by design, and rendering one here is what
+             put a ->format() call on a null.
+
+             Failed attempts are deliberately not shown to the visitor at all.
+             They are diagnostic detail for staff — a list reading "Failed,
+             Failed, Abandoned" tells the person who just paid nothing useful
+             and quite a lot that is alarming. The admin drawer shows them.
+        --}}
+        @php($receipts = $payment->receipts())
+
+        @if ($receipts->isNotEmpty())
             <section class="pay-card">
                 <h2>Your receipts</h2>
-                @foreach ($payment->transactions as $receipt)
+                @foreach ($receipts as $receipt)
                     <div class="pay-receipt">
                         <div>
                             <span class="pay-receipt__ref">{{ $receipt->reference }}</span>
                             <span class="pay-receipt__meta">
-                                {{ $receipt->received_at->format('j M Y') }} &middot;
+                                {{ $receipt->received_at?->format('j M Y') ?? '—' }} &middot;
                                 {{ $receipt->method->label() }}
                             </span>
                         </div>
