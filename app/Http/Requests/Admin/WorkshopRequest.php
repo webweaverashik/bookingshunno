@@ -56,6 +56,17 @@ class WorkshopRequest extends FormRequest
             'description'       => ['nullable', 'string', 'max:5000'],
 
             'price'       => ['required', 'numeric', 'min:0', 'max:9999999.99'],
+
+            /*
+             | PHASE 14A — café credit per person, in taka.
+             |
+             | Nullable and defaulting to zero: almost every workshop earns
+             | nothing, and requiring a figure would make staff type 0 into
+             | every form. Capped low because this is a courtesy coupon, and a
+             | mistyped 5000 would issue thirty thousand taka of credit to a
+             | party of six before anybody noticed.
+             */
+            'cafe_credit_per_person' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'price_basis' => ['required', Rule::in(['per_person', 'per_session'])],
 
             // Multiples of the slot step only: start times move in 30-minute

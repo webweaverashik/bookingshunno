@@ -1,0 +1,189 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\VoucherStatus;
+use App\Enums\VoucherType;
+use App\Models\Auth\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Voucher extends Model
+{
+    use HasFactory;
+
+    /** Written only by VoucherService. Same reasoning as Payment. */
+    protected $fillable = [];
+
+    protected function casts(): array
+    {
+        return [
+            'type'        => VoucherType::class,
+            'status'      => VoucherStatus::class,
+            'value'       => 'decimal:2',
+            'valid_from'  => 'date',
+            'expires_at'  => 'date',
+            'redeemed_at' => 'datetime',
+        ];
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'code';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
+    /** The visit that EARNED this, for café credit. */
+    public function reservation(): BelongsTo
+    {
+        return $this->belongsTo(Reservation::class);
+    }
+
+    /** The visit this was SPENT on, for a gift voucher. */
+    public function redeemedForReservation(): BelongsTo
+    {
+        return $this->belongsTo(Reservation::class, 'redeemed_for_reservation_id');
+    }
+
+    public function workshop(): BelongsTo
+    {
+        return $this->belongsTo(Workshop::class);
+    }
+
+    public function issuedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    public function redeemedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'redeemed_by');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeUsable(Builder $query): Builder
+    {
+        return $query->where('status', VoucherStatus::Active)
+            ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhereDate('expires_at', '>=', now()))
+            ->where(fn (Builder $q) => $q->whereNull('valid_from')->orWhereDate('valid_from', '<=', now()));
+    }
+
+    public function scopeSearch(Builder $query, ?string $term): Builder
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $inner) use ($term) {
+            $inner->where('code', 'like', $term . '%')
+                ->orWhere('issued_to_name', 'like', '%' . $term . '%')
+                ->orWhere('issued_to_email', 'like', '%' . $term . '%')
+                ->orWhereHas('reservation', fn (Builder $r) => $r->where('reference_code', 'like', $term . '%'));
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | State
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Expiry is derived, never stored.
+     *
+     * True the moment the day passes, whether or not any job ran. A status
+     * column would need a nightly task to stay honest, and the first time that
+     * task failed the studio would be accepting coupons it believed were dead.
+     */
+    public function hasExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->endOfDay()->isPast();
+    }
+
+    /** Issued, but the visit it belongs to has not happened yet. */
+    public function notYetValid(): bool
+    {
+        return $this->valid_from !== null && $this->valid_from->startOfDay()->isFuture();
+    }
+
+    public function isRedeemable(): bool
+    {
+        return $this->status === VoucherStatus::Active
+            && ! $this->hasExpired()
+            && ! $this->notYetValid();
+    }
+
+    /**
+     * The label a human should see, which is not the same as the status.
+     *
+     * An Active voucher three months past its date is Active in the database
+     * and Expired to everybody looking at it. Showing the raw status here would
+     * have staff honouring coupons that are not good.
+     */
+    public function displayStatus(): string
+    {
+        if ($this->status === VoucherStatus::Active && $this->hasExpired()) {
+            return 'Expired';
+        }
+
+        if ($this->status === VoucherStatus::Active && $this->notYetValid()) {
+            return 'Not yet valid';
+        }
+
+        return $this->status->label();
+    }
+
+    public function displayColour(): string
+    {
+        if ($this->status === VoucherStatus::Active && $this->hasExpired()) {
+            return 'danger';
+        }
+
+        if ($this->status === VoucherStatus::Active && $this->notYetValid()) {
+            return 'warning';
+        }
+
+        return $this->status->colour();
+    }
+
+    /**
+     * Why this cannot be used, in words a member of staff can read out.
+     *
+     * Returns null when it can. Deliberately specific — "expired on 14 August"
+     * ends a conversation at the counter that "invalid voucher" would prolong.
+     */
+    public function unusableReason(): ?string
+    {
+        if ($this->status === VoucherStatus::Redeemed) {
+            return 'This was already used on ' . $this->redeemed_at?->format('j M Y') . '.';
+        }
+
+        if ($this->status === VoucherStatus::Cancelled) {
+            return 'This voucher was cancelled.';
+        }
+
+        if ($this->hasExpired()) {
+            return 'This expired on ' . $this->expires_at->format('j M Y') . '.';
+        }
+
+        if ($this->notYetValid()) {
+            return 'This is not valid until ' . $this->valid_from->format('j M Y') . '.';
+        }
+
+        return null;
+    }
+}

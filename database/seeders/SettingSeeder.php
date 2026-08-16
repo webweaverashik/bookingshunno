@@ -26,8 +26,33 @@ class SettingSeeder extends Seeder
              | all carry on.
              */
             ['key' => 'payments.online_enabled',         'value' => '1',  'type' => 'boolean', 'group' => 'payment', 'label' => 'Accept payment online'],
-            ['key' => 'cafe_credit.entry_fee_coupon',    'value' => '50', 'type' => 'integer', 'group' => 'credit',  'label' => 'Cafe coupon with entry fee (BDT)'],
-            ['key' => 'cafe_credit.per_participant',     'value' => '1',  'type' => 'boolean', 'group' => 'credit',  'label' => 'Issue cafe coupon per participant'],
+
+            /*
+             | PHASE 14A — how long café credit lasts, counted from the VISIT
+             | date rather than from issue. Credit is issued when payment lands,
+             | which can be weeks before the day; counting from then would hand
+             | somebody a coupon that expired before they had been.
+             */
+            ['key' => 'cafe_credit.validity_days',      'value' => '30', 'type' => 'integer', 'group' => 'voucher', 'label' => 'Café credit valid for (days after visit)'],
+            /*
+             | PHASE 14A superseded two keys that used to sit here —
+             | cafe_credit.entry_fee_coupon and cafe_credit.per_participant.
+             |
+             | Both were placeholders from Phase 4, written before the client
+             | had decided anything. The amount is now workshops.cafe_credit_per_person,
+             | which lets the studio set a different figure per experience and
+             | add a second credit-earning visit type without a deploy; and
+             | per-participant is no longer a question, because the client
+             | settled it — the value is always the per-head figure times the
+             | party size, issued as ONE coupon.
+             |
+             | They are left out rather than set to 0. A seeder that keeps
+             | writing a key nothing reads is how a future contributor spends an
+             | afternoon working out which of two settings is the real one.
+             |
+             | Existing installs keep the orphan rows until they are deleted by
+             | hand; nothing reads them, so they are inert. See the phase notes.
+             */
             ['key' => 'reservation.max_participants',    'value' => '30', 'type' => 'integer', 'group' => 'general', 'label' => 'Largest group accepted online'],
 
             /*

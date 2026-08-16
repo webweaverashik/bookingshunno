@@ -39,6 +39,7 @@ class PaymentService
         private readonly PricingService $pricing,
         private readonly SettingsRepository $settings,
         private readonly ReservationService $reservations,
+        private readonly VoucherService $vouchers,
     ) {
     }
 
@@ -372,6 +373,26 @@ class PaymentService
                 $line . " The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
             );
         }
+
+        /*
+         | PHASE 14A — the café coupon, issued only once the request is settled.
+         |
+         | On settlement, not on approval: the client's rule is that credit is
+         | earned by a paid visit, and issuing it earlier would let somebody
+         | collect coupons by requesting bookings they never pay for.
+         |
+         | Note what this does NOT do — it does not touch the reservation total.
+         | Café credit is a thank-you spent at the counter, not a discount on the
+         | thing that earned it. That is why it is issued here, after the money
+         | has been counted, rather than anywhere near PricingService.
+         |
+         | issueCafeCredit() returns null for an experience that earns nothing,
+         | which is the ordinary case and not a failure. It also swallows a
+         | duplicate — SSLCommerz can settle the same payment twice, via the
+         | redirect and the IPN — so a repeated call cannot mint a second coupon
+         | or roll back a real payment.
+         */
+        $this->vouchers->issueCafeCredit($reservation->load('items.workshop'), $payment);
 
         PaymentReceived::dispatch($payment, $transaction);
 

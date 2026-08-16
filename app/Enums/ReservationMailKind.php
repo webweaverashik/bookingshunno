@@ -37,6 +37,9 @@ enum ReservationMailKind: string
     case PaymentRequested = 'payment_requested';
     case PaymentReceived  = 'payment_received';
 
+    // PHASE 14A.
+    case VoucherIssued    = 'voucher_issued';
+
     /**
      * Whether this goes to the visitor or to the studio.
      *
@@ -69,6 +72,11 @@ enum ReservationMailKind: string
             // a billing system.
             self::PaymentRequested => "Please complete your payment — {$reference}",
             self::PaymentReceived  => "Payment received — {$reference}",
+
+            // No reference in the subject. A gift voucher has no reservation
+            // behind it, and quoting a booking code at somebody who was given a
+            // present by a friend would be meaningless.
+            self::VoucherIssued    => "Your voucher from {$studio}",
         };
     }
 

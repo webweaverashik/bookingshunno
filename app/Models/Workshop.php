@@ -26,7 +26,7 @@ class Workshop extends Model
 
     protected $fillable = [
         'slug', 'title', 'medium', 'category', 'short_description', 'description',
-        'image_path', 'gallery', 'price', 'price_basis', 'duration_minutes',
+        'image_path', 'gallery', 'price', 'price_basis', 'cafe_credit_per_person', 'duration_minutes',
         'min_participants', 'max_participants', 'materials_included',
         'requires_experience', 'is_active', 'is_featured', 'sort_order',
     ];
@@ -37,6 +37,10 @@ class Workshop extends Model
             'category'            => WorkshopCategory::class,
             'gallery'             => 'array',
             'price'               => 'decimal:2',
+
+            // PHASE 14A. Zero means this experience earns no café credit, which
+            // is the default for everything except the space visit.
+            'cafe_credit_per_person' => 'decimal:2',
             'materials_included'  => 'boolean',
             'requires_experience' => 'boolean',
             'is_active'           => 'boolean',

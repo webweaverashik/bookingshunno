@@ -6,6 +6,7 @@ use App\Enums\ReservationMailKind;
 use App\Events\PaymentReceived;
 use App\Events\PaymentRequested;
 use App\Events\ReservationRequested;
+use App\Events\VoucherIssued;
 use App\Events\ReservationStatusChanged;
 use App\Models\Auth\User;
 use App\Models\Payment;
@@ -103,6 +104,23 @@ class SendReservationNotifications
             $event->payment,
             $event->transaction,
         );
+    }
+
+    /**
+     * PHASE 14A — a voucher has been issued.
+     *
+     * Handled here rather than in a listener of its own because everything that
+     * makes this awkward — the notifications kill switch, the failure handling,
+     * the communications log — is already solved in this class, and a second
+     * listener would either duplicate it or quietly skip it.
+     */
+    public function handleVoucherIssued(VoucherIssued $event): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        $this->log->sendVoucher($event->voucher);
     }
 
     /*

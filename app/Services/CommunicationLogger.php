@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Enums\CommunicationStatus;
 use App\Enums\ReservationMailKind;
 use App\Mail\ReservationNotificationMail;
+use App\Mail\VoucherMail;
 use App\Models\Auth\User;
 use App\Models\Communication;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\Reservation;
+use App\Models\Voucher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
@@ -90,6 +92,55 @@ class CommunicationLogger
                 'kind'          => $kind->value,
                 'communication' => $log->id,
                 'error'         => $e->getMessage(),
+            ]);
+        }
+
+        return $log;
+    }
+
+    /**
+     * PHASE 14A — the voucher email.
+     *
+     * Its own method rather than a branch in send(), because a voucher may have
+     * no reservation behind it at all and send() builds its subject and its
+     * context from one. Everything else is identical: row first, id stamped
+     * into the header, same failure handling, same log.
+     */
+    public function sendVoucher(Voucher $voucher, ?User $triggeredBy = null): ?Communication
+    {
+        if (! $voucher->issued_to_email) {
+            return null;        // Nobody to write to. Not an error.
+        }
+
+        $log = new Communication();
+
+        $log->forceFill([
+            'to_email'       => mb_substr($voucher->issued_to_email, 0, 255),
+            'subject'        => ReservationMailKind::VoucherIssued->subject($voucher->code, config('app.name')),
+            'kind'           => ReservationMailKind::VoucherIssued->value,
+
+            // Set for café credit, null for a gift voucher bought outright.
+            // Either way it is the visit that EARNED the coupon, never one it
+            // was later spent on.
+            'reservation_id' => $voucher->reservation_id,
+
+            'note'           => $voucher->code,
+            'status'         => CommunicationStatus::Queued,
+            'queued_at'      => now(),
+            'triggered_by'   => $triggeredBy?->id,
+        ])->save();
+
+        try {
+            Mail::to($voucher->issued_to_email)->queue(new VoucherMail($voucher, $log->id));
+        } catch (Throwable $e) {
+            $log->forceFill([
+                'status' => CommunicationStatus::Failed,
+                'error'  => mb_substr($e->getMessage(), 0, 1000),
+            ])->save();
+
+            Log::error('Voucher email failed to dispatch.', [
+                'voucher' => $voucher->code,
+                'error'   => $e->getMessage(),
             ]);
         }
 
