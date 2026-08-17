@@ -125,6 +125,22 @@
                         <div class="menu-content"><span
                                 class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
+                    {{-- PHASE 20 — staff accounts. Under Administration and
+                         gated on users.view, which is Admin-only: a Manager who
+                         could create accounts could create an Admin, and the
+                         role split would be decoration. --}}
+                    @can('users.view')
+                        <div class="menu-item">
+                            <a class="menu-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}"
+                                href="{{ route('admin.users.index') }}">
+                                <span class="menu-icon">
+                                    <i class="ki-outline ki-people fs-2"></i>
+                                </span>
+                                <span class="menu-title">Staff</span>
+                            </a>
+                        </div>
+                    @endcan
+
                     <div class="menu-item">
                         {{-- PHASE 17. The placeholder read routeIs('settings.*'),
                              which never matched: routes in this group carry the

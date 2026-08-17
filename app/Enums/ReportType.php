@@ -41,6 +41,37 @@ enum ReportType: string
     case Payments     = 'payments';
     case Vouchers     = 'vouchers';
 
+    /*
+    | PHASE 20 — the two LOGS.
+    |
+    | Reports of what the system did rather than of what the studio earned, and
+    | they sit here rather than in a module of their own because they answer the
+    | same shape of question: what happened between these dates. They inherit
+    | the whole toolbar — range, filter, export — for free.
+    |
+    | They are also the only two that can be CLEARED, which is why
+    | isClearable() exists below.
+    */
+    case Emails       = 'emails';
+    case Gateway      = 'gateway';
+
+    /*
+    | PHASE 21 — who changed a setting.
+    |
+    | Narrow on purpose. An earlier draft logged eight models through a package;
+    | six of those are already covered by ReservationStatusHistory,
+    | LoginActivity, Communication and PaymentTransaction, or are low-stakes
+    | reference data. This covers the one gap that opening the settings screen
+    | to credentials actually created.
+    |
+    | Here rather than in a module of its own because it answers the same shape
+    | of question as the other two logs — what happened between these dates —
+    | and so inherits the range, the filter and all three exports for free.
+    |
+    | NOT clearable. See isClearable().
+    */
+    case Changes      = 'changes';
+
     public function label(): string
     {
         return match ($this) {
@@ -48,6 +79,9 @@ enum ReportType: string
             self::Visitors     => 'Visitors',
             self::Payments     => 'Payments',
             self::Vouchers     => 'Vouchers',
+            self::Emails       => 'Email log',
+            self::Gateway      => 'Gateway log',
+            self::Changes      => 'Settings changes',
         };
     }
 
@@ -59,6 +93,9 @@ enum ReportType: string
             self::Visitors     => 'Ranged on visit dates, then totalled per visitor.',
             self::Payments     => 'Ranged on when the money arrived, not when it was requested.',
             self::Vouchers     => 'Ranged on when the voucher was issued.',
+            self::Emails       => 'Every message the system tried to send, ranged on when it was queued.',
+            self::Gateway      => 'Every SSLCommerz attempt, successful or not, ranged on when it was made.',
+            self::Changes      => 'Every change to a setting, and who made it.',
         };
     }
 
@@ -69,6 +106,9 @@ enum ReportType: string
             self::Visitors     => 'profile-user',
             self::Payments     => 'credit-cart',
             self::Vouchers     => 'gift',
+            self::Emails       => 'sms',
+            self::Gateway      => 'data',
+            self::Changes      => 'shield-search',
         };
     }
 
@@ -112,7 +152,45 @@ enum ReportType: string
                 'Issued to', 'Email', 'Restricted to',
                 'From reservation', 'Redeemed on', 'Redeemed against', 'Redeemed by',
             ],
+
+            self::Emails => [
+                'Queued at', 'Sent at', 'Status', 'Kind', 'To', 'Subject',
+                'Reservation', 'Payment', 'Resend', 'Triggered by', 'Error',
+            ],
+
+            self::Gateway => [
+                'Attempted at', 'Reference', 'Status', 'Reservation', 'Visitor',
+                'Amount (BDT)', 'Method', 'External reference', 'Gateway message',
+            ],
+
+            self::Changes => [
+                'When', 'Setting', 'Area', 'Changed from', 'Changed to', 'Changed by', 'IP address',
+            ],
         };
+    }
+
+    /**
+     * Whether the studio may delete rows from this report.
+     *
+     * Only the two logs, and even there the controller narrows it further —
+     * see the note on ReportController::clear(). The other four are views over
+     * reservations, payments and vouchers, and a "clear" button on those would
+     * be a delete button on the business.
+     */
+    public function isClearable(): bool
+    {
+        /*
+         | Settings changes are deliberately absent.
+         |
+         | A record of who changed the gateway mode, with a button that deletes
+         | it, is not a record — and the person most likely to want it gone is,
+         | by definition, the Admin whose change it describes.
+         |
+         | There is no pruning schedule either, unlike the other two logs. This
+         | table grows by a handful of rows a month; keeping a decade of it costs
+         | less than a single day of the email log.
+         */
+        return $this === self::Emails || $this === self::Gateway;
     }
 
     /** Filename stem for the download. The range is appended by the controller. */

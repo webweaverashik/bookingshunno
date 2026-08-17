@@ -82,6 +82,13 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'reports.export',
 
+            /*
+             | PHASE 20 — clearing a log is not the same act as reading one, so
+             | it is not the same permission. Admin only; Manager keeps view and
+             | export below.
+             */
+            'reports.clear',
+
             // ---------------------------------------------------------------
             // Settings
             // ---------------------------------------------------------------

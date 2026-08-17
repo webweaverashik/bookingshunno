@@ -2,14 +2,18 @@
 
 namespace App\Services\Reports;
 
+use App\Enums\CommunicationStatus;
 use App\Enums\PaymentChannel;
 use App\Enums\PaymentStatus;
 use App\Enums\ReportType;
 use App\Enums\ReservationStatus;
+use App\Enums\TransactionStatus;
 use App\Enums\VoucherType;
+use App\Models\Communication;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\Reservation;
+use App\Models\SettingChange;
 use App\Models\Voucher;
 use App\Support\CsvStream;
 use Carbon\CarbonImmutable;
@@ -61,7 +65,101 @@ class ReportService
             ReportType::Visitors     => $this->reservationsQuery($filters),  // aggregated later
             ReportType::Payments     => $this->paymentsQuery($filters),
             ReportType::Vouchers     => $this->vouchersQuery($filters),
+            ReportType::Emails       => $this->emailsQuery($filters),
+            ReportType::Gateway      => $this->gatewayQuery($filters),
+            ReportType::Changes      => $this->changesQuery($filters),
         };
+    }
+
+    /**
+     * PHASE 21 — who changed a setting.
+     *
+     * changedBy eager-loaded because the whole value of this log is the name
+     * beside the change, and a page of fifty rows without it is fifty extra
+     * queries.
+     */
+    private function changesQuery(array $filters): Builder
+    {
+        $query = SettingChange::query()
+            ->with('changedBy:id,name')
+            ->whereBetween('created_at', [
+                $filters['from']->startOfDay(),
+                $filters['to']->endOfDay(),
+            ]);
+
+        /*
+         | Filtered by key PREFIX, which is what the settings screen's tabs are
+         | organised by. 'sslcommerz' matches every gateway key without this
+         | needing a list of them — and a key added tomorrow under the same
+         | prefix is covered with no change here.
+         */
+        if ($filters['status'] !== 'all') {
+            $query->where('key', 'like', $filters['status'] . '%');
+        }
+
+        return $query->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logs (Phase 20)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Every message the system tried to send.
+     *
+     * Ranged on queued_at rather than sent_at, because a message that never
+     * sent has no sent_at — and those are exactly the rows somebody opens this
+     * log to find.
+     */
+    private function emailsQuery(array $filters): Builder
+    {
+        $query = Communication::query()
+            ->with([
+                'reservation:id,reference_code',
+                'payment:id,reference',
+                'triggeredBy:id,name',
+            ])
+            ->whereBetween('queued_at', [
+                $filters['from']->startOfDay(),
+                $filters['to']->endOfDay(),
+            ]);
+
+        if ($filters['status'] !== 'all') {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query->orderByDesc('queued_at')->orderByDesc('id');
+    }
+
+    /**
+     * Every SSLCommerz attempt, successful or not.
+     *
+     * The failures are the point. The payments report deliberately shows only
+     * receipts, because a failed attempt is not income — but when a visitor says
+     * they paid and nothing arrived, this is the only place that can say what
+     * actually happened.
+     */
+    private function gatewayQuery(array $filters): Builder
+    {
+        $query = PaymentTransaction::query()
+            ->where('channel', PaymentChannel::Gateway->value)
+            ->with([
+                'payment:id,reference,reservation_id',
+                'payment.reservation:id,reference_code,user_id',
+                'payment.reservation.user:id,name,email',
+            ])
+            ->whereBetween('created_at', [
+                $filters['from']->startOfDay(),
+                $filters['to']->endOfDay(),
+            ]);
+
+        if ($filters['status'] !== 'all') {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query->orderByDesc('created_at')->orderByDesc('id');
     }
 
     /**
@@ -257,7 +355,120 @@ class ReportService
             ReportType::Visitors     => $this->visitorsSummary($filters),
             ReportType::Payments     => $this->paymentsSummary($filters),
             ReportType::Vouchers     => $this->vouchersSummary($filters),
+            ReportType::Emails       => $this->emailsSummary($filters),
+            ReportType::Gateway      => $this->gatewaySummary($filters),
+            ReportType::Changes      => $this->changesSummary($filters),
         };
+    }
+
+    private function changesSummary(array $filters): array
+    {
+        $rows = $this->changesQuery(['status' => 'all'] + $filters)->get();
+
+        return [
+            [
+                'label' => 'Changes',
+                'value' => number_format($rows->count()),
+                'tone'  => 'primary',
+                'hint'  => $rows->pluck('key')->unique()->count() . ' distinct settings',
+            ],
+            [
+                /*
+                 | The tile worth having. Sensitive means "gets it wrong
+                 | silently" — the gateway mode, the booking fee, anything to do
+                 | with mail. Those are the changes somebody should look twice
+                 | at, and the count is the reason to open this page at all.
+                 */
+                'label' => 'Worth a look',
+                'value' => number_format($rows->filter(fn (SettingChange $c) => $c->isSensitive())->count()),
+                'tone'  => 'warning',
+                'hint'  => 'Gateway, payments or email',
+            ],
+            [
+                'label' => 'Credentials replaced',
+                'value' => number_format($rows->where('is_secret', true)->count()),
+                'tone'  => 'danger',
+                'hint'  => 'Values are never recorded',
+            ],
+            [
+                'label' => 'By',
+                'value' => number_format($rows->pluck('changed_by')->filter()->unique()->count()),
+                'tone'  => 'info',
+                'hint'  => 'Distinct staff accounts',
+            ],
+        ];
+    }
+
+    private function emailsSummary(array $filters): array
+    {
+        $rows = $this->emailsQuery(['status' => 'all'] + $filters)->get();
+
+        $failed = $rows->where('status', CommunicationStatus::Failed);
+
+        return [
+            [
+                'label' => 'Messages',
+                'value' => number_format($rows->count()),
+                'tone'  => 'primary',
+                'hint'  => $rows->where('is_resend', true)->count() . ' were resends',
+            ],
+            [
+                'label' => 'Accepted by the server',
+                'value' => number_format($rows->where('status', CommunicationStatus::Sent)->count()),
+                'tone'  => 'success',
+                // Said carefully on purpose: SMTP acceptance is not delivery,
+                // and a log that claims otherwise sends staff looking in the
+                // wrong place when a visitor says nothing arrived.
+                'hint'  => 'Handed to SMTP, not confirmed delivered',
+            ],
+            [
+                'label' => 'Still queued',
+                'value' => number_format($rows->where('status', CommunicationStatus::Queued)->count()),
+                'tone'  => 'info',
+                'hint'  => 'A number that never falls means the worker is down',
+            ],
+            [
+                'label' => 'Failed',
+                'value' => number_format($failed->count()),
+                'tone'  => $failed->isEmpty() ? 'success' : 'danger',
+            ],
+        ];
+    }
+
+    private function gatewaySummary(array $filters): array
+    {
+        $rows = $this->gatewayQuery(['status' => 'all'] + $filters)->get();
+
+        $success = $rows->where('status', TransactionStatus::Success);
+        $failed  = $rows->reject(fn (PaymentTransaction $t) => $t->status === TransactionStatus::Success);
+
+        return [
+            [
+                'label' => 'Attempts',
+                'value' => number_format($rows->count()),
+                'tone'  => 'primary',
+            ],
+            [
+                'label' => 'Completed',
+                'value' => number_format($success->count()),
+                'tone'  => 'success',
+                'hint'  => 'BDT ' . number_format($success->sum(fn (PaymentTransaction $t) => (float) $t->amount)),
+            ],
+            [
+                'label' => 'Did not complete',
+                'value' => number_format($failed->count()),
+                'tone'  => $failed->isEmpty() ? 'success' : 'warning',
+                'hint'  => 'Abandoned or refused at the gateway',
+            ],
+            [
+                'label' => 'Completion rate',
+                'value' => $rows->isEmpty()
+                    ? '—'
+                    : round($success->count() / $rows->count() * 100) . '%',
+                'tone'  => 'info',
+                'hint'  => 'A low figure usually means a checkout problem, not fraud',
+            ],
+        ];
     }
 
     private function reservationsSummary(array $filters): array
@@ -443,6 +654,9 @@ class ReportService
                     ReportType::Reservations => $this->reservationRow($row),
                     ReportType::Payments     => $this->paymentRow($row),
                     ReportType::Vouchers     => $this->voucherRow($row),
+                    ReportType::Emails       => $this->emailRow($row),
+                    ReportType::Gateway      => $this->gatewayRow($row),
+                    ReportType::Changes      => $this->changeRow($row),
                     default                  => [],
                 });
             }
@@ -471,6 +685,62 @@ class ReportService
             $r->created_at?->toDateTimeString(),
             $r->approved_at?->toDateTimeString(),
             $r->confirmed_at?->toDateTimeString(),
+        ];
+    }
+
+    /** Order must match ReportType::Emails->csvHeaders(). */
+    private function emailRow(Communication $c): array
+    {
+        return [
+            $c->queued_at?->toDateTimeString(),
+            $c->sent_at?->toDateTimeString(),
+            $c->status->label(),
+            $c->mailKind()?->label() ?? $c->kind,
+            $c->to_email,
+            $c->subject,
+            $c->reservation?->reference_code,
+            $c->payment?->reference,
+            $c->is_resend ? 'Yes' : '',
+            $c->triggeredBy?->name ?? 'System',
+            $c->error,
+        ];
+    }
+
+    /** Order must match ReportType::Gateway->csvHeaders(). */
+    private function gatewayRow(PaymentTransaction $t): array
+    {
+        return [
+            $t->created_at?->toDateTimeString(),
+            $t->reference,
+            $t->status->label(),
+            $t->payment?->reservation?->reference_code,
+            $t->payment?->reservation?->user?->name,
+            CsvStream::money($t->amount),
+            $t->method->label(),
+            $t->external_reference,
+
+            // failure_reason, not a generic message column: it is the only place
+            // the gateway's own explanation is kept, and it is the reason this
+            // log exists at all.
+            $t->failure_reason,
+        ];
+    }
+
+    /** Order must match ReportType::Changes->csvHeaders(). */
+    private function changeRow(SettingChange $c): array
+    {
+        return [
+            $c->created_at?->toDateTimeString(),
+            $c->label(),
+            $c->group(),
+
+            // Secrets export the same way they display: absent, and said so.
+            // A CSV that quietly omitted them would read as "no change".
+            $c->is_secret ? '(not recorded)' : $c->old_value,
+            $c->is_secret ? '(not recorded)' : $c->new_value,
+
+            $c->changedBy?->name ?? 'System or removed account',
+            $c->ip_address,
         ];
     }
 

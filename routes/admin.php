@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
@@ -284,6 +285,23 @@ Route::prefix('admin')
                 Route::get('{report}/export', [ReportController::class, 'export'])
                     ->middleware('permission:reports.export')
                     ->name('export');
+
+                /*
+                 | PHASE 20 — clearing a log.
+                 |
+                 | Its own permission, Admin-only, and separate from
+                 | reports.export on purpose: reading a log and destroying one
+                 | are different acts, and a Manager who needs the first should
+                 | not get the second.
+                 |
+                 | POST rather than DELETE because it takes a body (the cutoff)
+                 | and because the controller decides what "clear" means per
+                 | report — the gateway log never removes a successful
+                 | transaction, whatever cutoff is chosen.
+                 */
+                Route::post('{report}/clear', [ReportController::class, 'clear'])
+                    ->middleware('permission:reports.clear')
+                    ->name('clear');
             });
 
         /*
@@ -367,5 +385,42 @@ Route::prefix('admin')
                 Route::post('password', [ProfileController::class, 'updatePassword'])
                     ->middleware('throttle:password-change')
                     ->name('password');
+            });
+
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 20 — staff accounts
+        |----------------------------------------------------------------------
+        | users.* is Admin-only in the seeder, and stays that way. A Manager who
+        | could create accounts could create an Admin, which makes the
+        | Admin/Manager split decoration.
+        |
+        | Bound as {user} on the id. Every endpoint re-checks that the target is
+        | actually STAFF — this module does not manage visitors, and a visitor id
+        | in the URL gets a 404 rather than an edit form.
+        |
+        | 'list' before '{user}', per the ordering rule the other registers
+        | follow: without it, /admin/users/list is looked up as a user id.
+        */
+        Route::prefix('users')
+            ->name('users.')
+            ->middleware('permission:users.view')
+            ->group(function () {
+                Route::get('/', [UserController::class, 'index'])->name('index');
+                Route::get('list', [UserController::class, 'list'])->name('list');
+
+                Route::post('/', [UserController::class, 'store'])
+                    ->middleware('permission:users.create')
+                    ->name('store');
+
+                Route::middleware('permission:users.update')->group(function () {
+                    Route::get('{user:id}/edit', [UserController::class, 'edit'])->name('edit');
+                    Route::post('{user:id}', [UserController::class, 'update'])->name('update');
+                    Route::post('{user:id}/toggle', [UserController::class, 'toggle'])->name('toggle');
+                });
+
+                Route::delete('{user:id}', [UserController::class, 'destroy'])
+                    ->middleware('permission:users.delete')
+                    ->name('destroy');
             });
     });

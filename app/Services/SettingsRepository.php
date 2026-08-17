@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use App\Models\SettingChange;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -48,9 +49,13 @@ class SettingsRepository
 
     public function set(string $key, mixed $value, string $type = 'string'): void
     {
+        $written = is_array($value) ? json_encode($value) : (string) $value;
+
+        $this->record($key, $this->rawValue($key), $written);
+
         Setting::updateOrCreate(
             ['key' => $key],
-            ['value' => is_array($value) ? json_encode($value) : (string) $value, 'type' => $type],
+            ['value' => $written, 'type' => $type],
         );
 
         $this->flush();
@@ -69,14 +74,29 @@ class SettingsRepository
      */
     public function setMany(array $values): void
     {
-        DB::transaction(function () use ($values) {
+        /*
+         | Read BEFORE the writes, in one query.
+         |
+         | Reading each old value inside the loop would work and would be one
+         | query per key on a form that saves a dozen. It would also read a
+         | value this same transaction had already changed if a caller ever
+         | passed the same key twice.
+         */
+        $existing = Setting::whereIn('key', array_keys($values))
+            ->pluck('value', 'key')
+            ->all();
+
+        DB::transaction(function () use ($values, $existing) {
             foreach ($values as $key => $entry) {
-                $value = $entry['value'];
+                $value   = $entry['value'];
+                $written = is_array($value) ? json_encode($value) : (string) $value;
+
+                $this->record($key, $existing[$key] ?? null, $written);
 
                 Setting::updateOrCreate(
                     ['key' => $key],
                     [
-                        'value' => is_array($value) ? json_encode($value) : (string) $value,
+                        'value' => $written,
                         'type'  => $entry['type'] ?? 'string',
                     ],
                 );
@@ -108,6 +128,28 @@ class SettingsRepository
     */
     public function setSecret(string $key, string $value): void
     {
+        /*
+         | Recorded as a secret, which means NEITHER VALUE IS WRITTEN.
+         |
+         | Not the old one and not the new one — not even the ciphertext. There
+         | is no question this log needs a credential to answer: "the live store
+         | password was changed by Rahman on Tuesday" is the whole useful
+         | statement, and a second copy of the value in a table built for
+         | reading on screen and exporting to CSV buys nothing.
+         |
+         | Logged unconditionally rather than only on change, because comparing
+         | would mean decrypting the old value to see whether it differs — doing
+         | the one thing this branch exists to avoid, in order to decide whether
+         | to avoid it.
+         */
+        SettingChange::create([
+            'key'        => $key,
+            'is_secret'  => true,
+            'changed_by' => auth()->id(),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+
         Setting::updateOrCreate(
             ['key' => $key],
             ['value' => Crypt::encryptString($value), 'type' => 'secret'],
@@ -148,5 +190,56 @@ class SettingsRepository
     public function flush(): void
     {
         Cache::forget(self::CACHE_KEY);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The change log
+    |--------------------------------------------------------------------------
+    | PHASE 21. Here rather than in the controller because this class is the
+    | single choke point every settings write already passes through — set(),
+    | setMany() and setSecret() are the only three ways a row in that table
+    | changes. Logging in the controller would mean five call sites today and a
+    | sixth that somebody forgets tomorrow.
+    */
+
+    /**
+     * Write a change row, if anything actually changed.
+     *
+     * Silent when the value is identical. A settings form posts every field on
+     * every save, so without this an Admin correcting one typo would write
+     * twelve rows saying nothing happened — and a log that is mostly noise is
+     * one nobody reads, which is the same as not having it.
+     */
+    private function record(string $key, ?string $old, string $new): void
+    {
+        if ($old === $new) {
+            return;
+        }
+
+        SettingChange::create([
+            'key'        => $key,
+            'old_value'  => $old,
+            'new_value'  => $new,
+            'is_secret'  => false,
+            'changed_by' => auth()->id(),
+
+            // request() is null under artisan, so a seeder or a console command
+            // logs the change with no address rather than throwing.
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+    }
+
+    /**
+     * The stored string, read past the cache and without casting.
+     *
+     * get() returns a typed value through the cached array — an integer, a
+     * boolean — which cannot be compared against the string about to be
+     * written. This reads the column itself.
+     */
+    private function rawValue(string $key): ?string
+    {
+        return Setting::where('key', $key)->value('value');
     }
 }

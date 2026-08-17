@@ -2,17 +2,24 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\CommunicationStatus;
 use App\Enums\PaymentChannel;
 use App\Enums\ReportType;
 use App\Enums\ReservationStatus;
+use App\Enums\TransactionStatus;
 use App\Enums\VoucherStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Communication;
+use App\Models\PaymentTransaction;
+use App\Services\Reports\ReportExporter;
 use App\Services\Reports\ReportService;
 use App\Support\CsvStream;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -44,8 +51,22 @@ class ReportController extends Controller
      */
     private const MAX_RANGE_DAYS = 1096;
 
-    public function __construct(private readonly ReportService $reports)
-    {
+    /**
+     * How much may be asked for in a format that cannot stream.
+     *
+     * The CSV writes rows as it reads them and has no ceiling. A spreadsheet is
+     * a zip that must be finished before its first byte is valid, and a PDF has
+     * to lay out every page — both hold the whole report in memory, on shared
+     * hosting where memory_limit is somebody else's decision. Refused with an
+     * explanation and a suggestion, rather than dying halfway through with a
+     * 500 and half a file.
+     */
+    private const HEAVY_FORMAT_ROW_LIMIT = 20000;
+
+    public function __construct(
+        private readonly ReportService $reports,
+        private readonly ReportExporter $exporter,
+    ) {
     }
 
     /*
@@ -139,23 +160,139 @@ class ReportController extends Controller
      * avoid. The link carries the filter state in its query string, refreshed
      * by reports.js whenever a filter changes.
      */
-    public function export(Request $request, string $report): StreamedResponse
+    public function export(Request $request, string $report): StreamedResponse|BinaryFileResponse|JsonResponse
     {
         $type    = $this->type($report);
         $filters = $this->filters($request, $type);
+        $format  = in_array($request->query('format'), ['csv', 'xlsx', 'pdf'], true)
+            ? $request->query('format')
+            : 'csv';
 
-        $filename = sprintf(
-            'shunno-%s-%s-to-%s.csv',
+        $stem = sprintf(
+            'shunno-%s-%s-to-%s',
             $type->slug(),
             $filters['from']->format('Y-m-d'),
             $filters['to']->format('Y-m-d'),
         );
 
-        return CsvStream::download(
-            $filename,
-            $type->csvHeaders(),
-            fn (callable $write) => $this->reports->stream($type, $filters, $write),
-        );
+        if ($format === 'csv') {
+            return CsvStream::download(
+                "{$stem}.csv",
+                $type->csvHeaders(),
+                fn (callable $write) => $this->reports->stream($type, $filters, $write),
+            );
+        }
+
+        /*
+         | Counted before building, not while.
+         |
+         | The alternative is discovering the report is too big by running out
+         | of memory partway through writing it, which returns a 500 and a
+         | truncated download. One count query is cheap and the message can then
+         | say what to do instead.
+         */
+        $rows = $type === ReportType::Visitors
+            ? $this->reports->visitors($filters)->count()
+            : $this->reports->query($type, $filters)->count();
+
+        if ($rows > self::HEAVY_FORMAT_ROW_LIMIT) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That is ' . number_format($rows) . ' rows — too many for '
+                    . strtoupper($format) . '. Narrow the date range, or export as CSV, which has no limit.',
+            ], 422);
+        }
+
+        $path = $format === 'xlsx'
+            ? $this->exporter->xlsx($type, $filters)
+            : $this->exporter->pdf($type, $filters, $this->reports->summary($type, $filters));
+
+        // deleteFileAfterSend, or every export leaves a copy of the studio's
+        // visitor list in the system temp directory.
+        return response()
+            ->download($path, "{$stem}.{$format}")
+            ->deleteFileAfterSend(true);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clearing a log
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Delete old log entries — and ONLY log entries.
+     *
+     * Two narrowings, both of which matter more than the feature does:
+     *
+     *   ONLY THE TWO LOGS. isClearable() refuses the rest. The reservations,
+     *   payments, visitors and vouchers reports are views over the business
+     *   itself; a clear button on those is a delete button on the studio's
+     *   records.
+     *
+     *   THE GATEWAY LOG NEVER DELETES A SUCCESSFUL TRANSACTION. payment_
+     *   transactions holds receipts and failed attempts in the same table —
+     *   Phase 13 put them there deliberately. A clear that took the whole table
+     *   would destroy the payment audit trail, every payslip a visitor might
+     *   ask to see again, and the figures the payments report is built from.
+     *   Only attempts that did not complete are removed.
+     *
+     * A cutoff in days rather than "delete everything", because the useful
+     * version of this is housekeeping — clearing noise older than a quarter —
+     * and the destructive version is rarely what anybody means.
+     */
+    public function clear(Request $request, string $report): JsonResponse
+    {
+        $type = $this->type($report);
+
+        abort_unless($type->isClearable(), 404);
+
+        $validated = $request->validate([
+            'older_than_days' => ['required', 'integer', 'in:0,30,90,365'],
+        ]);
+
+        $days   = (int) $validated['older_than_days'];
+        $cutoff = $days > 0 ? now()->subDays($days) : null;
+
+        $deleted = match ($type) {
+            ReportType::Emails  => $this->clearEmails($cutoff),
+            ReportType::Gateway => $this->clearGateway($cutoff),
+            default             => 0,
+        };
+
+        return response()->json([
+            'success' => true,
+            'message' => $deleted === 0
+                ? 'Nothing to clear.'
+                : number_format($deleted) . ' ' . str('entry')->plural($deleted) . ' removed.',
+        ]);
+    }
+
+    private function clearEmails(?Carbon $cutoff): int
+    {
+        $query = Communication::query();
+
+        if ($cutoff) {
+            $query->where('queued_at', '<', $cutoff);
+        }
+
+        return $query->delete();
+    }
+
+    private function clearGateway(?Carbon $cutoff): int
+    {
+        $query = PaymentTransaction::query()
+            ->where('channel', PaymentChannel::Gateway->value)
+
+            // The line that must never be removed. A successful transaction is
+            // a receipt, not a log entry.
+            ->where('status', '!=', TransactionStatus::Success->value);
+
+        if ($cutoff) {
+            $query->where('created_at', '<', $cutoff);
+        }
+
+        return $query->delete();
     }
 
     /*
@@ -293,6 +430,32 @@ class ReportController extends Controller
                 + collect(PaymentChannel::cases())
                     ->mapWithKeys(fn (PaymentChannel $c) => [$c->value => $c->label()])
                     ->all(),
+
+            ReportType::Emails => ['all' => 'Every message']
+                + collect(CommunicationStatus::cases())
+                    ->mapWithKeys(fn (CommunicationStatus $c) => [$c->value => $c->label()])
+                    ->all(),
+
+            ReportType::Gateway => ['all' => 'Every attempt']
+                + collect(TransactionStatus::cases())
+                    ->mapWithKeys(fn (TransactionStatus $t) => [$t->value => $t->label()])
+                    ->all(),
+
+            /*
+             | PHASE 21 — filtered by key PREFIX, matching the tabs on the
+             | settings screen. The values here are what changesQuery() runs a
+             | LIKE against, so 'sslcommerz.' catches every gateway key without
+             | listing them.
+             */
+            ReportType::Changes => [
+                'all'          => 'Every change',
+                'sslcommerz.'  => 'Payment gateway',
+                'mail.'        => 'Email',
+                'availability.' => 'Reservations',
+                'contact.'     => 'Studio contact',
+                'group_discount.' => 'Group discount',
+                'cafe_credit.' => 'Café credit',
+            ],
 
             ReportType::Vouchers => [
                 'all'         => 'Everything issued',

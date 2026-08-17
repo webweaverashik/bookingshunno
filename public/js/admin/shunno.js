@@ -320,6 +320,58 @@ window.Shunno = (function () {
         });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Blocking progress dialog
+    |--------------------------------------------------------------------------
+    | For work the user must wait for and cannot usefully interrupt — building
+    | a PDF of a year of reservations, assembling a spreadsheet.
+    |
+    | A modal rather than a spinner on the button, because those exports are the
+    | one place in this panel where the wait is long enough that somebody starts
+    | wondering whether the click registered, and clicks again. The second click
+    | builds the whole file a second time.
+    |
+    | SweetAlert comes with Metronic's bundle; nothing is loaded here. When it is
+    | somehow absent this degrades to doing nothing rather than throwing — a
+    | missing progress dialog should not stop a download that would otherwise
+    | have worked.
+    */
+    function progress(title, text) {
+        if (!window.Swal) {
+            return;
+        }
+
+        Swal.fire({
+            title: title || 'Working…',
+            text: text || '',
+
+            // No outside click, no escape, no confirm button. There is nothing
+            // to cancel — the request is already in flight — and a dialog that
+            // closes while the work continues tells the user it stopped when it
+            // has not.
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+
+            didOpen: function () {
+                Swal.showLoading();
+            }
+        });
+    }
+
+    /**
+     * Close the progress dialog.
+     *
+     * Guarded on isVisible() so calling this when nothing is open cannot shut a
+     * confirmation dialog that happens to be showing instead.
+     */
+    function progressDone() {
+        if (window.Swal && Swal.isVisible()) {
+            Swal.close();
+        }
+    }
+
     /** Bootstrap modal instance for an element or selector. */
     function modal(target) {
         var el = typeof target === 'string' ? document.querySelector(target) : target;
@@ -414,6 +466,8 @@ window.Shunno = (function () {
         toast: toast,
         busy: busy,
         confirm: confirm,
+        progress: progress,
+        progressDone: progressDone,
         modal: modal,
         fill: fill,
         csrf: csrf

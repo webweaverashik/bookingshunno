@@ -111,21 +111,70 @@
                     @endforeach
                 </select>
 
+                @if ($report->isClearable())
+                    @can('reports.clear')
+                        {{-- Only the two logs carry this. The other four are
+                             views over reservations, payments and vouchers — a
+                             clear button on those would be a delete button on
+                             the studio's own records. --}}
+                        <div class="dropdown d-inline-block">
+                            <button type="button" class="btn btn-light-danger" data-kt-menu-trigger="click"
+                                data-kt-menu-placement="bottom-end">
+                                <i class="ki-outline ki-trash fs-2"></i>Clear log
+                            </button>
+                            <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-250px py-4"
+                                data-kt-menu="true">
+                                <div class="menu-item px-3">
+                                    <a href="#" class="menu-link px-3" data-log-clear="365">Older than a
+                                        year</a>
+                                </div>
+                                <div class="menu-item px-3">
+                                    <a href="#" class="menu-link px-3" data-log-clear="90">Older than 90 days</a>
+                                </div>
+                                <div class="menu-item px-3">
+                                    <a href="#" class="menu-link px-3" data-log-clear="30">Older than 30 days</a>
+                                </div>
+                                <div class="separator my-2"></div>
+                                <div class="menu-item px-3">
+                                    <a href="#" class="menu-link px-3 text-danger" data-log-clear="0">Everything</a>
+                                </div>
+                            </div>
+                        </div>
+                    @endcan
+                @endif
+
                 @can('reports.export')
-                    {{-- A real link, not a fetch(). A browser cannot save a
-                         streamed file it received over XHR without staging the
-                         whole thing in memory first, which is what the streaming
-                         exists to avoid. reports.js keeps the href in step with
-                         the filters. --}}
-                    <a class="btn btn-primary" id="report-export"
-                        href="{{ route('admin.reports.export', array_merge(['report' => $report->value], [
-                            'from' => $filters['from']->format('Y-m-d'),
-                            'to' => $filters['to']->format('Y-m-d'),
-                            'status' => $filters['status'],
-                        ])) }}">
-                        <i class="ki-outline ki-exit-down fs-3"></i>
-                        Download CSV
-                    </a>
+                    {{--
+                        Three formats, one endpoint, one set of rows.
+
+                        AJAX rather than a plain link, at your request: the
+                        response comes back as a blob and is saved from memory,
+                        which is what lets a failure — "that is 40,000 rows, too
+                        many for PDF" — arrive as a message rather than as a
+                        downloaded file full of an error page. See
+                        downloadExport() in reports.js.
+                    --}}
+                    <div class="dropdown d-inline-block">
+                        <button type="button" class="btn btn-light-primary" id="report-export"
+                            data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                            <i class="ki-duotone ki-exit-up fs-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>Export
+                        </button>
+                        <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px py-4"
+                            data-kt-menu="true">
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" data-row-export="xlsx">Export as Excel</a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" data-row-export="csv">Export as CSV</a>
+                            </div>
+                            <div class="menu-item px-3">
+                                <a href="#" class="menu-link px-3" data-row-export="pdf">Export as PDF</a>
+                            </div>
+                        </div>
+                    </div>
                 @endcan
             </div>
         </div>
@@ -146,7 +195,9 @@
     <script>
         var ReportsConfig = {
             listUrl: "{{ route('admin.reports.list', $report->value) }}",
-            exportUrl: "{{ route('admin.reports.export', $report->value) }}"
+            exportUrl: "{{ route('admin.reports.export', $report->value) }}",
+            clearUrl: "{{ route('admin.reports.clear', $report->value) }}",
+            reportLabel: @json($report->label())
         };
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
