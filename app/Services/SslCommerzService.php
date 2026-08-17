@@ -123,7 +123,19 @@ class SslCommerzService
             'cus_phone'   => $visitor?->phone ?: config('shunno.contact.phone'),
             'cus_add1'    => config('shunno.contact.address'),
             'cus_city'    => 'Dhaka',
-            'cus_country' => 'Bangladesh',
+
+            /*
+             | PHASE 22 — the v4 docs list cus_postcode as Mandatory and it was
+             | missing. In practice sandbox accepts a session without it; live
+             | stores have been known not to, and the refusal comes back as a
+             | generic failedreason that points at nothing.
+             |
+             | The studio's own postcode, because there is nowhere to get the
+             | visitor's — the reservation form does not ask for one and should
+             | not start, for a workshop nobody is posting anything to.
+             */
+            'cus_postcode' => '1207',
+            'cus_country'  => 'Bangladesh',
 
             // Nothing is posted to anybody. Saying so up front stops SSLCommerz
             // demanding a shipping address it would otherwise require.
@@ -215,6 +227,37 @@ class SslCommerzService
         $body = $response->json() ?? [];
 
         /*
+         | PHASE 22 — APIConnect first, before anything else is read.
+         |
+         | The docs define it as the AUTHENTICATION result, separately from the
+         | transaction result: INVALID_REQUEST, FAILED (bad credentials),
+         | INACTIVE (store disabled), DONE. When it is not DONE, `status` is
+         | either absent or meaningless — so without this check, wrong
+         | credentials or a store switched off by SSLCommerz surface as "the
+         | payment was not valid", and somebody spends a morning looking at the
+         | wrong thing.
+         |
+         | Logged at critical, because every one of those causes stops all
+         | online payment until a person fixes it.
+         */
+        $connect = strtoupper((string) ($body['APIConnect'] ?? ''));
+
+        if ($connect !== '' && $connect !== 'DONE') {
+            Log::critical('SSLCommerz rejected the validation request itself.', [
+                'attempt'    => $attempt->reference,
+                'APIConnect' => $connect,
+                'meaning'    => match ($connect) {
+                    'FAILED'          => 'Store ID or password is wrong.',
+                    'INACTIVE'        => 'The store is disabled at SSLCommerz.',
+                    'INVALID_REQUEST' => 'Malformed validation request.',
+                    default           => 'Unrecognised APIConnect value.',
+                },
+            ]);
+
+            return null;
+        }
+
+        /*
          | Four checks, and all four have to pass.
          |
          | 1. STATUS. VALID means settled; VALIDATED means settled and already
@@ -278,6 +321,75 @@ class SslCommerzService
         }
 
         return $body;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IPN authenticity
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * PHASE 22 — is this IPN actually from SSLCommerz?
+     *
+     * THE HOLE THIS CLOSES. The IPN endpoint is public, unauthenticated and
+     * CSRF-exempt, as it has to be. Before this, anybody who learned a tran_id
+     * could POST status=FAILED to it and the handler would dutifully mark a
+     * pending attempt as failed — not a way to steal anything, but a way to
+     * break a specific visitor's payment on demand, repeatedly, from anywhere.
+     *
+     * The paid path was never at risk: that always went through validate(),
+     * server to server, and a forged POST cannot make SSLCommerz say VALID. It
+     * is the FAILURE path that took the callback at its word.
+     *
+     * The scheme, from the v4 docs: SSLCommerz sends verify_key — a
+     * comma-separated list of which fields were signed — and verify_sign, the
+     * MD5 of those fields plus the store password, sorted by key.
+     *
+     * Not a replacement for validate(). This says the message is authentic; only
+     * validate() says money moved. Both, in that order.
+     */
+    public function verifyIpnSignature(array $payload): bool
+    {
+        $signature = (string) ($payload['verify_sign'] ?? '');
+        $keyList   = (string) ($payload['verify_key'] ?? '');
+
+        if ($signature === '' || $keyList === '') {
+            return false;
+        }
+
+        $data = [];
+
+        foreach (explode(',', $keyList) as $field) {
+            $field = trim($field);
+
+            if ($field !== '') {
+                // Missing fields participate as empty strings — that is how
+                // SSLCommerz builds it, and dropping them changes the hash.
+                $data[$field] = (string) ($payload[$field] ?? '');
+            }
+        }
+
+        $data['store_passwd'] = md5((string) $this->storePassword());
+
+        ksort($data);
+
+        $parts = [];
+
+        foreach ($data as $field => $value) {
+            $parts[] = $field . '=' . $value;
+        }
+
+        /*
+         | hash_equals, not ===. This compares a secret-derived value against
+         | one an attacker supplies, and a plain comparison leaks how much of
+         | the prefix matched through how long it took to fail.
+         |
+         | MD5 is SSLCommerz's choice, not ours. It is unsuitable for anything
+         | where collisions matter; here it is a shared-secret MAC over fields
+         | the server also validates independently, and we do not get a vote.
+         */
+        return hash_equals(md5(implode('&', $parts)), $signature);
     }
 
     /*

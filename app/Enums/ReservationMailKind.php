@@ -40,19 +40,6 @@ enum ReservationMailKind: string
     // PHASE 14A.
     case VoucherIssued    = 'voucher_issued';
 
-    /*
-     | PHASE 17 — one nudge before a payment deadline passes.
-     |
-     | Not a second PaymentRequested. It carries the same Payment and links to
-     | the same portal, but it is sent by a scheduled command rather than by an
-     | admin action, and it is logged under its own kind so the communications
-     | history shows plainly which message a visitor actually received. Reusing
-     | PaymentRequested would have made a reminder indistinguishable from a
-     | staff member re-sending the original, which is the one thing anybody
-     | reading that history is trying to tell apart.
-     */
-    case PaymentReminder  = 'payment_reminder';
-
     /**
      * Whether this goes to the visitor or to the studio.
      *
@@ -86,10 +73,6 @@ enum ReservationMailKind: string
             self::PaymentRequested => "Please complete your payment — {$reference}",
             self::PaymentReceived  => "Payment received — {$reference}",
 
-            // Says the deadline is near without saying it has passed, because
-            // when this sends it has not.
-            self::PaymentReminder  => "Your payment link expires soon — {$reference}",
-
             // No reference in the subject. A gift voucher has no reservation
             // behind it, and quoting a booking code at somebody who was given a
             // present by a friend would be meaningless.
@@ -100,6 +83,36 @@ enum ReservationMailKind: string
     public function view(): string
     {
         return 'emails.reservations.' . str_replace('_', '-', $this->value);
+    }
+
+    /**
+     * A short name for a log or a table cell.
+     *
+     * PHASE 22 — added because the email log partial called this and it did not
+     * exist, which is a 500 on /admin/reports/emails.
+     *
+     * Deliberately NOT subject(). That method builds the line a visitor reads in
+     * their inbox and needs a reference code and a studio name to do it; a log
+     * column wants three words with no arguments. Two different jobs that only
+     * look alike.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Received         => 'Request received',
+            self::InfoRequested    => 'More information asked',
+            self::Approved         => 'Approved',
+            self::Declined         => 'Declined',
+            self::Cancelled        => 'Cancelled',
+
+            // Says who it went to, because that is the distinguishing fact
+            // about this one in a list — it is the only internal email here.
+            self::Escalated        => 'Escalation (staff)',
+
+            self::PaymentRequested => 'Payment requested',
+            self::PaymentReceived  => 'Payment received',
+            self::VoucherIssued    => 'Voucher issued',
+        };
     }
 
     /**

@@ -56,6 +56,19 @@
                         <span class="badge badge-light-{{ $attempt->status->colour() }}">
                             {{ $attempt->status->label() }}
                         </span>
+
+                        {{-- PHASE 22 — SSLCommerz's own fraud assessment, which
+                             was previously arriving and being ignored. Shown
+                             here because a payment that settled and was flagged
+                             is a booking somebody should look at BEFORE the
+                             evening, not after a chargeback. --}}
+                        @if ($attempt->risk_level >= 1)
+                            <span class="badge badge-light-danger d-block mt-1">
+                                <i class="ki-outline ki-shield-cross fs-7 me-1"></i>
+                                Flagged risky{{ $attempt->risk_title ? ' — ' . $attempt->risk_title : '' }}
+                            </span>
+                        @endif
+
                         @if ($attempt->failure_reason)
                             <span class="text-danger fs-8 d-block text-truncate mw-200px"
                                 title="{{ $attempt->failure_reason }}">{{ $attempt->failure_reason }}</span>

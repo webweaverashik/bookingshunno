@@ -52,6 +52,31 @@ return [
         'store_id'       => env('SSLCZ_STORE_ID'),
         'store_password' => env('SSLCZ_STORE_PASSWORD'),
         'sandbox'        => env('SSLCZ_SANDBOX', true),
+
+        /*
+        | PHASE 22 — the addresses SSLCommerz sends IPN callbacks from, per the
+        | "Common Issues" section of the v4 documentation.
+        |
+        | NOT enforced in the application, and that is deliberate. Behind
+        | Webuzo's proxy the client IP arrives in a forwarded header rather than
+        | REMOTE_ADDR, so an application-level allowlist would either reject
+        | every genuine callback or trust a header anyone can set — the second
+        | being strictly worse than no check at all.
+        |
+        | Kept here as the authoritative list for the SERVER firewall, which is
+        | where an IP allowlist belongs, and so that nobody has to go looking
+        | through documentation for them at 2am. The signature check in
+        | SslCommerzService::verifyIpnSignature() is the application's answer to
+        | the same question, and it works regardless of proxying.
+        |
+        | Sandbox:  103.26.139.87
+        | Live:     103.26.139.81, 103.132.153.81   (primary + secondary)
+        |           103.26.139.148, 103.132.153.148 (outbound, for validation)
+        */
+        'ipn_source_ips' => [
+            'sandbox' => ['103.26.139.87'],
+            'live'    => ['103.26.139.81', '103.132.153.81'],
+        ],
     ],
 
     'slack' => [

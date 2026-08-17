@@ -155,6 +155,32 @@ class PaymentGatewayController extends Controller
      */
     public function ipn(Request $request): Response
     {
+        /*
+         | PHASE 22 — AUTHENTICITY FIRST, before anything is read or written.
+         |
+         | This endpoint is public, unauthenticated and CSRF-exempt, as it has
+         | to be. Before this check, anybody who learned a tran_id could POST
+         | status=FAILED here and the handler would mark a pending attempt as
+         | failed — not a way to steal anything, but a way to break one
+         | visitor's payment on demand, from anywhere, as often as they liked.
+         |
+         | The PAID path was never exposed: settling always went through
+         | validate(), server to server, and no forged POST can make SSLCommerz
+         | say VALID. It was the FAILURE path that took the callback at its word.
+         |
+         | 200 on rejection, not 403. SSLCommerz retries anything else, and a
+         | retry will not make a forged signature correct — it would only turn
+         | one bad request into a stream of them.
+         */
+        if (! $this->gateway->verifyIpnSignature($request->all())) {
+            Log::warning('SSLCommerz IPN failed signature verification — ignored.', [
+                'tran_id' => $request->input('tran_id'),
+                'ip'      => $request->ip(),
+            ]);
+
+            return response('Invalid signature', 200);
+        }
+
         $attempt = $this->attemptFrom($request);
 
         if (! $attempt) {
@@ -174,9 +200,22 @@ class PaymentGatewayController extends Controller
             return response('OK', 200);
         }
 
+        /*
+         | PHASE 22 — the v4 docs define five IPN statuses, not three:
+         | VALID, FAILED, CANCELLED, EXPIRED and UNATTEMPTED.
+         |
+         | UNATTEMPTED means the visitor reached the gateway and did not pick a
+         | payment method — closer to backing out than to a failure, so it is
+         | recorded as Cancelled. EXPIRED is a timeout and stays Failed. The
+         | distinction matters in the gateway log: a run of failures suggests
+         | something broken at checkout, a run of cancellations suggests
+         | something wrong with the price.
+         */
         $this->payments->failGatewayAttempt(
             $attempt,
-            $status === 'CANCELLED' ? TransactionStatus::Cancelled : TransactionStatus::Failed,
+            in_array($status, ['CANCELLED', 'UNATTEMPTED'], true)
+                ? TransactionStatus::Cancelled
+                : TransactionStatus::Failed,
             $request->input('error') ?: "Gateway reported {$status}",
             $request->all(),
         );
@@ -249,6 +288,60 @@ class PaymentGatewayController extends Controller
         }
 
         $this->payments->settleGatewayAttempt($attempt, $validation);
+
+        $this->recordRisk($attempt, $validation);
+    }
+
+    /**
+     * PHASE 22 — store SSLCommerz's fraud assessment, and shout if it is bad.
+     *
+     * The docs are explicit that this is the merchant's call: risk_level 1 means
+     * SSLCommerz thinks the transaction is risky and leaves the decision to us.
+     * It was arriving and being ignored — written into gateway_payload as part
+     * of the blob, on a reservation that had already been confirmed
+     * automatically, where nobody would ever see it.
+     *
+     * WRITTEN AFTER SETTLEMENT, NOT INSTEAD OF IT. The money moved and the
+     * validation passed; refusing to record that would leave a visitor charged
+     * with no booking, which is worse than a booking somebody checks by hand.
+     * The flag plus a critical log entry is the right response — it puts the
+     * decision in front of a person before the evening rather than after a
+     * chargeback.
+     *
+     * A separate update rather than part of settleGatewayAttempt() because
+     * that method's job is the money, and it is already the most carefully
+     * locked code in the application. This is annotation.
+     */
+    private function recordRisk(PaymentTransaction $attempt, array $validation): void
+    {
+        if (! array_key_exists('risk_level', $validation)) {
+            return;
+        }
+
+        $level = (int) $validation['risk_level'];
+
+        $attempt->forceFill([
+            'risk_level' => $level,
+            'risk_title' => $validation['risk_title'] ?? null,
+        ])->save();
+
+        if ($level < 1) {
+            return;
+        }
+
+        /*
+         | critical, not warning. This is money that has arrived and a workshop
+         | place that is now held, against a transaction the gateway itself is
+         | unsure about — somebody should look before the visitor turns up.
+         */
+        Log::critical('SSLCommerz flagged a payment as risky. Review before the visit.', [
+            'attempt'     => $attempt->reference,
+            'reservation' => $attempt->payment?->reservation?->reference_code,
+            'amount'      => $attempt->amount,
+            'risk_title'  => $validation['risk_title'] ?? null,
+            'card_issuer' => $validation['card_issuer'] ?? null,
+            'card_country' => $validation['card_issuer_country'] ?? null,
+        ]);
     }
 
     private function closeAttempt(Request $request, TransactionStatus $status, string $message): RedirectResponse
