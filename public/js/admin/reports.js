@@ -39,13 +39,22 @@
 
     function params(extra) {
         var query = new URLSearchParams();
+        extra = extra || {};
 
-        if (fromEl && fromEl.value) query.set('from', fromEl.value);
-        if (toEl && toEl.value) query.set('to', toEl.value);
+        /*
+         | When a named range is being requested, the from/to inputs still hold
+         | the PREVIOUS range — they are only updated once the response comes
+         | back. Sending them alongside would be sending two answers to the same
+         | question, so they are left out and the server's own resolution wins.
+         */
+        if (!extra.range) {
+            if (fromEl && fromEl.value) query.set('from', fromEl.value);
+            if (toEl && toEl.value) query.set('to', toEl.value);
+        }
         if (statusEl) query.set('status', statusEl.value);
         if (perPageEl) query.set('per_page', perPageEl.value);
 
-        Object.keys(extra || {}).forEach(function (key) {
+        Object.keys(extra).forEach(function (key) {
             query.set(key, extra[key]);
         });
 
@@ -78,10 +87,25 @@
                     exportEl.setAttribute('href', payload.data.export);
                 }
 
+                // The toolbar follows the server, never the other way round.
+                applyRange(payload.data.range);
+
                 // Keep the address bar honest so the view can be bookmarked or
                 // sent to somebody. replaceState, not pushState: a filter change
                 // is not a new page and should not fill the back button.
-                window.history.replaceState({}, '', window.location.pathname + '?' + query.toString());
+                var url = new URLSearchParams(query);
+                url.delete('range');
+
+                if (payload.data.range) {
+                    url.set('from', payload.data.range.from);
+                    url.set('to', payload.data.range.to);
+                }
+
+                // replaceState, not pushState: a filter change is not a new page
+                // and should not fill the back button. The resolved dates go in
+                // rather than the range key, so a copied URL keeps meaning the
+                // same window next month.
+                window.history.replaceState({}, '', window.location.pathname + '?' + url.toString());
             })
             .catch(function (error) {
                 if (token !== listRequest || error.handled) return;
@@ -110,72 +134,55 @@
        Date pickers
        ===================================================================== */
 
-    // Flatpickr replaces each field with a readable alt input and hides the
-    // real one, so the values read in params() are still Y-m-d. Bound after the
-    // listeners above because Flatpickr fires a native change on the original
-    // input when a date is chosen, and that is what triggers the reload.
-    var pickers = Shunno.datepickers(document, {
-        // A range that runs backwards is swapped server-side rather than
-        // refused, so nothing here needs to enforce an order. This only stops
-        // the obvious mistake before it costs a round trip.
-        maxDate: null,
-    });
+    // Attached before anything reads the fields. Shunno.datepickers() guards
+    // against double-initialising, which is what previously left these showing
+    // a date the table was not filtered by — see the note in shunno.js.
+    var pickers = Shunno.datepickers(document);
 
-    // Quick-range buttons write to the fields directly, so the pickers have to
-    // be told. setDate with the second argument false updates the display
-    // WITHOUT firing change — load() is called explicitly straight after, and
-    // letting both happen would fire two requests for one click.
-    function setRange(fromValue, toValue) {
-        if (pickers.length === 2) {
-            pickers[0].setDate(fromValue, false);
-            pickers[1].setDate(toValue, false);
-        } else {
-            fromEl.value = fromValue;
-            toEl.value = toValue;
+    function fromPicker() { return pickers[0] || null; }
+    function toPicker() { return pickers[1] || null; }
+
+    /**
+     * Write the range the SERVER resolved back into the pickers.
+     *
+     * setDate's second argument is false so this does NOT fire change — load()
+     * has already run, and letting the write trigger another would loop.
+     */
+    function applyRange(range) {
+        if (!range) return;
+
+        if (fromPicker()) {
+            fromPicker().setDate(range.from, false);
+        } else if (fromEl) {
+            fromEl.value = range.from;
+        }
+
+        if (toPicker()) {
+            toPicker().setDate(range.to, false);
+        } else if (toEl) {
+            toEl.value = range.to;
         }
     }
 
     /* =====================================================================
        Quick ranges
-       ===================================================================== */
+       =====================================================================
+       No date arithmetic here any more. The button posts a KEY and the server
+       decides what "last month" means, then sends the resolved dates back for
+       applyRange() to display.
 
-    function iso(date) {
-        // Local date parts, not toISOString(): that converts to UTC first, and
-        // Dhaka is UTC+6, so "today" becomes yesterday for six hours a day.
-        var month = String(date.getMonth() + 1).padStart(2, '0');
-        var day = String(date.getDate()).padStart(2, '0');
-        return date.getFullYear() + '-' + month + '-' + day;
-    }
+       The old version built two dates in the browser, which made the meaning of
+       a range depend on the clock and timezone of whichever machine had the
+       page open, and left the picker and the table able to disagree.
+    */
 
     document.querySelectorAll('[data-report-range]').forEach(function (button) {
         button.addEventListener('click', function () {
-            var now = new Date();
-            var from;
-            var to;
+            document.querySelectorAll('[data-report-range]').forEach(function (other) {
+                other.classList.toggle('active', other === button);
+            });
 
-            switch (this.getAttribute('data-report-range')) {
-                case 'last-month':
-                    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                    to = new Date(now.getFullYear(), now.getMonth(), 0);
-                    break;
-
-                case 'quarter':
-                    to = now;
-                    from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
-                    break;
-
-                case 'year':
-                    from = new Date(now.getFullYear(), 0, 1);
-                    to = new Date(now.getFullYear(), 11, 31);
-                    break;
-
-                default: // this-month
-                    from = new Date(now.getFullYear(), now.getMonth(), 1);
-                    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            }
-
-            setRange(iso(from), iso(to));
-            load({ page: 1 });
+            load({ page: 1, range: this.getAttribute('data-report-range') });
         });
     });
 

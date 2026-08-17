@@ -233,13 +233,22 @@
 
                         <div class="separator my-2"></div>
 
-                        <!--begin::Menu item-->
+                        {{-- PHASE 19 — this was href="#". The profile screen lives
+                             here rather than in the sidebar: it is about the
+                             person signed in, not about the studio, and the
+                             avatar menu is where anyone looks for it. --}}
                         <div class="menu-item px-5">
-                            <a href="#" class="menu-link px-5">
+                            <a href="{{ route('admin.profile.index') }}"
+                                class="menu-link px-5 {{ request()->routeIs('admin.profile.*') ? 'active' : '' }}">
                                 My Profile
                             </a>
                         </div>
-                        <!--end::Menu item-->
+
+                        <div class="menu-item px-5">
+                            <a href="{{ route('admin.profile.index') }}#profile-password" class="menu-link px-5">
+                                Change password
+                            </a>
+                        </div>
                         <!--begin::Menu separator-->
                         <div class="separator my-2"></div>
                         <!--end::Menu separator-->

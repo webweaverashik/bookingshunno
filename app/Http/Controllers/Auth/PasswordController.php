@@ -14,6 +14,15 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordController extends Controller
 {
+    /**
+     * PHASE 17 — said whether or not the address is on record.
+     *
+     * Phrased conditionally so it is not a lie in either case: it does not
+     * claim a message was sent, only what happens if there was somewhere to
+     * send one.
+     */
+    private const RESET_SENT = 'If that address belongs to an account, a reset link is on its way.';
+
 /**
  * Show the "forgot password" form.
  */
@@ -31,15 +40,38 @@ class PasswordController extends Controller
             'email' => 'required|email',
         ]);
 
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 17 — the same answer either way
+        |----------------------------------------------------------------------
+        | This used to reply "We could not find an active account with that
+        | email address." on a miss and "Password reset link sent" on a hit,
+        | which is the same staff roster the login form was handing out, reached
+        | by a different form. Closing one and leaving the other open would have
+        | achieved nothing.
+        |
+        | Now nothing is said about whether the address exists. A reset link is
+        | sent if there is somewhere to send it, and the reply is identical
+        | regardless.
+        |
+        | Note the deliberate asymmetry with the VISITOR flow in Phase 15: this
+        | one is for staff, who have passwords, and it stays a password reset.
+        | Visitors have no password to reset and sign in with a code instead.
+        */
         $user = User::where('email', $request->email)
             ->where('is_active', true)
             ->first();
 
         if (! $user) {
+            Log::info('Password reset requested for unknown or inactive address', [
+                'email' => $request->email,
+                'ip'    => $request->ip(),
+            ]);
+
             return response()->json([
-                'status'  => 'error',
-                'message' => 'We could not find an active account with that email address.',
-            ], 422);
+                'status'  => 'success',
+                'message' => self::RESET_SENT,
+            ]);
         }
 
         try {
@@ -52,15 +84,22 @@ class PasswordController extends Controller
             if ($status === Password::RESET_LINK_SENT) {
                 return response()->json([
                     'status'  => 'success',
-                    'message' => 'Password reset link sent to your email.',
+                    'message' => self::RESET_SENT,
                 ]);
-            } else {
-                // Consider checking for INVALID_USER here too if needed
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Unable to send reset link. Please try again later.',
-                ], 422);
             }
+
+            /*
+             | Anything other than RESET_LINK_SENT at this point is a throttle
+             | or a broker failure, not a missing account — the account was
+             | confirmed above. Reported as a generic retry so the distinction
+             | still never reaches the browser.
+             */
+            Log::warning('Password reset broker returned: ' . $status);
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Unable to send reset link. Please try again later.',
+            ], 422);
         } catch (TransportExceptionInterface $e) {
             Log::error('Mail sending failed: ' . $e->getMessage());
 
@@ -71,9 +110,16 @@ class PasswordController extends Controller
                 ], 429); // 429 Too Many Requests
             }
 
+            /*
+             | Was: "The email address seems invalid or unreachable." That is a
+             | statement about the address, on a path only reachable when the
+             | account exists — so it leaked the same fact the block above just
+             | stopped leaking. A transport failure is a fact about our mail
+             | server; the message now says so.
+             */
             return response()->json([
                 'status'  => 'error',
-                'message' => 'The email address seems invalid or unreachable. Please check and try again.',
+                'message' => 'We could not send email just now. Please try again in a few minutes.',
             ], 422);
         }
     }

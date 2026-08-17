@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureVisitor;
 use App\Http\Middleware\IsLoggedIn;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -39,6 +40,18 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        /*
+        | PHASE 17 — security headers on every web response.
+        |
+        | appendToGroup rather than an alias, because a header that has to be
+        | remembered on each route is a header that will be missing from the
+        | next one. This replaces the frame-busting script in the admin <head>,
+        | which an attacker could defeat with a sandbox attribute and which
+        | never covered the public site at all — see the middleware for the
+        | full reasoning.
+        */
+        $middleware->appendToGroup('web', SecurityHeaders::class);
+
         $middleware->alias([
             'isLoggedIn'         => IsLoggedIn::class,
 

@@ -29,11 +29,25 @@
     <link href="{{ asset('css/admin.css') }}" rel="stylesheet" type="text/css" />
     <!--end::Global Stylesheets Bundle-->
 
-    <script>
-        // Frame-busting to prevent site from being loaded within a frame without permission
-        if (window.top != window.self) {
-            window.top.location.replace(window.self.location.href);
-        }
-    </script>
+    {{--
+        PHASE 17 — the frame-busting script that was here has been removed.
+
+        It ran `if (window.top != window.self) window.top.location.replace(...)`,
+        which is defeated by one attribute: an attacker frames the panel with
+        <iframe sandbox="allow-scripts">, the script is allowed to run but
+        forbidden from navigating the top window, the assignment fails silently,
+        and the page renders inside the frame with the defence appearing to be
+        present.
+
+        App\Http\Middleware\SecurityHeaders now sends X-Frame-Options: DENY and
+        a CSP frame-ancestors directive on every web response — public pages
+        included, which this script never covered. The browser refuses to build
+        the frame before any of our code runs, and no sandbox attribute can
+        switch that off.
+
+        Do not add a JavaScript frame-buster back. If framing ever needs to be
+        allowed somewhere, the exemption belongs in that middleware, where it is
+        one list in one file.
+    --}}
 
 </head>

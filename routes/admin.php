@@ -5,7 +5,9 @@ use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\ReservationController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Admin\ReservationDecisionController;
@@ -282,5 +284,88 @@ Route::prefix('admin')
                 Route::get('{report}/export', [ReportController::class, 'export'])
                     ->middleware('permission:reports.export')
                     ->name('export');
+            });
+
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 17 — settings
+        |----------------------------------------------------------------------
+        | settings.view and settings.update are Admin-only in the seeder, and
+        | left that way. A Manager runs the floor; they record payments and
+        | redeem vouchers. They do not change the booking fee, the SMTP
+        | password, or how far ahead the calendar opens.
+        |
+        | Five save endpoints rather than one, matching the five tabs. A single
+        | Save would mean a validation error on the mail tab blocks saving a
+        | phone number, and every save rewriting every row whether it changed or
+        | not.
+        |
+        | There is no endpoint for the SSLCommerz tab. It is read-only by
+        | design — credentials live in .env and only in .env, per §11 and the
+        | note in config/services.php.
+        */
+        Route::prefix('settings')
+            ->name('settings.')
+            ->group(function () {
+                Route::get('/', [SettingController::class, 'index'])
+                    ->middleware('permission:settings.view')
+                    ->name('index');
+
+                Route::middleware('permission:settings.update')->group(function () {
+                    Route::post('general', [SettingController::class, 'updateGeneral'])->name('general');
+                    Route::post('reservations', [SettingController::class, 'updateReservations'])->name('reservations');
+                    Route::post('payments', [SettingController::class, 'updatePayments'])->name('payments');
+                    Route::post('mail', [SettingController::class, 'updateMail'])->name('mail');
+
+                    /*
+                     | PHASE 19 — the gateway tab is a form now, not a read-only
+                     | panel. Credentials moved from .env into the settings
+                     | table; both store passwords are encrypted at rest and
+                     | never sent back to the browser.
+                     */
+                    Route::post('gateway', [SettingController::class, 'updateGateway'])->name('gateway');
+
+                    /*
+                     | Throttled, because it sends real email on demand. Also
+                     | the replacement for GET /send-test-email in web.php,
+                     | which is unauthenticated, unthrottled, and has a personal
+                     | Gmail address hardcoded in it. DELETE THAT ROUTE.
+                     */
+                    Route::post('mail/test', [SettingController::class, 'testMail'])
+                        ->middleware('throttle:test-email')
+                        ->name('mail.test');
+                });
+            });
+
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 17 — your own account
+        |----------------------------------------------------------------------
+        | No permission gate. Every signed-in member of staff may edit
+        | themselves, and the controller reads $request->user() rather than an
+        | id from the route — there is no id to tamper with, so there is no
+        | authorisation decision to get wrong.
+        |
+        | The password endpoint is throttled on top of that: it accepts the
+        | current password, which makes it somewhere an open session could be
+        | used to guess at one.
+        */
+        Route::prefix('profile')
+            ->name('profile.')
+            ->group(function () {
+                Route::get('/', [ProfileController::class, 'index'])->name('index');
+                Route::post('/', [ProfileController::class, 'update'])->name('update');
+
+                /*
+                 | PHASE 19 — there is no longer an 'activity' endpoint. The
+                 | sign-in history is capped at the last 30 entries and rendered
+                 | with the page, then paged and searched by DataTables in the
+                 | browser. A server round trip to page thirty rows would be a
+                 | request for nothing.
+                 */
+
+                Route::post('password', [ProfileController::class, 'updatePassword'])
+                    ->middleware('throttle:password-change')
+                    ->name('password');
             });
     });

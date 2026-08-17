@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -61,9 +62,33 @@ Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
 Schedule::command('queue:prune-failed --hours=336')->weekly();
 
 /*
-| PHASE 12 will add here:
-|   - expiring payment requests past payment_deadline_hours
-|   - a reminder before that deadline
-| Both are scheduled work, and both are why this file is set up now rather than
-| when they are written.
+|--------------------------------------------------------------------------
+| PHASE 17 — the payment deadline reminder
+|--------------------------------------------------------------------------
+| Half of what the Phase 12 note above anticipated. The reminder is here; the
+| expiry is NOT, and deliberately so — see the header of RemindPaymentDeadlines
+| for why "what happens when a deadline passes" is still the client's decision
+| rather than a default this file quietly picked.
+|
+| HOURLY, not daily. A deadline can fall at any hour, so a daily run would send
+| some people a reminder twenty-three hours earlier than intended and others one
+| an hour before the link closed. The command deduplicates against the
+| communications log, so running it twelve times between two deadlines still
+| produces exactly one email per payment request.
+|
+| withoutOverlapping() because it shares the minute with queue:work and, on a
+| shared host under load, a run can take longer than the gap to the next one.
+| runInBackground() so a slow SMTP handshake cannot hold up the scheduler and
+| stall the queue behind it.
+|
+| onFailure logs rather than notifies: there is nobody on call at a studio this
+| size, and a failed reminder is a thing to find in the log on Monday, not an
+| alert at 2am.
 */
+Schedule::command('shunno:remind-payments')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onFailure(function () {
+        Log::error('shunno:remind-payments failed. Payment reminders may not have gone out.');
+    });

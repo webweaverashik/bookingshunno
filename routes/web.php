@@ -8,7 +8,6 @@ use App\Http\Controllers\Public\PaymentPortalController;
 use App\Http\Controllers\Public\VoucherRedemptionController;
 use App\Http\Controllers\Public\ReservationRequestController;
 use App\Http\Controllers\PayslipController;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -158,14 +157,25 @@ Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class,
 
 /*
 |--------------------------------------------------------------------------
-| Mail Test (DEV ONLY)
+| PHASE 17 — /send-test-email has been removed
 |--------------------------------------------------------------------------
-| Quick mailer smoke-test. REMOVE before deploying to production.
-| Still on the Phase 17 list.
+| It was an unauthenticated GET that sent mail to a hard-coded address. Three
+| things were wrong with leaving it on a public host:
+|
+|   Anyone could call it, and a GET is retried by prefetchers, link previewers
+|   and crawlers without anybody clicking anything.
+|
+|   Every call spends the studio's SMTP quota. Enough of them and the provider
+|   throttles or suspends the account — at which point reservation approvals,
+|   payment links and sign-in codes all stop, silently, because they queue.
+|
+|   The developer's personal address sat in the source of a production route.
+|
+| The smoke test itself is worth keeping, just not as a route. Use tinker:
+|
+|     php artisan tinker
+|     >>> Mail::raw('test', fn ($m) => $m->to('you@example.com')->subject('Test'));
+|
+| That needs shell access, which is the point — it is a thing an operator does,
+| not a thing a URL does.
 */
-Route::get('/send-test-email', function () {
-    Mail::raw('This is a test email!', function ($message) {
-        $message->to('webweaverashik@gmail.com')->subject('Test Email');
-    });
-    return 'Test email sent!';
-});

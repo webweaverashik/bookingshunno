@@ -15,6 +15,23 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class AuthController extends Controller
 {
+    /**
+     * PHASE 17 — the only thing a failed sign-in says.
+     *
+     * Deliberately vague about which half was wrong, and deliberately identical
+     * for an unknown address, a deleted account, a deactivated one and a bad
+     * password. See the block in login() for why.
+     */
+    private const LOGIN_FAILED = 'Those details did not work. Please check them and try again.';
+
+    /**
+     * A real bcrypt hash of a string nobody holds, used to spend the same time
+     * on an unknown address as on a real one. Hard-coded rather than generated
+     * per request because generating it would itself cost a different amount of
+     * time, which is the problem it exists to solve.
+     */
+    private const TIMING_HASH = '$2y$12$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+
     /*
     |--------------------------------------------------------------------------
     | Login screen
@@ -45,24 +62,68 @@ class AuthController extends Controller
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        // Fetch including soft-deleted so we can give precise account-state messages.
+        /*
+        |----------------------------------------------------------------------
+        | PHASE 17 — one answer for every kind of failure
+        |----------------------------------------------------------------------
+        | This block used to give four distinguishable replies: "No user found!"
+        | (401), "This account is invalid or deleted." (403), "Account is
+        | inactive." (403) and "User or password is incorrect." (401). Between
+        | them they answered three questions for anybody who could type an email
+        | address into a form:
+        |
+        |   does this person have an account here
+        |   is it still active
+        |   was it deleted
+        |
+        | That is a staff roster, readable by anyone, one address at a time. For
+        | a business this size the roster is close to the whole team, and
+        | knowing who is on it is the first step of every phishing attempt aimed
+        | at the panel.
+        |
+        | Now: one message, one status code, one code path. The real reason goes
+        | to the log, where the studio can read it and an attacker cannot.
+        |
+        | THE COST, stated plainly: a member of staff whose account has been
+        | deactivated no longer sees why. That is a real loss of helpfulness and
+        | it is worth paying here, because staff are a small known group who can
+        | be told directly, while the form is open to the entire internet.
+        */
         $user = User::withTrashed()->where('email', $request->email)->first();
 
-        if (! $user) {
-            return response()->json(['message' => 'No user found!'], 401);
-        }
+        $failure = match (true) {
+            ! $user                                          => 'unknown email',
+            $user->trashed()                                 => 'account deleted',
+            ! $user->is_active                               => 'account inactive',
+            ! Hash::check($request->password, $user->password) => 'wrong password',
+            default                                          => null,
+        };
 
-        if ($user->trashed()) {
-            return response()->json(['message' => 'This account is invalid or deleted.'], 403);
-        }
+        if ($failure !== null) {
+            /*
+             | TIMING.
+             |
+             | Without this, a missing account returns before any hashing
+             | happens while a real one pays for a full bcrypt comparison. The
+             | difference is tens of milliseconds and it is measurable over a
+             | handful of requests — which hands back, as a stopwatch reading,
+             | exactly the answer the shared message above refuses to give.
+             |
+             | So an unknown address is charged the same work. The hash is a
+             | real bcrypt digest of a string nobody has; it will never match,
+             | and matching is not the point — spending the time is.
+             */
+            if (! $user) {
+                Hash::check($request->password, self::TIMING_HASH);
+            }
 
-        if (! $user->is_active) {
-            return response()->json(['message' => 'Account is inactive. Please contact admin.'], 403);
-        }
+            Log::info('Failed staff login', [
+                'email'  => $request->email,
+                'reason' => $failure,
+                'ip'     => $request->ip(),
+            ]);
 
-        // Verify the password WITHOUT establishing an authenticated session.
-        if (! Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'User or password is incorrect.'], 401);
+            return response()->json(['message' => self::LOGIN_FAILED], 401);
         }
 
         // OTP disabled — complete the login immediately.

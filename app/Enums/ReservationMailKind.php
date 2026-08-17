@@ -40,6 +40,19 @@ enum ReservationMailKind: string
     // PHASE 14A.
     case VoucherIssued    = 'voucher_issued';
 
+    /*
+     | PHASE 17 — one nudge before a payment deadline passes.
+     |
+     | Not a second PaymentRequested. It carries the same Payment and links to
+     | the same portal, but it is sent by a scheduled command rather than by an
+     | admin action, and it is logged under its own kind so the communications
+     | history shows plainly which message a visitor actually received. Reusing
+     | PaymentRequested would have made a reminder indistinguishable from a
+     | staff member re-sending the original, which is the one thing anybody
+     | reading that history is trying to tell apart.
+     */
+    case PaymentReminder  = 'payment_reminder';
+
     /**
      * Whether this goes to the visitor or to the studio.
      *
@@ -72,6 +85,10 @@ enum ReservationMailKind: string
             // a billing system.
             self::PaymentRequested => "Please complete your payment — {$reference}",
             self::PaymentReceived  => "Payment received — {$reference}",
+
+            // Says the deadline is near without saying it has passed, because
+            // when this sends it has not.
+            self::PaymentReminder  => "Your payment link expires soon — {$reference}",
 
             // No reference in the subject. A gift voucher has no reservation
             // behind it, and quoting a booking code at somebody who was given a

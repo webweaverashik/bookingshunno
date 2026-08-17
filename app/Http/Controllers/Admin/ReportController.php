@@ -101,6 +101,25 @@ class ReportController extends Controller
                     ['report' => $type->value],
                     $this->queryString($filters),
                 )),
+
+                /*
+                 | The range the SERVER settled on, echoed back.
+                 |
+                 | This is what the date pickers are set to after every load, so
+                 | the toolbar can never disagree with the rows underneath it. It
+                 | also covers the cases where the server changed its mind about
+                 | what was asked for — a backwards range that was swapped, a
+                 | span longer than the cap that was clamped, a malformed date
+                 | that fell back to the default. Before this, all three failed
+                 | silently and left the picker showing something the table was
+                 | not filtered by.
+                 */
+                'range'   => [
+                    'from'       => $filters['from']->format('Y-m-d'),
+                    'to'         => $filters['to']->format('Y-m-d'),
+                    'from_label' => $filters['from']->format('j M Y'),
+                    'to_label'   => $filters['to']->format('j M Y'),
+                ],
             ],
         ]);
     }
@@ -164,11 +183,28 @@ class ReportController extends Controller
     {
         $today = CarbonImmutable::today();
 
-        // Default window: this calendar month. It is what somebody opening a
-        // report at the end of a month is almost always after, and it makes the
-        // first page load bounded rather than "everything ever".
-        $from = $this->date($request->query('from'), $today->startOfMonth());
-        $to   = $this->date($request->query('to'), $today->endOfMonth());
+        /*
+         | A named range wins over explicit dates.
+         |
+         | THE QUICK-RANGE BUTTONS RESOLVE HERE, NOT IN THE BROWSER. They used
+         | to build two date strings in JavaScript and post them, which meant
+         | the meaning of "this month" depended on the clock and the timezone of
+         | whatever machine had the page open — and left the browser holding a
+         | date the server then had to re-parse. One authority now: the button
+         | posts a KEY, the server decides what it means, and the resolved dates
+         | come back in the response for the pickers to display.
+         */
+        $named = $this->namedRange((string) $request->query('range'), $today);
+
+        if ($named) {
+            [$from, $to] = $named;
+        } else {
+            // Default window: this calendar month. It is what somebody opening a
+            // report at the end of a month is almost always after, and it makes
+            // the first page load bounded rather than "everything ever".
+            $from = $this->date($request->query('from'), $today->startOfMonth());
+            $to   = $this->date($request->query('to'), $today->endOfMonth());
+        }
 
         // Typed backwards. Swapped rather than rejected — the intent is obvious
         // and an error message here helps nobody.
@@ -189,6 +225,29 @@ class ReportController extends Controller
             'status'   => array_key_exists($status, $this->statusOptions($report)) ? $status : 'all',
             'per_page' => in_array($perPage, self::PAGE_SIZES, true) ? $perPage : 25,
         ];
+    }
+
+    /**
+     * The four windows the toolbar buttons offer.
+     *
+     * Kept server-side so "this month" means the same thing for everybody,
+     * whatever their machine thinks the date is. Returns null for anything
+     * unrecognised, which falls through to the explicit from/to.
+     *
+     * @return array{0:CarbonImmutable,1:CarbonImmutable}|null
+     */
+    private function namedRange(string $key, CarbonImmutable $today): ?array
+    {
+        return match ($key) {
+            'this-month' => [$today->startOfMonth(), $today->endOfMonth()],
+            'last-month' => [
+                $today->subMonthNoOverflow()->startOfMonth(),
+                $today->subMonthNoOverflow()->endOfMonth(),
+            ],
+            'quarter'    => [$today->subDays(89), $today],
+            'year'       => [$today->startOfYear(), $today->endOfYear()],
+            default      => null,
+        };
     }
 
     private function date(mixed $value, CarbonImmutable $fallback): CarbonImmutable

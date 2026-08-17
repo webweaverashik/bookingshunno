@@ -120,21 +120,30 @@
                     </div>
                 @endcan
 
-                @role('Admin')
+                @can('settings.view')
                     <div class="menu-item pt-5">
                         <div class="menu-content"><span
                                 class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
                     <div class="menu-item">
-                        <a class="menu-link {{ request()->routeIs('settings.*', 'backup') ? 'active' : '' }}"
-                            href="#" id="settings_link">
+                        {{-- PHASE 17. The placeholder read routeIs('settings.*'),
+                             which never matched: routes in this group carry the
+                             'admin.' name prefix, so the pattern has to be
+                             'admin.settings.*'. The href was '#'. --}}
+                        <a class="menu-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}"
+                            href="{{ route('admin.settings.index') }}">
                             <span class="menu-icon">
                                 <i class="ki-outline ki-setting-2 fs-2"></i>
                             </span>
                             <span class="menu-title">Settings</span>
                         </a>
                     </div>
-                @endrole
+                @endcan
+
+                {{-- PHASE 19 — My profile is NOT in this sidebar. It lives in the
+                     avatar menu in layouts/partials/header.blade.php, which is
+                     where people look for their own account. The sidebar is for
+                     the studio's work. --}}
             </div>
         </div>
     </div>

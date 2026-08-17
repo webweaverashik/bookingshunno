@@ -116,6 +116,29 @@ class RateLimitServiceProvider extends ServiceProvider
         | staff equivalent, because every attempt sends an email and a mailbox
         | full of codes nobody asked for is its own kind of harm.
         */
+        /*
+        | PHASE 17 — the two admin endpoints that need a ceiling.
+        |
+        | 'test-email' sends real mail every time it is called. Without a limit,
+        | an Admin holding the button down would burn through the mail
+        | provider's hourly quota and take every reservation notification with
+        | it — approvals, payment links, receipts. Keyed on the USER rather than
+        | the IP, because the studio's staff share one office connection and one
+        | person testing should not lock out the next.
+        |
+        | 'password-change' accepts the CURRENT password, which makes it a place
+        | an unattended session could be used to guess at one. Slow enough that
+        | guessing is pointless, generous enough that mistyping twice is not
+        | punished.
+        */
+        RateLimiter::for('test-email', fn (Request $request) => [
+            Limit::perMinute(2)->by('test-email:' . ($request->user()?->id ?: $request->ip())),
+            Limit::perHour(10)->by('test-email-hour:' . ($request->user()?->id ?: $request->ip())),
+        ]);
+
+        RateLimiter::for('password-change', fn (Request $request) => Limit::perMinute(5)
+            ->by('pwd:' . ($request->user()?->id ?: $request->ip())));
+
         RateLimiter::for('visitor-login', fn (Request $request) => [
             Limit::perMinute(3)->by('vlogin:' . strtolower((string) $request->input('email')) . '|' . $request->ip()),
             Limit::perHour(10)->by('vlogin-hour:' . $request->ip()),

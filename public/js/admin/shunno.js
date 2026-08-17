@@ -234,11 +234,44 @@ window.Shunno = (function () {
                 return field._flatpickr;
             }
 
+            /*
+             | THE BUG THIS GUARD EXISTS FOR — worth reading before touching it.
+             |
+             | With altInput on, flatpickr builds a SECOND visible input and, by
+             | default, copies the original's className onto it. That means the
+             | new input inherits `shunno-datepicker` too. The next scan over the
+             | document therefore finds it, sees no _flatpickr on it, and
+             | initialises a picker on the alt input — whose value is the DISPLAY
+             | string ("1 Aug 2026"), not Y-m-d.
+             |
+             | Flatpickr cannot parse that with dateFormat 'Y-m-d', falls back to
+             | a default, and the field ends up showing 1 Jan of the parsed year
+             | while the real hidden input keeps a value nothing updates. The
+             | symptom is a date picker that looks alive, reads wrong, and makes
+             | every filter behave as though no range were set at all.
+             |
+             | Two defences, because either alone is fragile:
+             |
+             |   altInputClass below stops the class being copied in the first
+             |   place, so a second scan never sees the alt input.
+             |
+             |   This check catches an alt input built before that was fixed, or
+             |   by any other code that makes one.
+             */
+            if (field.previousElementSibling && field.previousElementSibling._flatpickr) {
+                return field.previousElementSibling._flatpickr;
+            }
+
             return window.flatpickr(field, Object.assign({
                 dateFormat: 'Y-m-d',
                 altInput: true,
                 altFormat: 'j M Y',
                 allowInput: false,
+
+                // Explicit, and NOT carrying `shunno-datepicker` — see above.
+                // Metronic's own field classes are named so the alt input still
+                // looks like every other control on the page.
+                altInputClass: field.className.replace(/\bshunno-datepicker\b/g, '').trim(),
 
                 // Reads the field's own attributes, so a min or max date is set
                 // in Blade beside the input rather than in a JS lookup table
@@ -314,6 +347,47 @@ window.Shunno = (function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Password visibility
+    |--------------------------------------------------------------------------
+    | Any button carrying data-password-toggle="#selector" flips the field it
+    | points at between password and text, and swaps its own icon.
+    |
+    | Delegated from the document rather than bound per button, so a field
+    | inside a modal rendered later needs no wiring. Deliberately generic: the
+    | settings screen has an SMTP password and the profile screen has three
+    | more, and none of them should carry their own copy of six lines of DOM
+    | fiddling.
+    |
+    | The toggle is set back to hidden on form submit by the pages that use it —
+    | a password left legible on a screen somebody walks away from is the small
+    | version of the problem the field exists to prevent.
+    */
+    function initPasswordToggles() {
+        document.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-password-toggle]');
+            if (!button) return;
+
+            event.preventDefault();
+
+            var field = document.querySelector(button.getAttribute('data-password-toggle'));
+            if (!field) return;
+
+            var reveal = field.type === 'password';
+            field.type = reveal ? 'text' : 'password';
+
+            var icon = button.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('ki-eye', !reveal);
+                icon.classList.toggle('ki-eye-slash', reveal);
+            }
+
+            button.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+            button.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Startup
     |--------------------------------------------------------------------------
     | One scan for date fields when the document is ready. Modal contents are
@@ -327,6 +401,8 @@ window.Shunno = (function () {
     } else {
         datepickers();
     }
+
+    initPasswordToggles();
 
     return {
         request: request,

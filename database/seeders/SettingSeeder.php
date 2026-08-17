@@ -83,10 +83,105 @@ class SettingSeeder extends Seeder
              | outbound reservation email, including the ones to staff.
              */
             ['key' => 'notifications.enabled',           'value' => '1',   'type' => 'boolean', 'group' => 'notifications', 'label' => 'Send reservation emails'],
+
+            /*
+             | PHASE 17 — studio identity and contact, moved out of
+             | config/shunno.php so the client can correct a phone number
+             | without a deploy.
+             |
+             | Seeded with the values already in config/shunno.php rather than
+             | with blanks. These are printed on the public site and in every
+             | email footer, so an empty row would blank the footer on the first
+             | deploy after this seeder runs. config() remains the fallback, per
+             | SettingsRepository::get().
+             */
+            ['key' => 'studio.name',      'value' => 'Shunno Art Cafe',                            'type' => 'string', 'group' => 'general', 'label' => 'Studio name'],
+            ['key' => 'contact.email',    'value' => 'artcafe.shunno@gmail.com',                   'type' => 'string', 'group' => 'general', 'label' => 'Contact email'],
+            ['key' => 'contact.phone',    'value' => '+8801799020731',                             'type' => 'string', 'group' => 'general', 'label' => 'Contact phone'],
+            ['key' => 'contact.whatsapp', 'value' => '8801711532891',                              'type' => 'string', 'group' => 'general', 'label' => 'WhatsApp'],
+            ['key' => 'contact.address',  'value' => '5/6 Block F, Lalmatia, Dhaka 1207, Bangladesh', 'type' => 'string', 'group' => 'general', 'label' => 'Address'],
+
+            /*
+             | PHASE 17 — SMTP.
+             |
+             | SEEDED EMPTY, DELIBERATELY. An empty value means "not configured
+             | here", and RuntimeConfigServiceProvider skips empty keys — so a
+             | fresh install keeps running on .env until an Admin fills the form
+             | in. Seeding these with anything real would override a working
+             | .env the moment this seeder ran, which is the opposite of what a
+             | seeder should do to a live site.
+             |
+             | mail.password is absent from this list on purpose: it is written
+             | only through SettingsRepository::setSecret(), which encrypts it.
+             | A seeder row would create it as plain text with type 'string' and
+             | quietly bypass that.
+             */
+            ['key' => 'mail.host',         'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP host'],
+            ['key' => 'mail.port',         'value' => '', 'type' => 'integer', 'group' => 'mail', 'label' => 'SMTP port'],
+            ['key' => 'mail.username',     'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP username'],
+            ['key' => 'mail.encryption',   'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Encryption'],
+            ['key' => 'mail.from_address', 'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Send emails from'],
+            ['key' => 'mail.from_name',    'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Sender name'],
+
+            /*
+             | PHASE 19 — SSLCommerz, moved out of .env into this table.
+             |
+             | Store IDs are seeded empty for the same reason the mail keys are:
+             | empty means "not configured here", and
+             | RuntimeConfigServiceProvider leaves config alone until both an ID
+             | and a password exist. So an install still running on .env keeps
+             | working until somebody fills the form in.
+             |
+             | THE MODE DEFAULTS TO SANDBOX and that is deliberate. A missing or
+             | unrecognised value must never transact for real — the failure of
+             | guessing wrong in that direction is money moving when nobody
+             | meant it to, and the failure of guessing wrong the other way is a
+             | test payment that does not settle.
+             |
+             | Neither store password appears here. Both are written only
+             | through SettingsRepository::setSecret(), which encrypts them; a
+             | seeder row would create them as plain text with type 'string' and
+             | quietly bypass that.
+             */
+            ['key' => 'sslcommerz.mode',             'value' => 'sandbox', 'type' => 'string', 'group' => 'gateway', 'label' => 'Gateway mode'],
+            ['key' => 'sslcommerz.sandbox_store_id', 'value' => '',        'type' => 'string', 'group' => 'gateway', 'label' => 'Sandbox store ID'],
+            ['key' => 'sslcommerz.live_store_id',    'value' => '',        'type' => 'string', 'group' => 'gateway', 'label' => 'Live store ID'],
         ];
 
         foreach ($settings as $setting) {
-            Setting::updateOrCreate(['key' => $setting['key']], $setting);
+            /*
+             | PHASE 17 — VALUES ARE SEEDED ONCE, THEN LEFT ALONE.
+             |
+             | This used to be a plain updateOrCreate, which rewrote `value` on
+             | every run. That was survivable while the table held defaults
+             | nobody had touched. It stopped being survivable when Phase 17 put
+             | the studio's contact details and its SMTP configuration in here:
+             | a routine `db:seed` after a deploy would silently reset the
+             | booking fee, the payment deadline and the mail host back to the
+             | shipped defaults, and the only symptom would be email quietly
+             | stopping.
+             |
+             | So: create the row with its default if it is missing, and
+             | otherwise update only the METADATA — label, group, type,
+             | description. Those are ours to change between releases. The value
+             | belongs to the client from the moment they first save it.
+             |
+             | To reset a setting deliberately, delete the row and re-seed.
+             */
+            $existing = Setting::where('key', $setting['key'])->first();
+
+            if (! $existing) {
+                Setting::create($setting);
+
+                continue;
+            }
+
+            $existing->update([
+                'type'        => $setting['type'],
+                'group'       => $setting['group'],
+                'label'       => $setting['label'],
+                'description' => $setting['description'] ?? $existing->description,
+            ]);
         }
 
         app(\App\Services\SettingsRepository::class)->flush();
