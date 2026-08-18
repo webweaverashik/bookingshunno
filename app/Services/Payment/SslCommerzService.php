@@ -40,7 +40,7 @@ class SslCommerzService
      * possibility.
      */
     private const HOSTS = [
-        true  => 'https://sandbox.sslcommerz.com',
+        true  => 'https://sandbox-gw.sslcommerz.com',
         false => 'https://securepay.sslcommerz.com',
     ];
 
