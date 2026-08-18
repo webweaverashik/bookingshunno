@@ -242,9 +242,48 @@ Route::prefix('admin')
                 // "is this good" without spending anything.
                 Route::get('lookup', [VoucherController::class, 'lookup'])->name('lookup');
 
-                Route::post('/', [VoucherController::class, 'store'])->name('store');
+                /*
+                 | PHASE 25 — is this code free?
+                 |
+                 | Another literal segment, and it has to stay above
+                 | {voucher:code} or 'check-code' would be bound as a voucher
+                 | code and 404 for ever. Its own permission check inside the
+                 | controller: creating and editing both need it, and neither
+                 | permission implies the other.
+                 */
+                Route::get('check-code', [VoucherController::class, 'checkCode'])->name('check-code');
+
+                Route::post('/', [VoucherController::class, 'store'])
+                    ->middleware('permission:vouchers.create')
+                    ->name('store');
 
                 Route::get('{voucher:code}', [VoucherController::class, 'show'])->name('show');
+
+                /*
+                 | PHASE 25 — full CRUD on gift vouchers.
+                 |
+                 | POST to update and DELETE to destroy, matching workshops and
+                 | users. The middleware here is the coarse gate — "may this
+                 | person edit vouchers at all" — and VoucherPolicy adds the
+                 | half that depends on the row: café credit and anything
+                 | already spent are refused whatever the permission says.
+                 |
+                 | 'edit' sits under the wildcard rather than beside it because
+                 | it needs the voucher; the extra segment keeps it clear of
+                 | show() above.
+                 */
+                Route::get('{voucher:code}/edit', [VoucherController::class, 'edit'])
+                    ->middleware('permission:vouchers.update')
+                    ->name('edit');
+
+                Route::post('{voucher:code}', [VoucherController::class, 'update'])
+                    ->middleware('permission:vouchers.update')
+                    ->name('update');
+
+                Route::delete('{voucher:code}', [VoucherController::class, 'destroy'])
+                    ->middleware('permission:vouchers.delete')
+                    ->name('destroy');
+
                 Route::post('{voucher:code}/redeem', [VoucherController::class, 'redeem'])->name('redeem');
                 Route::post('{voucher:code}/cancel', [VoucherController::class, 'cancel'])->name('cancel');
             });

@@ -5,6 +5,14 @@
     decision: a client-side table has to hold every row before it can sort one,
     which defeats the paging it sits on.
 
+    Row actions are three plain buttons rather than a KTMenu dropdown, and that
+    is deliberate: this table is replaced wholesale by JavaScript on every
+    filter, sort and page, and a KTMenu inside it would need re-instantiating
+    after each swap or would silently stop opening. Delegated data-action
+    buttons survive the swap without any wiring at all. The FILTER menu in the
+    card header is a KTMenu, because that markup is rendered once and never
+    touched again.
+
     Comments are kept out of the row below — Blade comments compile to nothing,
     newlines included, so each one shifts the line numbers in a stack trace away
     from the source. Notes belong up here.
@@ -45,7 +53,7 @@
                     </th>
                 @endforeach
                 <th class="min-w-150px">Issued to</th>
-                <th class="text-end min-w-70px">Open</th>
+                <th class="text-end min-w-125px">Actions</th>
             </tr>
         </thead>
 
@@ -102,6 +110,22 @@
                             title="Open this voucher">
                             <i class="ki-outline ki-eye fs-4"></i>
                         </button>
+
+                        @can('update', $voucher)
+                            <button type="button" class="btn btn-icon btn-light btn-active-light-primary btn-sm ms-1"
+                                data-action="edit-voucher" data-url="{{ route('admin.vouchers.edit', $voucher) }}"
+                                title="Edit this voucher">
+                                <i class="ki-outline ki-pencil fs-4"></i>
+                            </button>
+                        @endcan
+
+                        @can('delete', $voucher)
+                            <button type="button" class="btn btn-icon btn-light btn-active-light-danger btn-sm ms-1"
+                                data-action="delete-voucher" data-url="{{ route('admin.vouchers.destroy', $voucher) }}"
+                                data-code="{{ $voucher->code }}" title="Delete this voucher">
+                                <i class="ki-outline ki-trash fs-4"></i>
+                            </button>
+                        @endcan
                     </td>
                 </tr>
             @empty

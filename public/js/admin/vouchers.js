@@ -8,7 +8,11 @@
 |
 |   the counter    type a code, read whether it is good, mark it used
 |   the register   search, filter, sort, page, drawer
-|   creating       gift vouchers only
+|   writing        create, edit and delete gift vouchers
+|
+| PHASE 25 changed two things worth knowing before reading further. Filters now
+| live in a Metronic menu and are read on Apply rather than on change, and the
+| create form is also the edit form.
 |
 | No arithmetic anywhere. Values, validity and the reason a code is refused all
 | arrive from the server already decided — a browser that worked out for itself
@@ -23,10 +27,16 @@
     var listEl = document.getElementById('vouchers-list');
     if (!listEl) return;
 
+    var defaults = config.defaults || { type: 'all', status: 'usable', per_page: '25' };
+
     var search = document.getElementById('vouchers-search');
     var typeFilter = document.getElementById('vouchers-type');
     var statusFilter = document.getElementById('vouchers-status');
     var perPage = document.getElementById('vouchers-per-page');
+
+    var filterApply = document.getElementById('vouchers-filter-apply');
+    var filterReset = document.getElementById('vouchers-filter-reset');
+    var filterCount = document.getElementById('vouchers-filter-count');
 
     var drawerEl = document.getElementById('voucher-modal');
     var drawerBody = document.getElementById('voucher-modal-body');
@@ -165,10 +175,12 @@
             params.delete(key);
         });
 
+        // Only non-default values are sent, so the address bar stays readable
+        // and a shared link carries exactly what somebody chose.
         if (search && search.value.trim()) params.set('q', search.value.trim());
-        if (typeFilter && typeFilter.value !== 'all') params.set('type', typeFilter.value);
-        if (statusFilter && statusFilter.value !== 'usable') params.set('status', statusFilter.value);
-        if (perPage && perPage.value !== '25') params.set('per_page', perPage.value);
+        if (typeFilter && typeFilter.value !== defaults.type) params.set('type', typeFilter.value);
+        if (statusFilter && statusFilter.value !== defaults.status) params.set('status', statusFilter.value);
+        if (perPage && perPage.value !== defaults.per_page) params.set('per_page', perPage.value);
 
         if (extra) {
             Object.keys(extra).forEach(function (key) {
@@ -221,12 +233,64 @@
         });
     }
 
-    // Native listeners on plain selects — Select2 would need jQuery's .trigger()
-    // and would never fire these.
-    [typeFilter, statusFilter, perPage].forEach(function (el) {
+    /* ---------------------------------------------------------------------
+       The filter menu
+
+       Nothing here listens for change, and that is the point. The three selects
+       are Select2, which announces a selection through jQuery's .trigger(),
+       which does not reach addEventListener — the gap the Phase 6 rule exists
+       to avoid. Reading .value on Apply sidesteps it entirely: the underlying
+       <select> always holds the right value whoever set it.
+
+       Going the other way still needs a nudge. Setting .value on a native
+       select does NOT redraw Select2's own markup, so Reset dispatches a native
+       change afterwards — which Select2 does hear, since jQuery .on() is a real
+       addEventListener underneath.
+       --------------------------------------------------------------------- */
+
+    function setFilter(el, value) {
         if (!el) return;
-        el.addEventListener('change', function () { loadList({ page: null }); });
-    });
+        el.value = value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function activeFilterCount() {
+        var count = 0;
+        if (typeFilter && typeFilter.value !== defaults.type) count++;
+        if (statusFilter && statusFilter.value !== defaults.status) count++;
+        if (perPage && perPage.value !== defaults.per_page) count++;
+        return count;
+    }
+
+    // A closed menu looks the same whether it is filtering everything out or
+    // nothing at all. The badge is the only thing that says which.
+    function paintFilterBadge() {
+        if (!filterCount) return;
+
+        var count = activeFilterCount();
+        filterCount.textContent = String(count);
+        filterCount.classList.toggle('d-none', count === 0);
+    }
+
+    if (filterApply) {
+        filterApply.addEventListener('click', function () {
+            loadList({ page: null });
+            paintFilterBadge();
+        });
+    }
+
+    if (filterReset) {
+        filterReset.addEventListener('click', function () {
+            setFilter(typeFilter, defaults.type);
+            setFilter(statusFilter, defaults.status);
+            setFilter(perPage, defaults.per_page);
+
+            loadList({ page: null });
+            paintFilterBadge();
+        });
+    }
+
+    paintFilterBadge();
 
     listEl.addEventListener('click', function (event) {
         var sortLink = event.target.closest('a[data-vouchers-sort]');
@@ -285,29 +349,228 @@
     }
 
     /* =====================================================================
-       Creating
+       Creating and editing
+
+       One form for both. The fields are the same and the rules are the same
+       bar a uniqueness ignore, so two forms would mean every future field had
+       to be added twice — and the missing second copy would only be noticed by
+       somebody who edited a voucher and lost what they had typed.
        ===================================================================== */
 
     var formModalEl = document.getElementById('voucher-form-modal');
     var form = document.getElementById('voucher-form');
     var formSave = document.getElementById('voucher-form-save');
+    var formSaveLabel = document.getElementById('voucher-form-save-label');
+    var formTitle = document.getElementById('voucher-form-title');
+    var sentWarning = document.getElementById('voucher-form-sent-warning');
     var createButton = document.getElementById('voucher-create');
 
-    if (createButton && form) {
-        createButton.addEventListener('click', function () {
-            Shunno.clearErrors(form);
-            form.reset();
+    var codeField = form ? form.querySelector('[name="code"]') : null;
+    var codeFeedback = document.getElementById('voucher-code-feedback');
+    var codeSuggest = document.getElementById('voucher-code-suggest');
+
+    // The code the form opened on, so the availability check does not report a
+    // voucher's own code as taken by itself. Empty while creating.
+    var editingCode = '';
+
+    // What the last check said. Read on submit so an already-known clash is
+    // shown at once instead of after a round trip.
+    var lastCodeVerdict = null;
+
+    /* ---------------------------------------------------------------------
+       Code availability
+
+       Advisory, and deliberately so. The unique index on the column is what
+       actually prevents two vouchers sharing a code, and VoucherService turns
+       the collision that lands between this answer and the insert into a
+       readable message. This exists only so nobody fills in a whole form and
+       then discovers the clash.
+       --------------------------------------------------------------------- */
+
+    var codeTyping = null;
+
+    function paintCode(state, message) {
+        if (!codeFeedback) return;
+
+        codeFeedback.className = 'form-text' +
+            (state === 'ok' ? ' text-success' : state === 'bad' ? ' text-danger' : '');
+        codeFeedback.textContent = message;
+    }
+
+    function checkCode() {
+        if (!codeField) return;
+
+        var code = (codeField.value || '').trim();
+        lastCodeVerdict = null;
+
+        if (code === '') {
+            paintCode('', 'Letters, numbers and hyphens. 4–24 characters. Checked as you type.');
+            return;
+        }
+
+        paintCode('', 'Checking…');
+
+        var url = config.checkCodeUrl +
+            '?code=' + encodeURIComponent(code) +
+            '&ignore=' + encodeURIComponent(editingCode);
+
+        Shunno.request(url)
+            .then(function (payload) {
+                // A slower reply for an older keystroke must not overwrite a
+                // newer one. Compared against what is in the box right now.
+                if ((codeField.value || '').trim().toUpperCase() !== code.toUpperCase()) return;
+
+                lastCodeVerdict = payload.data;
+                paintCode(payload.data.available ? 'ok' : 'bad', payload.data.message);
+            })
+            .catch(function (error) {
+                if (error.handled) return;
+
+                // A failed check must not block the form. The server decides at
+                // save time either way.
+                paintCode('', 'Could not check that code just now. It will be checked when you save.');
+            });
+    }
+
+    if (codeField) {
+        codeField.addEventListener('input', function () {
+            var start = this.selectionStart;
+            this.value = this.value.toUpperCase();
+            this.setSelectionRange(start, start);
+
+            window.clearTimeout(codeTyping);
+            codeTyping = window.setTimeout(checkCode, 400);
+        });
+    }
+
+    if (codeSuggest) {
+        codeSuggest.addEventListener('click', function () {
+            Shunno.busy(codeSuggest, true);
+
+            // An empty code asks the server for one. Kept server-side so the
+            // generated alphabet stays in one place rather than being
+            // reimplemented here and drifting.
+            Shunno.request(config.checkCodeUrl + '?code=')
+                .then(function (payload) {
+                    codeField.value = payload.data.suggestion;
+                    checkCode();
+                })
+                .catch(function (error) {
+                    if (error.handled) return;
+                    Shunno.toast('error', error.message);
+                })
+                .finally(function () {
+                    Shunno.busy(codeSuggest, false);
+                });
+        });
+    }
+
+    /* ---------------------------------------------------------------------
+       Opening the form
+       --------------------------------------------------------------------- */
+
+    /**
+     * Flatpickr hides the real input and shows its own beside it, so setting
+     * .value on the field updates nothing a person can see. The instance has to
+     * be told.
+     */
+    function setDateField(name, value) {
+        var field = form.querySelector('[name="' + name + '"]');
+        if (!field) return;
+
+        if (field._flatpickr) {
+            value ? field._flatpickr.setDate(value, false) : field._flatpickr.clear();
+        } else {
+            field.value = value || '';
+        }
+    }
+
+    function openForm(mode, data) {
+        Shunno.clearErrors(form);
+        form.reset();
+
+        editingCode = mode === 'edit' ? data.code : '';
+        lastCodeVerdict = null;
+
+        if (mode === 'edit') {
+            form.action = data.update_url;
+            formTitle.textContent = 'Edit ' + data.code;
+            formSaveLabel.textContent = 'Save changes';
+
+            Shunno.fill(form, {
+                code: data.code,
+                value: data.value,
+                workshop_id: data.workshop_id || '',
+                issued_to_name: data.issued_to_name || '',
+                issued_to_email: data.issued_to_email || '',
+                note: data.note || ''
+            });
+
+            setDateField('expires_at', data.expires_at);
+            sentWarning.classList.toggle('d-none', !data.was_emailed);
+        } else {
             form.action = config.storeUrl;
+            formTitle.textContent = 'New gift voucher';
+            formSaveLabel.textContent = 'Create it';
+
+            setDateField('expires_at', null);
+            sentWarning.classList.add('d-none');
+
+            /*
+             | The server-rendered suggestion is wiped by reset(), so it is put
+             | back here — and cleared after each successful create, because
+             | offering the same generated code twice would open the form on one
+             | that is now taken.
+             */
+            if (codeField) {
+                codeField.value = codeField.defaultValue;
+                if (!codeField.value && codeSuggest) codeSuggest.click();
+            }
 
             // Select2 keeps its own state and a native reset() does not reach
             // it, so the previous choice would survive into the next voucher.
             Shunno.syncSelects(form);
+        }
 
-            Shunno.modal(formModalEl).show();
+        checkCode();
+        Shunno.modal(formModalEl).show();
+    }
+
+    if (createButton && form) {
+        createButton.addEventListener('click', function () {
+            openForm('create');
         });
+    }
 
+    // Delegated: the trigger sits in the table, which is replaced wholesale,
+    // and in the drawer, which is rendered fresh on every open.
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-action="edit-voucher"]');
+        if (!trigger || !form) return;
+
+        event.preventDefault();
+
+        Shunno.request(trigger.dataset.url)
+            .then(function (payload) {
+                openForm('edit', payload.data);
+            })
+            .catch(function (error) {
+                if (error.handled) return;
+                Shunno.toast('error', error.message);
+            });
+    });
+
+    if (form) {
         form.addEventListener('submit', function (event) {
             event.preventDefault();
+
+            // A clash the browser already knows about is shown without asking
+            // the server again. Anything else — including a check that never
+            // came back — goes through and is decided server-side.
+            if (lastCodeVerdict && lastCodeVerdict.available === false) {
+                Shunno.showErrors(form, { code: [lastCodeVerdict.message] });
+                return;
+            }
 
             Shunno.clearErrors(form);
             Shunno.busy(formSave, true);
@@ -316,7 +579,18 @@
                 .then(function (payload) {
                     Shunno.modal(formModalEl).hide();
                     Shunno.toast('success', payload.message);
+
                     listEl.innerHTML = payload.data.list.html;
+
+                    // That suggestion has now been spent. See openForm().
+                    if (codeField && !editingCode) codeField.defaultValue = '';
+
+                    // An edit returns the redrawn panel; a create does not,
+                    // because there is no open drawer to redraw.
+                    if (payload.data.html && drawerBody) {
+                        drawerBody.innerHTML = payload.data.html;
+                        drawerTitle.textContent = payload.data.code;
+                    }
                 })
                 .catch(function (error) {
                     if (error.handled) return;
@@ -328,6 +602,48 @@
                 });
         });
     }
+
+    /* =====================================================================
+       Deleting
+
+       A confirmation rather than a modal with a reason box, which is the
+       difference between this and cancelling. Cancelling records WHY, because
+       the row survives and somebody turned away at the counter is owed the
+       explanation. Deleting leaves nothing for a reason to be written on.
+       ===================================================================== */
+
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-action="delete-voucher"]');
+        if (!trigger) return;
+
+        event.preventDefault();
+
+        var url = trigger.dataset.url;
+        var code = trigger.dataset.code;
+
+        Shunno.confirm({
+            title: 'Delete ' + code + '?',
+            text: 'This removes the voucher completely and leaves no record of it. ' +
+                'If somebody may be holding it, cancel it instead — that keeps the row and the reason.',
+            confirmText: 'Yes, delete it'
+        }).then(function (confirmed) {
+            if (!confirmed) return;
+
+            return Shunno.request(url, { method: 'DELETE' })
+                .then(function (payload) {
+                    Shunno.toast('success', payload.message);
+                    listEl.innerHTML = payload.data.list.html;
+
+                    // The drawer, if open, is showing a voucher that no longer
+                    // exists.
+                    if (drawerEl) Shunno.modal(drawerEl).hide();
+                })
+                .catch(function (error) {
+                    if (error.handled) return;
+                    Shunno.toast('error', error.message);
+                });
+        });
+    });
 
     /* =====================================================================
        Redeem and cancel

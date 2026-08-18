@@ -114,7 +114,7 @@
     </div>
 @endif
 
-@if (auth()->user()->can('redeem', $voucher) || auth()->user()->can('cancel', $voucher))
+@canany(['redeem', 'update', 'cancel', 'delete'], $voucher)
     <div class="separator my-5"></div>
 
     <div class="d-flex flex-wrap gap-2">
@@ -131,6 +131,18 @@
             </button>
         @endcan
 
+        @can('update', $voucher)
+            {{-- Hidden rather than disabled when the voucher cannot be edited,
+                 unlike the redeem button above. Nobody is standing at a counter
+                 waiting on an edit, so there is no sentence anyone needs read
+                 out — see the note in VoucherPolicy. --}}
+            <button type="button" class="btn btn-sm btn-light-primary" data-action="edit-voucher"
+                data-url="{{ route('admin.vouchers.edit', $voucher) }}">
+                <i class="ki-outline ki-pencil fs-5"></i>
+                Edit
+            </button>
+        @endcan
+
         @can('cancel', $voucher)
             <button type="button" class="btn btn-sm btn-light-danger" data-action="cancel-voucher"
                 data-url="{{ route('admin.vouchers.cancel', $voucher) }}"
@@ -139,5 +151,18 @@
                 Cancel it
             </button>
         @endcan
+
+        @can('delete', $voucher)
+            {{-- Last, and visually quietest of the destructive pair, because it
+                 is almost never the right one. Cancelling leaves a row saying
+                 why; this leaves nothing. It is for a voucher that should not
+                 have existed, not for one somebody is holding. --}}
+            <button type="button" class="btn btn-sm btn-light" data-action="delete-voucher"
+                data-url="{{ route('admin.vouchers.destroy', $voucher) }}"
+                data-code="{{ $voucher->code }}">
+                <i class="ki-outline ki-trash fs-5"></i>
+                Delete
+            </button>
+        @endcan
     </div>
-@endif
+@endcanany

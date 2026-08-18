@@ -141,7 +141,16 @@ class VoucherService
     /**
      * Create a gift voucher by hand.
      *
-     * @param  array{value:float,expires_at:?string,workshop_id:?int,issued_to_name:?string,issued_to_email:?string,note:?string}  $data
+     * PHASE 25 — the code now comes from the person creating it. Campaign codes
+     * (EIDGIFT2026, WORKSHOP-50) are worth far more to the studio than a random
+     * string, and a code somebody chose is a code they can print on a card
+     * without copying it off a screen first.
+     *
+     * suggestCode() is still here and still generates, because most vouchers do
+     * not need a memorable code and inventing one every time is a chore. The
+     * form offers a suggestion; nothing forces its use.
+     *
+     * @param  array{code:string,value:float,expires_at:?string,workshop_id:?int,issued_to_name:?string,issued_to_email:?string,note:?string}  $data
      */
     public function issueGift(array $data, User $actor): Voucher
     {
@@ -149,11 +158,13 @@ class VoucherService
             throw new RuntimeException('A voucher has to be worth something.');
         }
 
-        return DB::transaction(function () use ($data, $actor) {
+        $code = self::normaliseCode($data['code'] ?? '') ?: $this->suggestCode(VoucherType::Gift);
+
+        return DB::transaction(function () use ($data, $actor, $code) {
             $voucher = new Voucher();
 
             $voucher->forceFill([
-                'code'            => $this->generateCode(VoucherType::Gift),
+                'code'            => $code,
                 'type'            => VoucherType::Gift,
                 'status'          => VoucherStatus::Active,
                 'value'           => round((float) $data['value'], 2),
@@ -167,7 +178,9 @@ class VoucherService
                 'issued_to_email' => $data['issued_to_email'] ?? null,
                 'note'            => $data['note'] ?? null,
                 'issued_by'       => $actor->id,
-            ])->save();
+            ]);
+
+            $this->saveOrExplainDuplicate($voucher, $code);
 
             if ($voucher->issued_to_email) {
                 VoucherIssued::dispatch($voucher);
@@ -175,6 +188,167 @@ class VoucherService
 
             return $voucher;
         });
+    }
+
+    /**
+     * Change a gift voucher that has not been spent.
+     *
+     * The lock and the re-read are not ceremony. isEditable() is asked twice —
+     * once by the policy so the button is drawn, and again HERE, inside the
+     * transaction, against a freshly read row. Between those two moments
+     * somebody at the counter can redeem the thing, and an edit that landed
+     * afterwards would rewrite the value of a voucher that had already been
+     * honoured at the old one.
+     *
+     * NOTHING IS SENT. Editing does not re-email the recipient, because the
+     * common edit is a typo in a note and a second identical-looking email is
+     * worse than silence. Where the change matters — a new code, a new value —
+     * the form says so before it is saved. See the note in the phase summary
+     * about giving this its own history table.
+     *
+     * @param  array{code:string,value:float,expires_at:?string,workshop_id:?int,issued_to_name:?string,issued_to_email:?string,note:?string}  $data
+     */
+    public function updateGift(Voucher $voucher, array $data, User $actor): Voucher
+    {
+        if (($data['value'] ?? 0) <= 0) {
+            throw new RuntimeException('A voucher has to be worth something.');
+        }
+
+        $code = self::normaliseCode($data['code'] ?? '');
+
+        if ($code === '') {
+            throw new RuntimeException('A voucher needs a code.');
+        }
+
+        return DB::transaction(function () use ($voucher, $data, $actor, $code) {
+            $voucher = Voucher::whereKey($voucher->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($reason = $voucher->uneditableReason()) {
+                throw new RuntimeException($reason);
+            }
+
+            $before = [
+                'code'  => $voucher->code,
+                'value' => (float) $voucher->value,
+            ];
+
+            $voucher->forceFill([
+                'code'            => $code,
+                'value'           => round((float) $data['value'], 2),
+                'workshop_id'     => $data['workshop_id'] ?? null,
+                'expires_at'      => $data['expires_at'] ?? null,
+                'issued_to_name'  => $data['issued_to_name'] ?? null,
+                'issued_to_email' => $data['issued_to_email'] ?? null,
+                'note'            => $data['note'] ?? null,
+            ]);
+
+            $this->saveOrExplainDuplicate($voucher, $code);
+
+            /*
+             | There is no voucher history table, so the only durable trace of a
+             | value or code change is this line. It is written whether or not
+             | anything actually differed — a log that only fires on "important"
+             | edits is a log nobody can trust when it is silent.
+             */
+            Log::info('voucher.updated', [
+                'voucher_id' => $voucher->id,
+                'actor_id'   => $actor->id,
+                'from'       => $before,
+                'to'         => ['code' => $voucher->code, 'value' => (float) $voucher->value],
+            ]);
+
+            return $voucher;
+        });
+    }
+
+    /**
+     * Destroy a gift voucher outright.
+     *
+     * Narrow on purpose, and NOT the same tool as cancel(). Cancelling leaves a
+     * dead row carrying a reason, which is what somebody turned away at the
+     * counter is owed an explanation from. Deleting leaves nothing at all, and
+     * is only ever right for a row that should not have existed — a value typed
+     * with an extra zero, a duplicate created twice by an impatient click.
+     *
+     * A redeemed voucher can never be deleted. That row is the record of money
+     * the studio gave away, and it outlives the convenience of tidying up.
+     * Café credit cannot be deleted either: the unique (reservation_id, type)
+     * pair is what makes issuance safe to retry, and removing the row would let
+     * a repeated SSLCommerz callback mint the same coupon a second time.
+     */
+    public function delete(Voucher $voucher, User $actor): void
+    {
+        DB::transaction(function () use ($voucher, $actor) {
+            $voucher = Voucher::whereKey($voucher->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($reason = $voucher->undeletableReason()) {
+                throw new RuntimeException($reason);
+            }
+
+            // Written BEFORE the delete, because after it there is nothing left
+            // to describe.
+            Log::warning('voucher.deleted', [
+                'voucher_id' => $voucher->id,
+                'code'       => $voucher->code,
+                'value'      => (float) $voucher->value,
+                'status'     => $voucher->status->value,
+                'actor_id'   => $actor->id,
+            ]);
+
+            $voucher->delete();
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Codes
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * One place that decides what a code looks like once typed.
+     *
+     * Upper case, because that is how codes are printed and how every lookup in
+     * the system matches. Spaces and punctuation dropped, because somebody
+     * reading a code off a card will type the spaces they see.
+     */
+    public static function normaliseCode(?string $code): string
+    {
+        return strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', trim((string) $code)));
+    }
+
+    /**
+     * Is this code free?
+     *
+     * Advisory only. The unique index is the real guard and
+     * saveOrExplainDuplicate() catches the collision that happens between this
+     * answer and the insert — two people creating EIDGIFT at the same moment is
+     * rare but not impossible, and a check-then-write is never atomic.
+     */
+    public function codeIsAvailable(string $code, ?Voucher $ignore = null): bool
+    {
+        $code = self::normaliseCode($code);
+
+        if ($code === '') {
+            return false;
+        }
+
+        return ! Voucher::where('code', $code)
+            ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->getKey()))
+            ->exists();
+    }
+
+    /**
+     * A code to offer when nobody has a better idea.
+     *
+     * GIFT-2608-K4RT. Keeps the unambiguous alphabet — no I, O, 0 or 1 — because
+     * a code the system invents is one nobody chose to be memorable, so the only
+     * thing it has to be is readable aloud. A code a person types is their own
+     * business and is not held to that.
+     */
+    public function suggestCode(VoucherType $type = VoucherType::Gift): string
+    {
+        return $this->generateCode($type);
     }
 
     /*
@@ -286,6 +460,28 @@ class VoucherService
     | Internals
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Save, and turn a unique-index collision into something readable.
+     *
+     * The check in the Form Request and the AJAX check in the browser both run
+     * before this and both can be stale by the time the insert happens. This is
+     * the only guard that cannot be, because it is the database's own.
+     */
+    private function saveOrExplainDuplicate(Voucher $voucher, string $code): void
+    {
+        try {
+            $voucher->save();
+        } catch (QueryException $e) {
+            if (($e->errorInfo[1] ?? null) === 1062 || $e->getCode() === '23000') {
+                throw new RuntimeException(
+                    "The code {$code} was taken while you were typing. Choose another one."
+                );
+            }
+
+            throw $e;
+        }
+    }
 
     /**
      * GIFT-2608-K4RT. Same alphabet as everything else that gets read aloud.

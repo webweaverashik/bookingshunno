@@ -6,6 +6,7 @@ use App\Enums\Voucher\VoucherStatus;
 use App\Enums\Voucher\VoucherType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Voucher\StoreVoucherRequest;
+use App\Http\Requests\Admin\Voucher\UpdateVoucherRequest;
 use App\Models\Voucher\Voucher;
 use App\Models\Workshop\Workshop;
 use App\Services\Voucher\VoucherService;
@@ -58,6 +59,11 @@ class VoucherController extends Controller
             'pageSizes' => self::VOUCHER_PAGE_SIZES,
             'workshops' => Workshop::orderBy('title')->get(['id', 'title']),
             'summary'   => $this->summary(),
+
+            // Prefilled into the create form so staff who do not want to invent
+            // a code do not have to. Overwritable, and re-rollable from the
+            // modal without a page reload.
+            'suggestedCode' => $this->vouchers->suggestCode(),
         ]);
     }
 
@@ -113,7 +119,10 @@ class VoucherController extends Controller
         if (! $voucher) {
             return response()->json([
                 'success' => false,
-                'message' => 'No voucher with that code. Check the spelling — there are no letter O or number 0 in our codes.',
+                // PHASE 25: this used to promise our codes contain no letter O
+                // and no zero. Admins now type their own codes, so that promise
+                // is no longer ours to make.
+                'message' => 'No voucher with that code. Check the spelling — letters and numbers only, and case does not matter.',
             ], 404);
         }
 
@@ -163,6 +172,141 @@ class VoucherController extends Controller
                 'code' => $voucher->code,
                 'list' => $this->listPayload($request),
             ],
+        ]);
+    }
+
+    /**
+     * Is this code free, and does it look like a code?
+     *
+     * Advisory. Answers 200 with available:false rather than 422, because "that
+     * one is taken" is a normal thing for a form to say while somebody types
+     * and not an error in the request. The Form Request and the unique index
+     * are what actually decide at save time.
+     *
+     * `ignore` carries the code being edited so a form opened on EIDGIFT does
+     * not report EIDGIFT as taken by itself.
+     */
+    public function checkCode(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->canAny(['vouchers.create', 'vouchers.update']),
+            403,
+        );
+
+        // No code at all means "give me one" — the Suggest link in the form.
+        if (trim((string) $request->query('code')) === '') {
+            return response()->json([
+                'success' => true,
+                'data'    => ['code' => '', 'available' => false, 'suggestion' => $this->vouchers->suggestCode()],
+            ]);
+        }
+
+        $code = VoucherService::normaliseCode($request->query('code'));
+
+        $ignore = ($ignoreCode = VoucherService::normaliseCode($request->query('ignore')))
+            ? Voucher::where('code', $ignoreCode)->first()
+            : null;
+
+        if (! preg_match(StoreVoucherRequest::CODE_PATTERN, $code) || mb_strlen($code) < 4 || mb_strlen($code) > 24) {
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'code'      => $code,
+                    'available' => false,
+                    'message'   => 'Letters and numbers only, 4 to 24 characters, single hyphens between.',
+                ],
+            ]);
+        }
+
+        $available = $this->vouchers->codeIsAvailable($code, $ignore);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'code'      => $code,
+                'available' => $available,
+                'message'   => $available
+                    ? $code . ' is free.'
+                    : $code . ' is already in use by another voucher.',
+            ],
+        ]);
+    }
+
+    /**
+     * The current values, for the edit form.
+     *
+     * Returns fields rather than rendered HTML — unlike show(), which returns a
+     * panel. The form already exists in the DOM; sending markup for it would
+     * mean two definitions of the same form, and they would drift.
+     */
+    public function edit(Voucher $voucher): JsonResponse
+    {
+        Gate::authorize('update', $voucher);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'code'            => $voucher->code,
+                'value'           => (float) $voucher->value,
+
+                // Y-m-d, which is what the date field submits and what Flatpickr
+                // is configured to parse. The readable form is the picker's job.
+                'expires_at'      => $voucher->expires_at?->format('Y-m-d'),
+
+                'workshop_id'     => $voucher->workshop_id,
+                'issued_to_name'  => $voucher->issued_to_name,
+                'issued_to_email' => $voucher->issued_to_email,
+                'note'            => $voucher->note,
+
+                // Drives the warning in the form. A voucher that was emailed is
+                // one somebody is holding a copy of, and changing its code or
+                // value behind them is a different act from correcting a draft.
+                'was_emailed'     => (bool) $voucher->issued_to_email,
+                'update_url'      => route('admin.vouchers.update', $voucher),
+            ],
+        ]);
+    }
+
+    public function update(UpdateVoucherRequest $request, Voucher $voucher): JsonResponse
+    {
+        Gate::authorize('update', $voucher);
+
+        try {
+            $voucher = $this->vouchers->updateGift($voucher, $request->validated(), $request->user());
+        } catch (RuntimeException $e) {
+            // Redeemed or cancelled between the form opening and the save, or a
+            // code taken in the meantime. 409 — the request was fine, the world
+            // moved.
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$voucher->code} has been updated.",
+            'data'    => [
+                'code' => $voucher->code,
+                'html' => $this->detailHtml($voucher),
+                'list' => $this->listPayload($request),
+            ],
+        ]);
+    }
+
+    public function destroy(Request $request, Voucher $voucher): JsonResponse
+    {
+        Gate::authorize('delete', $voucher);
+
+        $code = $voucher->code;
+
+        try {
+            $this->vouchers->delete($voucher, $request->user());
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$code} has been deleted.",
+            'data'    => ['list' => $this->listPayload($request)],
         ]);
     }
 

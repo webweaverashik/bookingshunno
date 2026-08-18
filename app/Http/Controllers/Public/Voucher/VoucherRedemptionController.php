@@ -56,10 +56,17 @@ class VoucherRedemptionController extends Controller
         $voucher = Voucher::with('workshop')->where('code', $code)->first();
 
         if (! $voucher) {
-            // Deliberately not "invalid voucher". Our codes contain no letter O
-            // and no zero, and saying so turns a dead end into a fixable typo.
+            /*
+             | Deliberately not "invalid voucher" — a dead end with no way out.
+             |
+             | PHASE 25 changed what this can honestly say. It used to promise
+             | that our codes contain no letter O and no zero, which was true
+             | while every code was generated. Admins now type their own, so the
+             | hint is what IS still true: case does not matter, and spaces and
+             | punctuation are ignored.
+             */
             return back()->with('payment_error',
-                'We could not find that code. Check it carefully — our codes never contain the letter O or the number 0.');
+                'We could not find that code. Check it carefully — capitals do not matter, and you can ignore any spaces.');
         }
 
         try {

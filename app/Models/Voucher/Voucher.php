@@ -162,6 +162,71 @@ class Voucher extends Model
         return $this->status->colour();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Editing and deleting  (PHASE 25)
+    |--------------------------------------------------------------------------
+    | Both answer with a REASON rather than a bare boolean, for the same reason
+    | unusableReason() does: the policy needs a yes or no to draw a button, and
+    | the person who clicked needs a sentence when the answer changed underneath
+    | them. One rule, stated once, read by the policy, the service and the view.
+    */
+
+    /**
+     * Why this cannot be edited, or null if it can.
+     *
+     * Café credit is excluded because it is not a thing anybody decided — it is
+     * arithmetic on a paid visit, and a hand-edited value would no longer match
+     * the workshop rate that produced it. A redeemed voucher is excluded
+     * because it has already been honoured at the value it had.
+     */
+    public function uneditableReason(): ?string
+    {
+        if ($this->type->isAutomatic()) {
+            return 'Café credit is worked out from the visit that earned it and is not edited by hand.';
+        }
+
+        if ($this->status === VoucherStatus::Redeemed) {
+            return 'This has already been used. A spent voucher stays as it was spent.';
+        }
+
+        if ($this->status === VoucherStatus::Cancelled) {
+            return 'This voucher was cancelled. Editing it would not bring it back.';
+        }
+
+        return null;
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->uneditableReason() === null;
+    }
+
+    /**
+     * Why this cannot be deleted, or null if it can.
+     *
+     * Deliberately narrower than cancelling. A cancelled voucher CAN be deleted
+     * — it is already dead and the row is only clutter — but a redeemed one
+     * never can, because that row is the record of money the studio gave away.
+     */
+    public function undeletableReason(): ?string
+    {
+        if ($this->type->isAutomatic()) {
+            return 'Café credit belongs to the visit that earned it. Cancel it instead — deleting the row would let a repeated payment callback issue it a second time.';
+        }
+
+        if ($this->status === VoucherStatus::Redeemed) {
+            return 'This voucher was spent. Deleting it would erase the record of it.';
+        }
+
+        return null;
+    }
+
+    public function isDeletable(): bool
+    {
+        return $this->undeletableReason() === null;
+    }
+
     /**
      * Why this cannot be used, in words a member of staff can read out.
      *

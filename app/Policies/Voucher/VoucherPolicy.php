@@ -53,4 +53,35 @@ class VoucherPolicy
         return $user->can('vouchers.cancel')
             && $voucher->status === VoucherStatus::Active;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PHASE 25 — editing and deleting
+    |--------------------------------------------------------------------------
+    | These two DO hide their buttons on state, unlike redeem() above, and the
+    | difference is who is standing there. Redemption is refused in front of a
+    | visitor holding a coupon, so the button stays and the service supplies a
+    | sentence to read out. Nobody is waiting on an edit — it is an admin alone
+    | with a register — so a button that cannot work is just a button that lies.
+    |
+    | The model owns the rule. Asking it here rather than restating the
+    | conditions means the policy and the service cannot drift apart.
+    */
+
+    public function update(User $user, Voucher $voucher): bool
+    {
+        return $user->can('vouchers.update') && $voucher->isEditable();
+    }
+
+    /**
+     * Admin only, and separate from cancel() on purpose.
+     *
+     * Cancelling withdraws a voucher and says why. Deleting removes the fact
+     * that it ever existed, which is the right answer only for a row created in
+     * error — and the wrong answer for one that somebody out there is holding.
+     */
+    public function delete(User $user, Voucher $voucher): bool
+    {
+        return $user->can('vouchers.delete') && $voucher->isDeletable();
+    }
 }

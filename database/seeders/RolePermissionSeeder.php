@@ -76,6 +76,15 @@ class RolePermissionSeeder extends Seeder
             'vouchers.cancel',
             'vouchers.redeem',
 
+            /*
+             | PHASE 25. Deleting is not cancelling and does not inherit from
+             | it. Cancelling withdraws a voucher and leaves a row saying why;
+             | deleting removes the row. Only ever right for one created in
+             | error, and never available for a voucher that was actually spent
+             | — VoucherPolicy::delete() and the model enforce that half.
+             */
+            'vouchers.delete',
+
             // ---------------------------------------------------------------
             // Reports
             // ---------------------------------------------------------------
