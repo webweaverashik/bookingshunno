@@ -243,12 +243,6 @@
                                 My Profile
                             </a>
                         </div>
-
-                        <div class="menu-item px-5">
-                            <a href="{{ route('admin.profile.index') }}#profile-password" class="menu-link px-5">
-                                Change password
-                            </a>
-                        </div>
                         <!--begin::Menu separator-->
                         <div class="separator my-2"></div>
                         <!--end::Menu separator-->
