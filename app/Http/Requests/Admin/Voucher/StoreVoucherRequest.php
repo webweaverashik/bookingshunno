@@ -3,9 +3,9 @@
 namespace App\Http\Requests\Admin\Voucher;
 
 use App\Services\Voucher\VoucherService;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 /**
  * PHASE 14B — creating a gift voucher by hand.
@@ -90,8 +90,16 @@ class StoreVoucherRequest extends FormRequest
         ];
     }
 
-    /** Overridden by UpdateVoucherRequest to exclude the row being edited. */
-    protected function codeUniqueRule(): ValidationRule
+    /**
+     * Overridden by UpdateVoucherRequest to exclude the row being edited.
+     *
+     * Typed as Unique, NOT as the ValidationRule interface. Rule::unique()
+     * returns a fluent builder the validator casts to a string; the interface is
+     * for the OTHER kind of custom rule, the one carrying a validate() method.
+     * They are unrelated, and hinting the interface here throws a TypeError the
+     * moment the form is submitted.
+     */
+    protected function codeUniqueRule(): Unique
     {
         return Rule::unique('vouchers', 'code');
     }

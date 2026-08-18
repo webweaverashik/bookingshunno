@@ -5,8 +5,8 @@ namespace App\Http\Requests\Admin\Voucher;
 use App\Models\Voucher\Voucher;
 use Carbon\CarbonImmutable;
 use Closure;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 /**
  * PHASE 25 — editing a gift voucher.
@@ -31,7 +31,7 @@ class UpdateVoucherRequest extends StoreVoucherRequest
         ]);
     }
 
-    protected function codeUniqueRule(): ValidationRule
+    protected function codeUniqueRule(): Unique
     {
         return Rule::unique('vouchers', 'code')->ignore($this->voucher()->getKey());
     }
