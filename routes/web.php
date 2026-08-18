@@ -1,13 +1,13 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Public\AvailabilityController;
+use App\Http\Controllers\Payment\PayslipController;
+use App\Http\Controllers\Public\Availability\AvailabilityController;
 use App\Http\Controllers\Public\LandingController;
-use App\Http\Controllers\Public\PaymentGatewayController;
-use App\Http\Controllers\Public\PaymentPortalController;
-use App\Http\Controllers\Public\VoucherRedemptionController;
-use App\Http\Controllers\Public\ReservationRequestController;
-use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\Public\Payment\PaymentGatewayController;
+use App\Http\Controllers\Public\Payment\PaymentPortalController;
+use App\Http\Controllers\Public\Reservation\ReservationRequestController;
+use App\Http\Controllers\Public\Voucher\VoucherRedemptionController;
 use Illuminate\Support\Facades\Route;
 
 /*

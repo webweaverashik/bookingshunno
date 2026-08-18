@@ -1,8 +1,8 @@
 @php
-    use App\Models\Workshop;
-    use App\Services\AvailabilityService;
-    use App\Services\SettingsRepository;
-    use App\Support\VisitPurposes;
+    use App\Models\Workshop\Workshop;
+    use App\Services\Availability\AvailabilityService;
+    use App\Services\Setting\SettingsRepository;
+    use App\Support\Reservation\VisitPurposes;
 
     $experiences = Workshop::menu();
     $settings = app(SettingsRepository::class);

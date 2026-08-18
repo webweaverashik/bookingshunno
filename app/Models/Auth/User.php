@@ -1,9 +1,9 @@
 <?php
+
 namespace App\Models\Auth;
 
-use App\Enums\ReservationSource;
-use App\Models\Auth\LoginActivity;
-use App\Models\Reservation;
+use App\Enums\Reservation\ReservationSource;
+use App\Models\Reservation\Reservation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,7 +13,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasRoles, SoftDeletes, Notifiable;
+    use HasRoles, Notifiable, SoftDeletes;
 
     protected $guard_name = 'web';
 
@@ -24,11 +24,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at'   => 'datetime',
-            'password'            => 'hashed',
-            'is_active'           => 'boolean',
-            'source'              => ReservationSource::class,
-            'total_reservations'  => 'integer',
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'is_active' => 'boolean',
+            'source' => ReservationSource::class,
+            'total_reservations' => 'integer',
             'last_reservation_at' => 'datetime',
         ];
     }
@@ -54,6 +54,7 @@ class User extends Authenticatable
     {
         return $this->hasAnyRole(['Admin', 'Manager']);
     }
+
     /*
     |--------------------------------------------------------------------------
     | Relationships

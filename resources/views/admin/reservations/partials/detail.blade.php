@@ -9,7 +9,7 @@
 --}}
 
 @php
-    use App\Enums\ReservationStatus;
+    use App\Enums\Reservation\ReservationStatus;
 
     $item = $reservation->items->first();
     $start = \Carbon\CarbonImmutable::createFromTimeString($reservation->start_time);

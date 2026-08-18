@@ -1,19 +1,19 @@
 <?php
 
-use App\Http\Controllers\Admin\AvailabilityController;
-use App\Http\Controllers\Admin\BlockedDateController;
-use App\Http\Controllers\Admin\CommunicationController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\PaymentController;
-use App\Http\Controllers\Admin\ProfileController;
-use App\Http\Controllers\Admin\ReportController;
-use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\ReservationController;
-use App\Http\Controllers\Admin\VoucherController;
-use App\Http\Controllers\Admin\ReservationDecisionController;
-use App\Http\Controllers\Admin\VisitorController;
-use App\Http\Controllers\Admin\WorkshopController;
+use App\Http\Controllers\Admin\Availability\AvailabilityController;
+use App\Http\Controllers\Admin\Availability\BlockedDateController;
+use App\Http\Controllers\Admin\Communication\CommunicationController;
+use App\Http\Controllers\Admin\Dashboard\DashboardController;
+use App\Http\Controllers\Admin\Payment\PaymentController;
+use App\Http\Controllers\Admin\Report\ReportController;
+use App\Http\Controllers\Admin\Reservation\ReservationController;
+use App\Http\Controllers\Admin\Reservation\ReservationDecisionController;
+use App\Http\Controllers\Admin\Setting\SettingController;
+use App\Http\Controllers\Admin\Staff\ProfileController;
+use App\Http\Controllers\Admin\Staff\UserController;
+use App\Http\Controllers\Admin\Visitor\VisitorController;
+use App\Http\Controllers\Admin\Voucher\VoucherController;
+use App\Http\Controllers\Admin\Workshop\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,10 +24,11 @@ Route::prefix('admin')
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::get('/logout', fn() => redirect()->back())->name('logout.get');
+        Route::get('/logout', fn () => redirect()->back())->name('logout.get');
 
         Route::get('clear-cache', function () {
             clearServerCache();
+
             return response()->json(['success' => true]);
         })->name('clear.cache');
 

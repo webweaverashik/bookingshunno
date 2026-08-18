@@ -11,7 +11,7 @@
 --}}
 
 @component('mail::message')
-@if ($voucher->type === \App\Enums\VoucherType::CafeCredit)
+@if ($voucher->type === \App\Enums\Voucher\VoucherType::CafeCredit)
 # Here is your café credit
 @else
 # You have a gift voucher
@@ -19,7 +19,7 @@
 
 Hello {{ $voucher->issued_to_name ?? 'there' }},
 
-@if ($voucher->type === \App\Enums\VoucherType::CafeCredit)
+@if ($voucher->type === \App\Enums\Voucher\VoucherType::CafeCredit)
 Thank you for booking with us. Your visit comes with
 **BDT {{ number_format((float) $voucher->value) }}** to spend on food and drink at the café.
 @else
@@ -45,7 +45,7 @@ Worth BDT {{ number_format((float) $voucher->value) }}
 | Spend it on  | {{ $voucher->type->spendableOn() }}                                 |
 @endcomponent
 
-@if ($voucher->type === \App\Enums\VoucherType::CafeCredit)
+@if ($voucher->type === \App\Enums\Voucher\VoucherType::CafeCredit)
 Just show this code at the counter when you visit. It can be used once, in one go, so pick
 something you will enjoy.
 

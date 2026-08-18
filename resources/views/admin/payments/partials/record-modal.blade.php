@@ -51,7 +51,7 @@
                             <label class="required form-label">How did it arrive?</label>
                             <select name="method" class="form-select form-select-solid border">
                                 <option value="">Choose…</option>
-                                @foreach (\App\Enums\PaymentMethod::manualOptions() as $method)
+                                @foreach (\App\Enums\Payment\PaymentMethod::manualOptions() as $method)
                                     <option value="{{ $method->value }}">{{ $method->label() }}</option>
                                 @endforeach
                             </select>

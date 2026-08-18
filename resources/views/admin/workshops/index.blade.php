@@ -37,7 +37,7 @@
                 </span>
             </div>
 
-            @can('create', App\Models\Workshop::class)
+            @can('create', App\Models\Workshop\Workshop::class)
                 <div class="card-toolbar">
                     <button type="button" class="btn btn-primary" data-workshop-create>
                         <i class="ki-outline ki-plus fs-2"></i>New workshop

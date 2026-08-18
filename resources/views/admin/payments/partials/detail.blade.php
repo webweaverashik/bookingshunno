@@ -8,7 +8,7 @@
 --}}
 
 @php
-    use App\Enums\PaymentStatus;
+    use App\Enums\Payment\PaymentStatus;
 
     $reservation = $payment->reservation;
     $overdue = $payment->isOverdue();

@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\VisitPurpose;
+use App\Models\Reservation\VisitPurpose;
 use Illuminate\Database\Seeder;
 
 /**
@@ -19,7 +19,7 @@ class VisitPurposeSeeder extends Seeder
         $purposes = [
             ['slug' => 'workshop',   'name' => 'Workshop or learning session',    'is_chargeable' => true,  'is_invitation_only' => false],
             ['slug' => 'exhibition', 'name' => 'Exhibition or event',             'is_chargeable' => false, 'is_invitation_only' => false],
-            ['slug' => 'meeting',    'name' => 'Creative meeting or collaboration','is_chargeable' => true, 'is_invitation_only' => false],
+            ['slug' => 'meeting',    'name' => 'Creative meeting or collaboration', 'is_chargeable' => true, 'is_invitation_only' => false],
             ['slug' => 'quiet-work', 'name' => 'Research, reading or quiet work',  'is_chargeable' => true,  'is_invitation_only' => false],
             ['slug' => 'gathering',  'name' => 'Community or cultural gathering',  'is_chargeable' => true,  'is_invitation_only' => false],
             ['slug' => 'cafe',       'name' => 'A short cafe visit',               'is_chargeable' => true,  'is_invitation_only' => false],

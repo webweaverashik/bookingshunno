@@ -158,7 +158,7 @@
                         </span>
                     </div>
 
-                    @can('create', App\Models\BlockedDate::class)
+                    @can('create', App\Models\Availability\BlockedDate::class)
                         <div class="card-toolbar">
                             <button type="button" class="btn btn-primary" data-block-create>
                                 <i class="ki-outline ki-plus fs-2"></i>Block a date
@@ -196,7 +196,7 @@
 @endsection
 
 @push('modals')
-    @can('create', App\Models\BlockedDate::class)
+    @can('create', App\Models\Availability\BlockedDate::class)
         @include('admin.availability.partials.blocked-modal')
     @endcan
 @endpush

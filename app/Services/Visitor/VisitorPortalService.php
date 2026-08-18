@@ -2,11 +2,11 @@
 
 namespace App\Services\Visitor;
 
-use App\Enums\ReservationStatus;
-use App\Enums\VoucherType;
+use App\Enums\Reservation\ReservationStatus;
+use App\Enums\Voucher\VoucherType;
 use App\Models\Auth\User;
-use App\Models\Reservation;
-use App\Models\Voucher;
+use App\Models\Reservation\Reservation;
+use App\Models\Voucher\Voucher;
 use Illuminate\Support\Collection;
 
 /**
@@ -57,7 +57,7 @@ class VisitorPortalService
 
         $upcoming = $reservations->filter(
             fn (Reservation $r) => $r->reserved_date->gte($today) && ! in_array($r->status, $dead, true)
-        // Soonest first: the next visit is the one being looked for.
+            // Soonest first: the next visit is the one being looked for.
         )->sortBy(fn (Reservation $r) => $r->reserved_date->timestamp)->values();
 
         $past = $reservations->reject(
@@ -135,70 +135,70 @@ class VisitorPortalService
 
         return match ($reservation->status) {
             ReservationStatus::Pending, ReservationStatus::Escalated => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'With us for review',
-                'body'  => 'Someone from the studio is looking at your request. We usually reply within a day, and nothing is owed until we do.',
-                'cta'   => null,
+                'body' => 'Someone from the studio is looking at your request. We usually reply within a day, and nothing is owed until we do.',
+                'cta' => null,
             ],
 
             ReservationStatus::InfoRequested => [
-                'owed'  => true,
+                'owed' => true,
                 'title' => 'We need a little more from you',
-                'body'  => 'Check the email we sent — there is something we need to know before we can confirm this. Replying to that email is the quickest way.',
-                'cta'   => null,
+                'body' => 'Check the email we sent — there is something we need to know before we can confirm this. Replying to that email is the quickest way.',
+                'cta' => null,
             ],
 
             ReservationStatus::Approved => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'Approved — a payment link is coming',
-                'body'  => 'Your date is held. We will email you a link to settle it shortly, and it will appear here too.',
-                'cta'   => null,
+                'body' => 'Your date is held. We will email you a link to settle it shortly, and it will appear here too.',
+                'cta' => null,
             ],
 
             ReservationStatus::PaymentRequested => [
-                'owed'  => true,
+                'owed' => true,
                 'title' => 'Ready for payment',
-                'body'  => $payment?->due_at
-                    ? 'Please settle this by ' . $payment->due_at->format('j F, g:i A') . ' so we can hold your place.'
+                'body' => $payment?->due_at
+                    ? 'Please settle this by '.$payment->due_at->format('j F, g:i A').' so we can hold your place.'
                     : 'Settle this and your visit is confirmed.',
-                'cta'   => $payment
+                'cta' => $payment
                     ? ['label' => 'Pay now', 'url' => route('payment.portal', $payment->token)]
                     : null,
             ],
 
             ReservationStatus::Confirmed => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'Confirmed — we will see you then',
-                'body'  => 'Nothing more to do. Come a few minutes early if you can; aprons and everything else are here.',
-                'cta'   => null,
+                'body' => 'Nothing more to do. Come a few minutes early if you can; aprons and everything else are here.',
+                'cta' => null,
             ],
 
             ReservationStatus::Completed => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'Thank you for coming',
-                'body'  => 'We hope it was a good evening. Any café credit from this visit is listed below.',
-                'cta'   => null,
+                'body' => 'We hope it was a good evening. Any café credit from this visit is listed below.',
+                'cta' => null,
             ],
 
             ReservationStatus::Declined => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'We could not take this one',
-                'body'  => 'The email we sent explains why. Do send another request — a different date often works.',
-                'cta'   => null,
+                'body' => 'The email we sent explains why. Do send another request — a different date often works.',
+                'cta' => null,
             ],
 
             ReservationStatus::Cancelled => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'Cancelled',
-                'body'  => 'This booking is closed. If that is not right, please get in touch.',
-                'cta'   => null,
+                'body' => 'This booking is closed. If that is not right, please get in touch.',
+                'cta' => null,
             ],
 
             ReservationStatus::NoShow => [
-                'owed'  => false,
+                'owed' => false,
                 'title' => 'Marked as missed',
-                'body'  => 'We had you down for this one but did not see you. If something went wrong, please tell us.',
-                'cta'   => null,
+                'body' => 'We had you down for this one but did not see you. If something went wrong, please tell us.',
+                'cta' => null,
             ],
         };
     }

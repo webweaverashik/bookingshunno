@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\OperatingHour;
+use App\Models\Availability\OperatingHour;
 use Illuminate\Database\Seeder;
 
 /**
@@ -20,7 +20,7 @@ class OperatingHourSeeder extends Seeder
             OperatingHour::updateOrCreate(
                 ['day_of_week' => $day],
                 [
-                    'opens_at'  => $closed ? null : '16:00:00',
+                    'opens_at' => $closed ? null : '16:00:00',
                     'closes_at' => $closed ? null : '21:30:00',
                     'is_closed' => $closed,
                 ],

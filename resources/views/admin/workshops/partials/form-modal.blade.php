@@ -96,7 +96,7 @@
                         <div class="col-md-4">
                             <label class="required form-label">Duration (minutes)</label>
                             <input type="number" name="duration_minutes" class="form-control form-control-solid border"
-                                min="30" max="{{ \App\Support\SessionSlots::windowMinutes() }}" step="30"
+                                min="30" max="{{ \App\Support\Availability\SessionSlots::windowMinutes() }}" step="30"
                                 inputmode="numeric" />
                             <div class="form-text" id="workshop-duration-hint"></div>
                             <div class="invalid-feedback d-block" data-error-for="duration_minutes"></div>

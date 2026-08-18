@@ -1,5 +1,5 @@
 {{--
-    PHASE 6: $experience is an App\Models\Workshop, not the array
+    PHASE 6: $experience is an App\Models\Workshop\Workshop, not the array
     ExperienceCatalogue used to hand over. The prop name is unchanged so the
     experiences section did not have to move.
 --}}

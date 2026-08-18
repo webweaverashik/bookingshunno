@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Visitor;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Visitor\UpdateVisitorProfileRequest;
-use App\Models\Reservation;
+use App\Models\Reservation\Reservation;
 use App\Services\Visitor\VisitorPortalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,22 +22,20 @@ use Illuminate\View\View;
  */
 class VisitorAreaController extends Controller
 {
-    public function __construct(private readonly VisitorPortalService $portal)
-    {
-    }
+    public function __construct(private readonly VisitorPortalService $portal) {}
 
     public function index(Request $request): View
     {
-        $user     = $request->user();
-        $visits   = $this->portal->visits($user);
+        $user = $request->user();
+        $visits = $this->portal->visits($user);
         $vouchers = $this->portal->vouchers($user);
 
         return view('visitor.index', [
             'upcoming' => $visits['upcoming'],
-            'past'     => $visits['past'],
+            'past' => $visits['past'],
             'vouchers' => $vouchers,
-            'summary'  => $this->portal->summary($user, $vouchers),
-            'portal'   => $this->portal,
+            'summary' => $this->portal->summary($user, $vouchers),
+            'portal' => $this->portal,
         ]);
     }
 
@@ -63,11 +61,11 @@ class VisitorAreaController extends Controller
 
         return view('visitor.show', [
             'reservation' => $reservation,
-            'next'        => $this->portal->nextStep($reservation),
+            'next' => $this->portal->nextStep($reservation),
 
             // Credit earned BY this visit. Distinct from the vouchers list on
             // the index, which is everything the person holds.
-            'vouchers'    => $this->portal->creditFrom($reservation),
+            'vouchers' => $this->portal->creditFrom($reservation),
         ]);
     }
 

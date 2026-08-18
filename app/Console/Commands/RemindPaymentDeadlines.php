@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\ReservationMailKind;
-use App\Models\Communication;
-use App\Models\Payment;
-use App\Services\CommunicationLogger;
+use App\Enums\Communication\ReservationMailKind;
+use App\Models\Communication\Communication;
+use App\Models\Payment\Payment;
+use App\Services\Communication\CommunicationLogger;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -91,6 +91,7 @@ class RemindPaymentDeadlines extends Command
              */
             if (! $reservation || ! $reservation->user?->email) {
                 $this->warn("Skipped {$payment->reference}: no visitor address.");
+
                 continue;
             }
 
@@ -107,6 +108,7 @@ class RemindPaymentDeadlines extends Command
                     $payment->due_at->format('j M, g:i A'),
                 ));
                 $sent++;
+
                 continue;
             }
 

@@ -41,7 +41,7 @@
                  symptom of a worker that is not running — on shared hosting,
                  driven by one cron entry, that is a real and recurring failure.
                  Worth naming rather than leaving as an unexplained badge. --}}
-            @if ($message->status === \App\Enums\CommunicationStatus::Queued && $message->queued_at->lt(now()->subMinutes(15)))
+            @if ($message->status === \App\Enums\Communication\CommunicationStatus::Queued && $message->queued_at->lt(now()->subMinutes(15)))
                 <div class="text-warning fs-8 mt-1">
                     Still waiting after {{ $message->queued_at->diffForHumans(null, true) }} — the queue
                     worker may not be running.

@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Services\SettingsRepository;
+use App\Services\Setting\SettingsRepository;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -44,12 +44,12 @@ class RuntimeConfigServiceProvider extends ServiceProvider
      * ever appears, this map is what has to grow.
      */
     private const MAIL_MAP = [
-        'mail.host'         => 'mail.mailers.smtp.host',
-        'mail.port'         => 'mail.mailers.smtp.port',
-        'mail.username'     => 'mail.mailers.smtp.username',
-        'mail.encryption'   => 'mail.mailers.smtp.scheme',
+        'mail.host' => 'mail.mailers.smtp.host',
+        'mail.port' => 'mail.mailers.smtp.port',
+        'mail.username' => 'mail.mailers.smtp.username',
+        'mail.encryption' => 'mail.mailers.smtp.scheme',
         'mail.from_address' => 'mail.from.address',
-        'mail.from_name'    => 'mail.from.name',
+        'mail.from_name' => 'mail.from.name',
     ];
 
     public function boot(): void
@@ -125,7 +125,7 @@ class RuntimeConfigServiceProvider extends ServiceProvider
     private function applyGatewaySettings(SettingsRepository $settings): void
     {
         $values = $settings->all();
-        $mode   = $values['sslcommerz.mode'] ?? null;
+        $mode = $values['sslcommerz.mode'] ?? null;
 
         // Nothing configured in the database. Leave config/services.php and
         // whatever .env still holds entirely alone.
@@ -133,7 +133,7 @@ class RuntimeConfigServiceProvider extends ServiceProvider
             return;
         }
 
-        $storeId  = $values["sslcommerz.{$mode}_store_id"] ?? null;
+        $storeId = $values["sslcommerz.{$mode}_store_id"] ?? null;
         $password = $settings->getSecret("sslcommerz.{$mode}_store_password");
 
         /*
@@ -150,7 +150,7 @@ class RuntimeConfigServiceProvider extends ServiceProvider
         }
 
         config([
-            'services.sslcommerz.store_id'       => $storeId,
+            'services.sslcommerz.store_id' => $storeId,
             'services.sslcommerz.store_password' => $password,
 
             /*
@@ -160,7 +160,7 @@ class RuntimeConfigServiceProvider extends ServiceProvider
              | when live is selected — those two are what replace the old
              | guarantee that this could only be changed by a deploy.
              */
-            'services.sslcommerz.sandbox'        => $mode === 'sandbox',
+            'services.sslcommerz.sandbox' => $mode === 'sandbox',
         ]);
     }
 }

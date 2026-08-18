@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
-use App\Models\Workshop;
+use App\Models\Workshop\Workshop;
 use Illuminate\Contracts\View\View;
 
 class LandingController extends Controller

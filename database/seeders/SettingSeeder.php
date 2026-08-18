@@ -2,7 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Setting;
+use App\Models\Setting\Setting;
+use App\Services\Setting\SettingsRepository;
 use Illuminate\Database\Seeder;
 
 class SettingSeeder extends Seeder
@@ -177,13 +178,13 @@ class SettingSeeder extends Seeder
             }
 
             $existing->update([
-                'type'        => $setting['type'],
-                'group'       => $setting['group'],
-                'label'       => $setting['label'],
+                'type' => $setting['type'],
+                'group' => $setting['group'],
+                'label' => $setting['label'],
                 'description' => $setting['description'] ?? $existing->description,
             ]);
         }
 
-        app(\App\Services\SettingsRepository::class)->flush();
+        app(SettingsRepository::class)->flush();
     }
 }

@@ -7,7 +7,7 @@
 --}}
 
 @php
-    use App\Enums\VoucherStatus;
+    use App\Enums\Voucher\VoucherStatus;
     $blocked = $voucher->unusableReason();
 @endphp
 

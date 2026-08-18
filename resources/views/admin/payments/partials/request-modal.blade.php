@@ -46,12 +46,12 @@
                     <label class="required form-label">What are you asking for?</label>
 
                     <div class="row g-3 mb-4">
-                        @foreach ([\App\Enums\PaymentType::BookingFee, \App\Enums\PaymentType::Full] as $type)
+                        @foreach ([\App\Enums\Payment\PaymentType::BookingFee, \App\Enums\Payment\PaymentType::Full] as $type)
                             <div class="col-md-6">
                                 <label class="btn btn-outline btn-outline-dashed btn-active-light-primary d-flex text-start p-4 w-100"
                                     data-payment-type-option="{{ $type->value }}">
                                     <input class="form-check-input me-3" type="radio" name="type"
-                                        value="{{ $type->value }}" @checked($type === \App\Enums\PaymentType::BookingFee) />
+                                        value="{{ $type->value }}" @checked($type === \App\Enums\Payment\PaymentType::BookingFee) />
                                     <span class="d-block">
                                         <span class="fw-bold text-gray-900 d-block"
                                             data-payment-type-label="{{ $type->value }}">

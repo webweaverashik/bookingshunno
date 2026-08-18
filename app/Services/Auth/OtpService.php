@@ -1,7 +1,8 @@
 <?php
+
 namespace App\Services\Auth;
 
-use App\Mail\LoginOtpMail;
+use App\Mail\Auth\LoginOtpMail;
 use App\Models\Auth\LoginOtp;
 use App\Models\Auth\User;
 use Illuminate\Support\Facades\Hash;
@@ -15,16 +16,16 @@ class OtpService
      */
     public function generateAndSend(User $user): void
     {
-        $length    = (int) config('otp.length', 6);
+        $length = (int) config('otp.length', 6);
         $expiresIn = (int) config('otp.expires_in', 5);
-        $code      = $this->randomCode($length);
+        $code = $this->randomCode($length);
 
         LoginOtp::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'code'         => Hash::make($code),
-                'expires_at'   => now()->addMinutes($expiresIn),
-                'attempts'     => 0,
+                'code' => Hash::make($code),
+                'expires_at' => now()->addMinutes($expiresIn),
+                'attempts' => 0,
                 'last_sent_at' => now(),
             ]
         );
@@ -59,6 +60,7 @@ class OtpService
 
         if ($otp->attempts >= $max) {
             $otp->delete();
+
             return ['ok' => false, 'reset' => true, 'message' => 'Too many incorrect attempts. Please sign in again.'];
         }
 
@@ -68,6 +70,7 @@ class OtpService
 
             if ($remaining === 0) {
                 $otp->delete();
+
                 return ['ok' => false, 'reset' => true, 'message' => 'Too many incorrect attempts. Please sign in again.'];
             }
 
@@ -75,6 +78,7 @@ class OtpService
         }
 
         $otp->delete();
+
         return ['ok' => true, 'reset' => false, 'message' => 'Verified.'];
     }
 
@@ -89,7 +93,7 @@ class OtpService
             return 0;
         }
 
-        $after   = (int) config('otp.resend_after', 60);
+        $after = (int) config('otp.resend_after', 60);
         $elapsed = now()->getTimestamp() - $otp->last_sent_at->getTimestamp();
 
         return max(0, $after - $elapsed);
@@ -109,6 +113,7 @@ class OtpService
         for ($i = 0; $i < $length; $i++) {
             $code .= random_int(0, 9);
         }
+
         return $code;
     }
 }

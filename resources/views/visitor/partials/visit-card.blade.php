@@ -1,7 +1,7 @@
 {{--
     PHASE 15 — one booking, as a visitor sees it.
 
-    @param App\Models\Reservation $reservation
+    @param App\Models\Reservation\Reservation $reservation
     @param array                  $next        from VisitorPortalService::nextStep()
 
     The chip colour comes straight from ReservationStatus::colour(), the same
