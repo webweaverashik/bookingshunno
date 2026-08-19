@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -27,12 +28,25 @@ class RolePermissionSeeder extends Seeder
             'reservations.approve',
             'reservations.decline',
             'reservations.request-info',
-            'reservations.escalate',        // Manager hands a decision up
+            'reservations.escalate',        // PHASE 10A — Manager hands a decision up
             'reservations.update',
             'reservations.payment-request',
-            'reservations.cancel',          // cancel before any payment
+            'reservations.cancel',          // PHASE 10A — cancel before any payment
             'reservations.cancel-paid',
             'reservations.discount-override',
+
+            /*
+             | Marking a visit as having happened. Admin only for now, per the
+             | client's wording — though "they came" is a fact rather than a
+             | decision, which is the test that gave Manager offline payments
+             | and voucher redemption. Moving the line is one entry in the
+             | Manager block below.
+             |
+             | The gate is more than this row: ReservationPolicy::complete()
+             | also requires the reservation to be Confirmed, to owe nothing,
+             | and for the studio to have opened on the day of the visit.
+             */
+            'reservations.complete',
 
             // ---------------------------------------------------------------
             // Visitors
@@ -64,7 +78,7 @@ class RolePermissionSeeder extends Seeder
             'payments.verify',
             'payments.update-status',
 
-            // Repeating an email the visitor was already sent.
+            // PHASE 13B — repeating an email the visitor was already sent.
             'communications.resend',
 
             // ---------------------------------------------------------------
@@ -77,7 +91,7 @@ class RolePermissionSeeder extends Seeder
             'vouchers.redeem',
 
             /*
-             | Deleting is not cancelling and does not inherit from
+             | PHASE 25. Deleting is not cancelling and does not inherit from
              | it. Cancelling withdraws a voucher and leaves a row saying why;
              | deleting removes the row. Only ever right for one created in
              | error, and never available for a voucher that was actually spent
@@ -100,7 +114,7 @@ class RolePermissionSeeder extends Seeder
             'reports.logs',
 
             /*
-             | Clearing a log is not the same act as reading one, so
+             | PHASE 20 — clearing a log is not the same act as reading one, so
              | it is not the same permission. Admin only; Manager keeps view and
              | export below.
              */
@@ -129,7 +143,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
-                'name'       => $permission,
+                'name' => $permission,
                 'guard_name' => 'web',
             ]);
         }
@@ -141,17 +155,17 @@ class RolePermissionSeeder extends Seeder
         */
 
         $admin = Role::firstOrCreate([
-            'name'       => 'Admin',
+            'name' => 'Admin',
             'guard_name' => 'web',
         ]);
 
         $manager = Role::firstOrCreate([
-            'name'       => 'Manager',
+            'name' => 'Manager',
             'guard_name' => 'web',
         ]);
 
         $visitor = Role::firstOrCreate([
-            'name'       => 'Visitor',
+            'name' => 'Visitor',
             'guard_name' => 'web',
         ]);
 
@@ -170,7 +184,7 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         | Manager handles day-to-day reservation operations.
         |
-        | The client's escalation rule. Manager prepares a request
+        | PHASE 10A — the client's escalation rule. Manager prepares a request
         | and hands the decision up; Admin commits the studio to it. So:
         |
         |   REMOVED  reservations.approve   — approval is the commitment
@@ -179,7 +193,7 @@ class RolePermissionSeeder extends Seeder
         |                                     equally a decision about a
         |                                     commitment already made
         |
-        | The client has now closed the question 10A left open:
+        | PHASE 10B — the client has now closed the question 10A left open:
         |
         |   REMOVED  reservations.decline   — a refusal is a decision about the
         |                                     studio's business, and the visitor
@@ -247,7 +261,7 @@ class RolePermissionSeeder extends Seeder
             'payments.update-status',
 
             /*
-             | Resending is a Manager job too. Repeating a message
+             | PHASE 13B. Resending is a Manager job too. Repeating a message
              | the visitor was already sent is not a decision about the
              | studio's business — the content, the recipient and the
              | reservation are all unchanged. Whoever is on the phone to
