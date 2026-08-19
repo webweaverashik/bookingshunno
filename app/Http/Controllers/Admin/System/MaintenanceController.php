@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\System;
 
 use App\Enums\System\MaintenanceTask;
 use App\Http\Controllers\Controller;
+use App\Services\Setting\SettingsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -39,22 +40,42 @@ use Throwable;
  */
 class MaintenanceController extends Controller
 {
+    public function __construct(private readonly SettingsRepository $settings)
+    {
+    }
+
+    /**
+     * Whether the console is switched on at all.
+     *
+     * 404 rather than 403, and the difference is deliberate. A 403 confirms the
+     * page exists and is merely shut, which invites somebody to come back with
+     * a better session; a 404 says there is nothing here. Since the switch is
+     * off by default, that is also the honest answer for most installs.
+     *
+     * Checked in BOTH actions rather than in middleware, because a settings
+     * read is cheap and a route file is one careless edit away from losing a
+     * middleware entry.
+     */
+    private function assertEnabled(Request $request): void
+    {
+        abort_unless($request->user()?->can('system.maintenance'), 404);
+        abort_unless((bool) $this->settings->get('system.maintenance_console', false), 404);
+    }
+
     public function index(Request $request): View
     {
         /*
-         | The PERMISSION name, not an invented ability name.
+         | The permission AND the switch. See assertEnabled().
          |
-         | This read Gate::authorize('run-maintenance') and denied everyone,
-         | including Admin. Spatie registers a gate check that answers for
-         | permission names and returns null for anything else; nothing else
-         | answered 'run-maintenance', so the gate fell through to a denial. The
-         | permission is called system.maintenance and always was.
+         | The permission check reads system.maintenance, which is the name that
+         | exists — an earlier version asked the gate for 'run-maintenance', an
+         | ability nothing had ever defined, and denied everyone including Admin.
          |
-         | Route middleware already enforces both this and role:Admin. Kept here
-         | as well because a controller that trusts its route file is one
-         | copy-pasted route definition away from being open.
+         | Route middleware enforces the permission too. Kept here as well
+         | because a controller that trusts its route file is one copy-pasted
+         | route definition away from being open.
          */
-        abort_unless($request->user()?->can('system.maintenance'), 403);
+        $this->assertEnabled($request);
 
         return view('admin.system.maintenance', [
             'tasks' => MaintenanceTask::all(),
@@ -63,12 +84,14 @@ class MaintenanceController extends Controller
 
     public function run(Request $request): JsonResponse
     {
-        abort_unless($request->user()?->can('system.maintenance'), 403);
+        // Re-checked, not assumed from index(). Somebody could have the page
+        // open when the switch is turned off, and the buttons would still post.
+        $this->assertEnabled($request);
 
         $validated = $request->validate([
             // Rule::enum is the gate. A payload naming anything not in the enum
             // never reaches Artisan::call().
-            'task' => ['required', Rule::enum(MaintenanceTask::class)],
+            'task'     => ['required', Rule::enum(MaintenanceTask::class)],
             'password' => ['nullable', 'string'],
         ]);
 
@@ -81,7 +104,7 @@ class MaintenanceController extends Controller
          | limited here is a person hammering a button, which is a per-person
          | problem.
          */
-        $key = 'maintenance:'.$user->id;
+        $key = 'maintenance:' . $user->id;
 
         if (RateLimiter::tooManyAttempts($key, 5)) {
             return response()->json([
@@ -108,17 +131,17 @@ class MaintenanceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'That password is not right.',
-                'errors' => ['password' => ['Enter your own password to confirm.']],
+                'errors'  => ['password' => ['Enter your own password to confirm.']],
             ], 422);
         }
 
         [$command, $arguments] = $task->command();
 
         Log::warning('Maintenance command started from the admin panel.', [
-            'user' => $user->email,
-            'task' => $task->value,
+            'user'    => $user->email,
+            'task'    => $task->value,
             'command' => $command,
-            'ip' => $request->ip(),
+            'ip'      => $request->ip(),
         ]);
 
         try {
@@ -132,15 +155,15 @@ class MaintenanceController extends Controller
             $output = trim(Artisan::output());
         } catch (Throwable $e) {
             Log::error('Maintenance command failed.', [
-                'user' => $user->email,
-                'task' => $task->value,
+                'user'  => $user->email,
+                'task'  => $task->value,
                 'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => $task->label().' failed.',
-                'data' => [
+                'message' => $task->label() . ' failed.',
+                'data'    => [
                     /*
                      | The exception message, shown deliberately. §16 says not to
                      | leak debug detail to the browser — and this is the one
@@ -155,16 +178,16 @@ class MaintenanceController extends Controller
         }
 
         Log::warning('Maintenance command finished.', [
-            'user' => $user->email,
-            'task' => $task->value,
+            'user'   => $user->email,
+            'task'   => $task->value,
             'status' => $status,
         ]);
 
         return response()->json([
             'success' => $status === 0,
             'message' => $status === 0
-                ? $task->label().' finished.'
-                : $task->label().' exited with status '.$status.'.',
+                ? $task->label() . ' finished.'
+                : $task->label() . ' exited with status ' . $status . '.',
             'data' => [
                 // Artisan writes nothing for several of these when there was
                 // nothing to do. Silence reads as a failure, so it is spelled

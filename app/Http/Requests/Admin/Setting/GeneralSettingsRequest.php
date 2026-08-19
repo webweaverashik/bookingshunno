@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Studio identity and contact details.
+ * PHASE 17 — studio identity and contact details.
  *
  * These are not decoration. contact.email is where staff notifications go and
  * what visitors are told to reply to; contact.phone and contact.whatsapp are
@@ -29,6 +29,7 @@ class GeneralSettingsRequest extends FormRequest
             'contact_whatsapp'      => ['nullable', 'string', 'max:32'],
             'contact_address'       => ['required', 'string', 'max:255'],
             'notifications_enabled' => ['required', 'boolean'],
+            'maintenance_console'   => ['required', 'boolean'],
         ];
     }
 
@@ -46,6 +47,7 @@ class GeneralSettingsRequest extends FormRequest
         // rule as "missing" rather than passing as false.
         $this->merge([
             'notifications_enabled' => $this->boolean('notifications_enabled'),
+            'maintenance_console'   => $this->boolean('maintenance_console'),
         ]);
     }
 }

@@ -1,3 +1,10 @@
+@php
+    // One settings read for the Maintenance link below. SettingsRepository
+    // memoises, so this costs nothing after the first call in a request.
+    $maintenanceConsole = app(\App\Services\Setting\SettingsRepository::class)
+        ->get('system.maintenance_console', false);
+@endphp
+
 <div id="kt_app_sidebar" class="app-sidebar flex-column" data-kt-drawer="true" data-kt-drawer-name="app-sidebar"
     data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="225px"
     data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
@@ -141,21 +148,31 @@
                         </div>
                     @endcan
 
-                    {{-- Maintenance: artisan from the browser, because the live
-                         host gives no shell. Its own permission rather than
-                         settings.view — reading the SMTP password and migrating
-                         the database are different powers. --}}
-                    @can('system.maintenance')
-                        <div class="menu-item">
-                            <a class="menu-link {{ request()->routeIs('admin.maintenance.*') ? 'active' : '' }}"
-                                href="{{ route('admin.maintenance.index') }}">
-                                <span class="menu-icon">
-                                    <i class="ki-outline ki-wrench fs-2"></i>
-                                </span>
-                                <span class="menu-title">Maintenance</span>
-                            </a>
-                        </div>
-                    @endcan
+    {{-- Maintenance: artisan from the browser, because the live host gives no
+                         shell.
+
+                         Two conditions, and both matter. The permission is its
+                         own rather than settings.view — reading the SMTP
+                         password and migrating the database are different
+                         powers. The switch is in Settings › Studio and ships
+                         off, so the link is absent until somebody turns the
+                         console on for the job at hand.
+
+                         Hiding the link is presentation only; the route answers
+                         404 when the switch is off. --}}
+                    @if ($maintenanceConsole ?? false)
+                        @can('system.maintenance')
+                            <div class="menu-item">
+                                <a class="menu-link {{ request()->routeIs('admin.maintenance.*') ? 'active' : '' }}"
+                                    href="{{ route('admin.maintenance.index') }}">
+                                    <span class="menu-icon">
+                                        <i class="ki-outline ki-wrench fs-2"></i>
+                                    </span>
+                                    <span class="menu-title">Maintenance</span>
+                                </a>
+                            </div>
+                        @endcan
+                    @endif
 
                     <div class="menu-item">
                         {{-- PHASE 17. The placeholder read routeIs('settings.*'),

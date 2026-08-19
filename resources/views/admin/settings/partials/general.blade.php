@@ -78,6 +78,38 @@
                     </div>
                 </div>
 
+                {{--
+                    The maintenance console.
+
+                    Ships OFF. The page runs artisan against the live database,
+                    and a screen with that much power should be switched on for
+                    the hour it is needed and switched off again — not left
+                    standing open because it was useful once after a deploy.
+
+                    Off is a 404, not a hidden link: the route itself refuses,
+                    so nothing is reachable by URL either. Turning it back on
+                    needs settings.update, which is Admin-only, so an attacker
+                    who has that already has everything the console offers.
+
+                    The switch lives here rather than in .env because the point
+                    is that somebody with no shell can flip it — which is the
+                    same reason the console exists at all.
+                --}}
+                <div class="col-12">
+                    <div class="form-check form-switch form-check-custom form-check-solid">
+                        <input class="form-check-input" type="checkbox" name="maintenance_console" value="1"
+                            id="maintenance_console" @checked($values['system.maintenance_console'] ?? false) />
+                        <label class="form-check-label fw-semibold" for="maintenance_console">
+                            Maintenance console
+                            <span class="d-block text-muted fs-7 fw-normal">
+                                Adds Maintenance under Administration, where an Admin can run migrations, clear
+                                caches and re-sync permissions without shell access. Leave it off except when you
+                                need it.
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
             </div>
         </div>
 

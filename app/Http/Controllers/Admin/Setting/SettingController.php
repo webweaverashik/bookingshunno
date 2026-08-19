@@ -17,7 +17,7 @@ use Illuminate\View\View;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
- * The settings screen.
+ * PHASE 17 — the settings screen.
  *
  * FIVE TABS, FIVE FORMS, FIVE ENDPOINTS. Not one giant form with one Save.
  * The tabs hold unrelated things — a studio phone number and an SMTP port have
@@ -108,6 +108,10 @@ class SettingController extends Controller
             'contact.whatsapp'            => ['value' => $data['contact_whatsapp'] ?? '', 'type' => 'string'],
             'contact.address'             => ['value' => $data['contact_address'], 'type' => 'string'],
             'notifications.enabled'       => ['value' => $data['notifications_enabled'], 'type' => 'boolean'],
+
+            // Off by default and off again as soon as the job is done — see the
+            // note beside the switch in the general settings tab.
+            'system.maintenance_console'  => ['value' => $data['maintenance_console'], 'type' => 'boolean'],
         ]);
 
         return $this->saved('Studio details updated.');
@@ -197,7 +201,7 @@ class SettingController extends Controller
     /**
      * Prove the SMTP settings actually work, by sending somewhere real.
      *
-     * The recipient is now supplied by the form rather than fixed to
+     * PHASE 19 — the recipient is now supplied by the form rather than fixed to
      * the signed-in Admin, at your request. Sensible: the address you need to
      * test against is often a Gmail account or the client's own inbox, not the
      * one you happen to be signed in as.
