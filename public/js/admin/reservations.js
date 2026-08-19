@@ -19,10 +19,12 @@
     if (!listEl) return;
 
     var search = document.getElementById('reservations-search');
-    var status = document.getElementById('reservations-status');
-    var range = document.getElementById('reservations-range');
-    var workshop = document.getElementById('reservations-workshop');
-    var perPage = document.getElementById('reservations-per-page');
+
+    // Status, date range, session and page size all live in the shared filter
+    // menu now — see js/admin/filters.js and the filter-bar partial. It is
+    // created further down, after loadList() exists for it to call.
+    var filters = null;
+    var lastRange = null;
 
     // Sorting is server-side, so the current sort lives here rather than in the
     // table. Seeded from the URL so a shared link or a refresh reproduces it.
@@ -59,14 +61,13 @@
 
     var listRequest = 0;
 
+    // changed() returns only the filters that are NOT at their default, so the
+    // address bar stays readable and the server's own defaults stand where
+    // nothing was chosen.
     function currentQuery(extra) {
-        var params = new URLSearchParams();
+        var params = new URLSearchParams(filters ? filters.changed() : {});
 
         if (search && search.value.trim()) params.set('q', search.value.trim());
-        if (status) params.set('status', status.value);
-        if (range) params.set('range', range.value);
-        if (workshop && workshop.value !== 'all') params.set('workshop', workshop.value);
-        if (perPage) params.set('per_page', perPage.value);
         if (sortState.sort) params.set('sort', sortState.sort);
         if (sortState.dir) params.set('dir', sortState.dir);
         if (extra && extra.page) params.set('page', extra.page);
@@ -123,18 +124,28 @@
         });
     }
 
-    [status, range, workshop, perPage].forEach(function (select) {
-        if (!select) return;
-        select.addEventListener('change', function () {
-            // Changing the date range changes which direction is useful —
-            // upcoming reads forwards, history backwards — so an explicit sort
-            // direction is dropped and the server's default for the new range
-            // applies. An explicit column choice is kept.
-            if (select === range) sortState.dir = '';
+    filters = Shunno.filterBar({
+        root: document.getElementById('reservations-filter'),
+
+        onApply: function (changed, all) {
+            /*
+             | Changing the date range changes which direction is useful —
+             | forward-looking ranges read earliest first, history reads latest
+             | first — so an explicit sort DIRECTION is dropped and the server's
+             | default for the new range applies. An explicit column choice is
+             | kept: that is a preference about what to sort by rather than
+             | about which end of the list to start from.
+             */
+            if (all.range !== lastRange) {
+                lastRange = all.range;
+                sortState.dir = '';
+            }
 
             loadList();
-        });
+        }
     });
+
+    lastRange = filters ? filters.values().range : null;
 
     /* =====================================================================
        Pagination and row actions
@@ -325,6 +336,10 @@
                 Shunno.clearErrors(editForm);
                 editForm.action = data.update_url;
                 editBody.innerHTML = data.html;
+
+                // Injected markup, so the DOM-ready scan in shunno.js never saw
+                // it. Without this the date field is a plain text box.
+                Shunno.datepickers(editBody);
                 editTitle.textContent = data.editable
                     ? 'Edit ' + data.reference
                     : 'Notes for ' + data.reference;

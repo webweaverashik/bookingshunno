@@ -71,29 +71,46 @@
             </div>
 
             <div class="card-toolbar">
-                <div class="d-flex align-items-center gap-3 flex-wrap">
-                    {{--
-                        Plain form-select with a native listener, not Select2.
-                        Phase 6 established the rule: Metronic auto-initialises
-                        anything carrying data-control="select2", and jQuery's
-                        .trigger() does not reach a native addEventListener. A
-                        short filter list gains nothing from a search box and
-                        loses the straightforward event.
-                    --}}
-                    <select id="payments-status" class="form-select form-select-solid w-175px">
-                        <option value="open" @selected($filters['status'] === 'open')>Awaiting payment</option>
-                        <option value="overdue" @selected($filters['status'] === 'overdue')>Overdue</option>
-                        <option value="paid" @selected($filters['status'] === 'paid')>Paid</option>
-                        <option value="cancelled" @selected($filters['status'] === 'cancelled')>Cancelled</option>
-                        <option value="all" @selected($filters['status'] === 'all')>Everything</option>
-                    </select>
-
-                    <select id="payments-per-page" class="form-select form-select-solid w-100px">
-                        @foreach ($pageSizes as $size)
-                            <option value="{{ $size }}" @selected($filters['per_page'] === $size)>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @include('admin.partials.filter-bar', [
+                    'id' => 'payments-filter',
+                    'fields' => [
+                        [
+                            'key' => 'status',
+                            'label' => 'Status',
+                            'default' => 'open',
+                            'placeholder' => 'Awaiting payment',
+                            'options' => [
+                                'open' => 'Awaiting payment',
+                                'overdue' => 'Overdue',
+                                'paid' => 'Paid',
+                                'cancelled' => 'Cancelled',
+                                'all' => 'Everything',
+                            ],
+                            'value' => $filters['status'],
+                        ],
+                        [
+                            'key' => 'from',
+                            'label' => 'Requested from',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'value' => $filters['from'],
+                        ],
+                        [
+                            'key' => 'to',
+                            'label' => 'Requested to',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'value' => $filters['to'],
+                        ],
+                        [
+                            'key' => 'per_page',
+                            'label' => 'Rows per page',
+                            'default' => 25,
+                            'options' => collect($pageSizes)->mapWithKeys(fn($size) => [$size => $size . ' per page'])->all(),
+                            'value' => $filters['per_page'],
+                        ],
+                    ],
+                ])
             </div>
         </div>
 
@@ -140,6 +157,9 @@
         };
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
+    {{-- The shared filter menu. Must load before any register script that calls
+         Shunno.filterBar(). --}}
+    <script src="{{ asset('js/admin/filters.js') }}"></script>
     <script src="{{ asset('js/admin/payments.js') }}"></script>
     {{-- PHASE 13B — message history, resend, and copying the payment link.
          Delegated from the document, so it works inside drawers that the other

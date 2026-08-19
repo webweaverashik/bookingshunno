@@ -59,13 +59,39 @@
             </div>
 
             <div class="card-toolbar">
-                <select id="visitors-status" class="form-select form-select-solid w-200px">
-                    <option value="all" @selected($filters['status'] === 'all')>All visitors</option>
-                    <option value="returning" @selected($filters['status'] === 'returning')>Returning</option>
-                    <option value="never" @selected($filters['status'] === 'never')>No reservations yet</option>
-                    <option value="active" @selected($filters['status'] === 'active')>Active accounts</option>
-                    <option value="inactive" @selected($filters['status'] === 'inactive')>Deactivated</option>
-                </select>
+                @include('admin.partials.filter-bar', [
+                    'id' => 'visitors-filter',
+                    'fields' => [
+                        [
+                            'key' => 'status',
+                            'label' => 'Visitor',
+                            'default' => 'all',
+                            'placeholder' => 'All visitors',
+                            'options' => [
+                                'all' => 'All visitors',
+                                'returning' => 'Returning',
+                                'never' => 'No reservations yet',
+                                'active' => 'Active accounts',
+                                'inactive' => 'Deactivated',
+                            ],
+                            'value' => $filters['status'],
+                        ],
+                        [
+                            'key' => 'joined_from',
+                            'label' => 'Joined from',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'value' => $filters['joined_from'],
+                        ],
+                        [
+                            'key' => 'joined_to',
+                            'label' => 'Joined to',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'value' => $filters['joined_to'],
+                        ],
+                    ],
+                ])
             </div>
         </div>
 
@@ -108,5 +134,8 @@
         };
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
+    {{-- The shared filter menu. Must load before any register script that calls
+         Shunno.filterBar(). --}}
+    <script src="{{ asset('js/admin/filters.js') }}"></script>
     <script src="{{ asset('js/admin/visitors.js') }}"></script>
 @endpush

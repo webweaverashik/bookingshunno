@@ -7,12 +7,13 @@ use App\Enums\Payment\PaymentStatus;
 use App\Enums\Payment\PaymentType;
 use App\Enums\Payment\TransactionStatus;
 use App\Models\Auth\User;
+use App\Models\Reservation\Reservation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Reservation\Reservation;
+use Illuminate\Support\Collection;
 
 class Payment extends Model
 {
@@ -32,16 +33,16 @@ class Payment extends Model
     protected function casts(): array
     {
         return [
-            'type'              => PaymentType::class,
-            'status'            => PaymentStatus::class,
-            'method'            => PaymentMethod::class,
-            'percentage'        => 'integer',
+            'type' => PaymentType::class,
+            'status' => PaymentStatus::class,
+            'method' => PaymentMethod::class,
+            'percentage' => 'integer',
             'reservation_total' => 'decimal:2',
-            'amount_due'        => 'decimal:2',
-            'amount_paid'       => 'decimal:2',
-            'gateway_payload'   => 'array',
-            'due_at'            => 'datetime',
-            'paid_at'           => 'datetime',
+            'amount_due' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
+            'gateway_payload' => 'array',
+            'due_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 
@@ -125,14 +126,14 @@ class Payment extends Model
         }
 
         return $query->where(function (Builder $inner) use ($term) {
-            $inner->where('reference', 'like', $term . '%')
-                ->orWhere('gateway_reference', 'like', $term . '%')
+            $inner->where('reference', 'like', $term.'%')
+                ->orWhere('gateway_reference', 'like', $term.'%')
                 ->orWhereHas('reservation', function (Builder $reservation) use ($term) {
-                    $reservation->where('reference_code', 'like', $term . '%')
+                    $reservation->where('reference_code', 'like', $term.'%')
                         ->orWhereHas('user', function (Builder $user) use ($term) {
-                            $user->where('name', 'like', '%' . $term . '%')
-                                ->orWhere('email', 'like', '%' . $term . '%')
-                                ->orWhere('phone', 'like', '%' . $term . '%');
+                            $user->where('name', 'like', '%'.$term.'%')
+                                ->orWhere('email', 'like', '%'.$term.'%')
+                                ->orWhere('phone', 'like', '%'.$term.'%');
                         });
                 });
         });
@@ -157,7 +158,7 @@ class Payment extends Model
      * eager load they already have and a list of payments does not become an
      * N+1.
      */
-    public function receipts(): \Illuminate\Support\Collection
+    public function receipts(): Collection
     {
         return $this->transactions->filter(
             fn (PaymentTransaction $transaction) => $transaction->status === TransactionStatus::Success
@@ -187,7 +188,17 @@ class Payment extends Model
      */
     public function remainingOnReservation(): float
     {
-        return max(0, (float) $this->reservation_total - (float) $this->amount_paid);
+        $reservation = $this->relationLoaded('reservation') ? $this->reservation : null;
+
+        $received = $reservation?->relationLoaded('payments')
+            ? $reservation->amountPaid()
+            : (float) $this->amount_paid;
+
+        // Nothing more is coming from a settled or withdrawn request, and its
+        // receipts are already inside $received.
+        $stillToCome = $this->isOpen() ? $this->outstanding() : 0.0;
+
+        return max(0, (float) $this->reservation_total - $received - $stillToCome);
     }
 
     /*

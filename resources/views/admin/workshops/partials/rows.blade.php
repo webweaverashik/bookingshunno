@@ -91,20 +91,16 @@
                 </button>
             @endcan
 
-            @can('delete', $workshop)
-                <button type="button" class="btn btn-icon btn-light btn-active-light-danger btn-sm"
-                    data-action="delete"
-                    data-title="{{ $workshop->title }}"
-                    data-url="{{ route('admin.workshops.destroy', $workshop->id) }}"
-                    title="{{ $workshop->reservation_items_count ? 'Has reservations — deactivate instead' : 'Delete' }}">
-                    <i class="ki-outline ki-trash fs-4"></i>
-                </button>
-            @endcan
+            {{-- No delete button, by decision rather than by permission: a
+                 workshop is referenced by every reservation item that ever
+                 quoted it, so removing one takes the explanation out of last
+                 year's figures. The Live/Hidden toggle in the previous column
+                 is the action people are actually reaching for — it takes the
+                 session off the website and out of the booking form, and leaves
+                 the history intact. See WorkshopPolicy::delete(). --}}
 
             @cannot('update', $workshop)
-                @cannot('delete', $workshop)
-                    <span class="text-muted fs-8">View only</span>
-                @endcannot
+                <span class="text-muted fs-8">View only</span>
             @endcannot
         </td>
     </tr>

@@ -82,7 +82,8 @@ class ReportController extends Controller
 
         return view('admin.reports.index', [
             'report'    => $type,
-            'reports'   => ReportType::all(),
+            // Only the tabs this person may open. See ReportType::for().
+            'reports'   => ReportType::for($request->user()),
             'rows'      => $this->reports->page($type, $filters),
             'summary'   => $this->reports->summary($type, $filters),
             'filters'   => $filters,
@@ -301,9 +302,22 @@ class ReportController extends Controller
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Resolve the URL segment into a report, and refuse the ones this person
+     * may not open.
+     *
+     * 403 rather than 404: the report exists and the Manager knows it exists —
+     * pretending otherwise would have them reporting a broken link. Every
+     * entry point runs through here (index, list, export, clear), so hiding the
+     * tab is presentation and this is the actual gate.
+     */
     private function type(string $report): ReportType
     {
-        return ReportType::tryFrom($report) ?? abort(404);
+        $type = ReportType::tryFrom($report) ?? abort(404);
+
+        abort_if($type->isLog() && ! request()->user()?->can('reports.logs'), 403);
+
+        return $type;
     }
 
     /**

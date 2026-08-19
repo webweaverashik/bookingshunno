@@ -12,7 +12,11 @@
 --}}
 
 @php
+    // Phase 27 split these apart. isEditable() is now "the visit may still be
+    // corrected", true until the reservation closes; isMoneyLocked() is "a
+    // figure has been quoted or taken". They used to be one flag meaning both.
     $locked = !$reservation->isEditable();
+    $priced = $reservation->isMoneyLocked();
     $item = $reservation->items->first();
 @endphp
 
@@ -28,22 +32,33 @@
     </div>
 </div>
 
-@if ($locked)
-    {{-- Not a disabled form with no explanation: the admin needs to know why,
-         and that they can still leave a note. --}}
+@if ($priced)
+    {{-- The visit is still correctable here; the price is not. The studio does
+         change confirmed bookings — somebody rings up, two of the six cannot
+         come — and refusing to record that does not stop it happening, it just
+         means the register stops describing the visit that will take place.
+
+         What it CANNOT do quietly is move money, which is what this says. --}}
     <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-4 mb-5">
         <i class="ki-outline ki-information fs-2 text-warning me-3"></i>
         <div class="fs-7 text-gray-700">
-            This reservation has reached <strong>{{ $reservation->status->label() }}</strong>, so the date,
-            time, party size and price are locked — the visitor has been quoted a figure and changing it
-            here would silently re-price what they were asked to pay. Notes can still be edited.
+            This reservation has reached <strong>{{ $reservation->status->label() }}</strong>. You can still
+            correct the date, time and party size, and the change is written into the history — but changing
+            the party size re-prices the visit, and the payment request already sent will not update itself.
+            Check the balance in Payments afterwards.
         </div>
     </div>
-@else
+@endif
+
+@unless ($locked)
     <div class="row g-5 mb-5">
         <div class="col-md-6">
             <label class="form-label required">Date</label>
-            <input type="date" name="reserved_date" id="reservation-date" class="form-control form-control-solid"
+            {{-- Flatpickr, like every other date field in the panel. Submits
+                 Y-m-d and shows "14 Aug 2026"; it fires a normal change event
+                 on this input, so the slot reload below still hears it. --}}
+            <input type="text" name="reserved_date" id="reservation-date"
+                class="form-control form-control-solid shunno-datepicker"
                 value="{{ $reservation->reserved_date->toDateString() }}">
             <div class="invalid-feedback d-block" data-error-for="reserved_date"></div>
         </div>
@@ -69,7 +84,7 @@
             <div class="invalid-feedback d-block" data-error-for="participants"></div>
         </div>
     </div>
-@endif
+@endunless
 
 @if (!$locked && $canSetPrice)
     {{-- PHASE 10A. Admin only, via reservations.discount-override. The

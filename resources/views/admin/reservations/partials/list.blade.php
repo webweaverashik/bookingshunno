@@ -124,7 +124,7 @@
                             <button type="button" class="btn btn-icon btn-light btn-active-light-primary btn-sm"
                                 data-action="edit-reservation"
                                 data-url="{{ route('admin.reservations.edit', $reservation) }}"
-                                title="{{ $reservation->isEditable() ? 'Edit the visit' : 'Add a note (visit is locked)' }}">
+                                title="Edit the visit">
                                 <i class="ki-outline ki-pencil fs-4"></i>
                             </button>
                         @endcan
@@ -133,10 +133,10 @@
             @empty
                 <tr>
                     <td colspan="8" class="text-center text-muted py-10">
-                        @if ($filters['q'] !== '' || $filters['status'] !== 'open' || $filters['range'] !== 'upcoming' || $filters['workshop'] !== 'all')
+                        @if ($filters['q'] !== '' || $filters['status'] !== 'all' || $filters['range'] !== 'all' || $filters['workshop'] !== 'all')
                             No reservation matches those filters.
                         @else
-                            Nothing open and upcoming. New requests from the website appear here as
+                            No reservations yet. New requests from the website appear here as
                             <em>Pending review</em>.
                         @endif
                     </td>

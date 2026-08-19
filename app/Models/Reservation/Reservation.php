@@ -6,6 +6,8 @@ use App\Enums\Payment\PaymentStatus;
 use App\Enums\Reservation\ReservationSource;
 use App\Enums\Reservation\ReservationStatus;
 use App\Models\Auth\User;
+use App\Models\Payment\Payment;
+use App\Models\Workshop\Workshop;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,8 +15,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Payment\Payment;
-use App\Models\Workshop\Workshop;
 
 class Reservation extends Model
 {
@@ -34,18 +34,18 @@ class Reservation extends Model
     protected function casts(): array
     {
         return [
-            'reserved_date'   => 'date',
-            'participants'    => 'integer',
-            'status'          => ReservationStatus::class,
-            'source'          => ReservationSource::class,
-            'subtotal'        => 'decimal:2',
+            'reserved_date' => 'date',
+            'participants' => 'integer',
+            'status' => ReservationStatus::class,
+            'source' => ReservationSource::class,
+            'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',
-            'total_amount'    => 'decimal:2',
-            'total_override'  => 'decimal:2',
-            'approved_at'     => 'datetime',
-            'declined_at'     => 'datetime',
-            'confirmed_at'    => 'datetime',
-            'cancelled_at'    => 'datetime',
+            'total_amount' => 'decimal:2',
+            'total_override' => 'decimal:2',
+            'approved_at' => 'datetime',
+            'declined_at' => 'datetime',
+            'confirmed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -149,11 +149,11 @@ class Reservation extends Model
         }
 
         return $query->where(function (Builder $inner) use ($term) {
-            $inner->where('reference_code', 'like', $term . '%')
+            $inner->where('reference_code', 'like', $term.'%')
                 ->orWhereHas('user', function (Builder $user) use ($term) {
-                    $user->where('name', 'like', '%' . $term . '%')
-                        ->orWhere('email', 'like', '%' . $term . '%')
-                        ->orWhere('phone', 'like', '%' . $term . '%');
+                    $user->where('name', 'like', '%'.$term.'%')
+                        ->orWhere('email', 'like', '%'.$term.'%')
+                        ->orWhere('phone', 'like', '%'.$term.'%');
                 });
         });
     }
@@ -172,29 +172,42 @@ class Reservation extends Model
     /**
      * Whether the visit itself may still be corrected.
      *
-     * Up to and including Approved, the date, time and party size are just
-     * details of a request and fixing a typo costs nothing. From
-     * PaymentRequested onward there is a figure the visitor has been asked to
-     * pay, and quietly re-pricing underneath that is how a studio ends up
-     * taking the wrong amount of money. Phase 12 owns whatever the correct
-     * answer is there — probably reissuing the payment request — so this stops
-     * short of guessing.
+     * Open until the reservation closes. The studio does correct confirmed
+     * bookings — somebody rings up, two of the six cannot come, the date moves
+     * — and refusing to record that does not stop it happening; it just means
+     * the register stops describing the visit that will actually take place.
+     * Every correction is written into the status history, which is where a
+     * re-priced booking becomes visible.
      *
-     * Notes stay editable at every status; they are not money.
+     * The one hard stop is a closed reservation. Completed in particular: the
+     * visit happened, and a record of what happened is not something anyone
+     * gets to revise afterwards.
+     *
+     * The PRICE is a separate question — see isMoneyLocked() and
+     * ReservationPolicy::setPrice().
      */
     public function isEditable(): bool
     {
-        return in_array($this->status, [
-            ReservationStatus::Pending,
-            ReservationStatus::InfoRequested,
-            ReservationStatus::Escalated,
-            ReservationStatus::Approved,
-        ], true);
+        return ! $this->status->isClosed();
     }
 
+    /**
+     * Whether a figure has been quoted to the visitor or taken from them.
+     *
+     * Used to be the negation of isEditable(), which made "the visit may be
+     * corrected" and "money is committed" one flag with two meanings. They are
+     * different questions with different answers from PaymentRequested onward,
+     * and this is the money half: it decides whether the agreed price may still
+     * be set, and whether cancelling needs reservations.cancel-paid rather than
+     * reservations.cancel.
+     */
     public function isMoneyLocked(): bool
     {
-        return ! $this->isEditable();
+        return in_array($this->status, [
+            ReservationStatus::PaymentRequested,
+            ReservationStatus::Confirmed,
+            ReservationStatus::Completed,
+        ], true);
     }
 
     /*
@@ -287,6 +300,21 @@ class Reservation extends Model
     public function isFullyPaid(): bool
     {
         return $this->outstandingTotal() < 0.01 && $this->amountPaid() > 0;
+    }
+
+    /**
+     * Nothing is owed on this visit.
+     *
+     * Not the same as isFullyPaid(), which requires money to have arrived. A
+     * complimentary visit — a partner school, a comped session — is owed
+     * nothing and has paid nothing, and must not be barred from completion for
+     * failing to pay zero taka.
+     *
+     * Reads the payments relation, so callers must have loaded it.
+     */
+    public function hasNothingLeftToPay(): bool
+    {
+        return $this->payableTotal() <= 0.009 || $this->outstandingTotal() < 0.01;
     }
 
     /*

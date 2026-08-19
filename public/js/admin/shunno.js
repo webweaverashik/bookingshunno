@@ -217,6 +217,21 @@ window.Shunno = (function () {
     */
     function datepickers(root, options) {
         var scope = root || document;
+        var settings = Object.assign({}, options || {});
+
+        /*
+         | `selector` is ours, not Flatpickr's, and is removed before the config
+         | is handed over or Flatpickr logs it as an unknown option on every
+         | field.
+         |
+         | It exists so a caller can claim a SUBSET of the date fields and give
+         | them a different configuration. The filter menus need it: their
+         | pickers must render inside the menu (static: true) or the first click
+         | on a date counts as a click outside the KTMenu and closes it. They
+         | carry `shunno-filter-date` so the house scan below leaves them alone.
+         */
+        var selector = settings.selector || '.shunno-datepicker';
+        delete settings.selector;
 
         if (typeof window.flatpickr !== 'function') {
             // Bundle not loaded on this page. The fields stay plain text inputs
@@ -225,7 +240,7 @@ window.Shunno = (function () {
             return [];
         }
 
-        var fields = Array.prototype.slice.call(scope.querySelectorAll('.shunno-datepicker'));
+        var fields = Array.prototype.slice.call(scope.querySelectorAll(selector));
 
         return fields.map(function (field) {
             // Re-initialising a field would stack two calendars on it. Flatpickr
@@ -271,7 +286,10 @@ window.Shunno = (function () {
                 // Explicit, and NOT carrying `shunno-datepicker` — see above.
                 // Metronic's own field classes are named so the alt input still
                 // looks like every other control on the page.
-                altInputClass: field.className.replace(/\bshunno-datepicker\b/g, '').trim(),
+                altInputClass: field.className
+                    .replace(/\bshunno-datepicker\b/g, '')
+                    .replace(/\bshunno-filter-date\b/g, '')
+                    .trim(),
 
                 // Reads the field's own attributes, so a min or max date is set
                 // in Blade beside the input rather than in a JS lookup table
@@ -279,7 +297,70 @@ window.Shunno = (function () {
                 minDate: field.dataset.minDate || null,
                 maxDate: field.dataset.maxDate || null,
                 defaultDate: field.value || null,
-            }, options || {}));
+            }, settings));
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Time fields
+    |--------------------------------------------------------------------------
+    | The same argument as the date fields above, for the same reason.
+    |
+    | <input type="time"> renders as a different control in every browser, is
+    | unusable on some Android keyboards, and looks nothing like the rest of a
+    | Metronic form. Worse for this project specifically: the studio's operating
+    | hours and its partial closures are entered in half-hour steps, and a
+    | native control that accepts 18:07 hands the server a value it has to
+    | reject after the fact.
+    |
+    | One house configuration:
+    |
+    |   the input SUBMITS H:i          what every time column and Form Request
+    |                                  in the application already expects
+    |   the input SHOWS  h:i K         6:00 PM, not 18:00
+    |
+    | minuteIncrement is 30 by default here, matching the step="1800" the native
+    | inputs carried, and can be overridden per call.
+    */
+    function timepickers(root, options) {
+        var scope = root || document;
+        var settings = Object.assign({}, options || {});
+        var selector = settings.selector || '.shunno-timepicker';
+        delete settings.selector;
+
+        if (typeof window.flatpickr !== 'function') {
+            return [];
+        }
+
+        var fields = Array.prototype.slice.call(scope.querySelectorAll(selector));
+
+        return fields.map(function (field) {
+            if (field._flatpickr) {
+                return field._flatpickr;
+            }
+
+            // Same alt-input trap as the date fields — see the long note above.
+            if (field.previousElementSibling && field.previousElementSibling._flatpickr) {
+                return field.previousElementSibling._flatpickr;
+            }
+
+            return window.flatpickr(field, Object.assign({
+                noCalendar: true,
+                enableTime: true,
+                dateFormat: 'H:i',
+                altInput: true,
+                altFormat: 'h:i K',
+                time_24hr: false,
+                minuteIncrement: parseInt(field.dataset.minuteStep, 10) || 30,
+                allowInput: false,
+
+                altInputClass: field.className
+                    .replace(/\bshunno-timepicker\b/g, '')
+                    .trim(),
+
+                defaultDate: field.value || null,
+            }, settings));
         });
     }
 
@@ -391,10 +472,115 @@ window.Shunno = (function () {
                 if (radio) radio.checked = true;
             } else {
                 field.value = data[key] === null || data[key] === undefined ? '' : data[key];
+
+                /*
+                 | A flatpickr field has TWO inputs: the real one, which this
+                 | just set, and the visible alt input beside it. Setting .value
+                 | updates the first and leaves the second showing whatever was
+                 | there before — so an edit modal would submit the right date
+                 | while displaying the previous one.
+                 |
+                 | false suppresses the change event: this is the form being
+                 | populated, not somebody choosing a date, and firing change
+                 | here would set off every listener watching the field.
+                 */
+                if (field._flatpickr) {
+                    field._flatpickr.setDate(field.value || null, false);
+                }
             }
         });
 
         syncSelects(form);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | File downloads
+    |--------------------------------------------------------------------------
+    | Every export in the panel. Lifted out of reports.js in Phase 29, unchanged
+    | in behaviour: the awkward parts — a JSON refusal arriving from an endpoint
+    | that otherwise returns a file, reading the filename back off the header,
+    | revoking the object URL late enough — are the same everywhere and were
+    | never specific to reports.
+    |
+    | A blob fetch rather than a plain link because xlsx and PDF cannot stream.
+    | CSV can, but goes through the same path so all three behave alike.
+    */
+    var FORMAT_LABELS = { csv: 'CSV', xlsx: 'spreadsheet', pdf: 'PDF' };
+
+    function download(url, format, trigger) {
+        if (trigger) busy(trigger, true);
+
+        /*
+         | A blocking dialog, not just a spinner on the button. A PDF of a year
+         | of reservations takes seconds — long enough that somebody wonders
+         | whether the click registered and clicks again, and the second click
+         | builds the entire file a second time.
+         |
+         | The message names the format, because "Preparing your PDF" is the
+         | difference between waiting and wondering whether the wrong menu item
+         | was hit.
+         */
+        progress(
+            'Preparing your ' + (FORMAT_LABELS[format] || 'file'),
+            format === 'pdf'
+                ? 'Laying out the pages. Larger ranges take a moment.'
+                : 'Gathering the rows.'
+        );
+
+        return fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+            .then(function (response) {
+                var type = response.headers.get('content-type') || '';
+
+                // A refusal — "too many rows", "nothing in that range" — comes
+                // back as JSON from an endpoint that otherwise returns a file.
+                if (type.indexOf('application/json') !== -1) {
+                    return response.json().then(function (payload) {
+                        throw { message: payload.message || 'Export failed.' };
+                    });
+                }
+
+                if (!response.ok) {
+                    throw { message: 'Export failed. Please try again.' };
+                }
+
+                // The server already worked out the filename, range included.
+                // Reading it back beats rebuilding it here and disagreeing.
+                var disposition = response.headers.get('content-disposition') || '';
+                var match = disposition.match(/filename="?([^"]+)"?/);
+
+                return response.blob().then(function (blob) {
+                    return { blob: blob, name: match ? match[1] : 'export.' + format };
+                });
+            })
+            .then(function (file) {
+                var objectUrl = URL.createObjectURL(file.blob);
+                var link = document.createElement('a');
+
+                link.href = objectUrl;
+                link.download = file.name;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+
+                // Released on a timer rather than immediately: revoking before
+                // the browser has finished handing the blob to its download
+                // manager cancels the download.
+                setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1000);
+            })
+            .catch(function (error) {
+                toast('error', error.message || 'Export failed.');
+            })
+            .then(function () {
+                // In the final then, not in each branch: this runs whether the
+                // export succeeded, was refused, or the connection dropped. A
+                // dialog left open after a failure says the work is still going.
+                progressDone();
+                if (trigger) busy(trigger, false);
+            });
     }
 
     /*
@@ -448,10 +634,36 @@ window.Shunno = (function () {
     | in the DOM. Anything that builds fields dynamically should call
     | Shunno.datepickers(container) itself.
     */
+    /*
+     | A native form.reset() restores the real input's value and knows nothing
+     | about the visible alt input beside it, so a modal reused for "create"
+     | after an "edit" would open showing the last record's date. Delegated from
+     | the document so no form has to remember to do this.
+     |
+     | The timeout is not decoration: reset fires BEFORE the browser has put the
+     | values back, so reading field.value in the handler itself would sync
+     | flatpickr to the value being discarded.
+     */
+    document.addEventListener('reset', function (event) {
+        var form = event.target;
+
+        if (!(form instanceof HTMLFormElement)) return;
+
+        window.setTimeout(function () {
+            Array.prototype.slice.call(form.querySelectorAll('input')).forEach(function (field) {
+                if (field._flatpickr) field._flatpickr.setDate(field.value || null, false);
+            });
+        }, 0);
+    });
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { datepickers(); });
+        document.addEventListener('DOMContentLoaded', function () {
+            datepickers();
+            timepickers();
+        });
     } else {
         datepickers();
+        timepickers();
     }
 
     initPasswordToggles();
@@ -462,12 +674,14 @@ window.Shunno = (function () {
         clearErrors: clearErrors,
         syncSelects: syncSelects,
         datepickers: datepickers,
+        timepickers: timepickers,
         onChange: onChange,
         toast: toast,
         busy: busy,
         confirm: confirm,
         progress: progress,
         progressDone: progressDone,
+        download: download,
         modal: modal,
         fill: fill,
         csrf: csrf

@@ -13,8 +13,8 @@
     <option value="{{ $slot['value'] }}" @selected($slot['value'] === $selected)>
         @if (!$slot['available'])
             {{ $slot['label'] }} &mdash; {{ $slot['reason'] }}
-        @elseif (!is_null($slot['seats_left']))
-            {{ $slot['label'] }} &middot; {{ $slot['seats_left'] }} left
+        @elseif ($slot['note'])
+            {{ $slot['label'] }} &middot; {{ $slot['note'] }}
         @else
             {{ $slot['label'] }}
         @endif

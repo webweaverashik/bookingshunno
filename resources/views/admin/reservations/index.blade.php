@@ -56,43 +56,72 @@
                 </div>
             </div>
 
-            <div class="card-toolbar flex-row-fluid justify-content-end gap-3">
-                <select id="reservations-range" class="form-select form-select-solid w-auto">
-                    <option value="upcoming" @selected($filters['range'] === 'upcoming')>Today and ahead</option>
-                    <option value="today" @selected($filters['range'] === 'today')>Today only</option>
-                    <option value="past" @selected($filters['range'] === 'past')>Past visits</option>
-                    <option value="all" @selected($filters['range'] === 'all')>Any date</option>
-                </select>
-
-                <select id="reservations-status" class="form-select form-select-solid w-auto">
-                    <option value="open" @selected($filters['status'] === 'open')>Still open</option>
-                    <option value="needs_decision" @selected($filters['status'] === 'needs_decision')>Needing a decision</option>
-                    <option value="all" @selected($filters['status'] === 'all')>Every status</option>
-                    @foreach ($statuses as $status)
-                        <option value="{{ $status->value }}" @selected($filters['status'] === $status->value)>
-                            {{ $status->label() }}
-                        </option>
-                    @endforeach
-                </select>
-
-                <select id="reservations-workshop" class="form-select form-select-solid w-auto">
-                    <option value="all" @selected($filters['workshop'] === 'all')>All sessions</option>
-                    @foreach ($workshops as $workshop)
-                        <option value="{{ $workshop->id }}" @selected($filters['workshop'] === (string) $workshop->id)>
-                            {{ $workshop->title }}
-                        </option>
-                    @endforeach
-                </select>
-
-                {{-- PHASE 10A. Page size, server-side like everything else here.
-                     The table is expected to grow; the browser never holds more
-                     than one page of it. --}}
-                <select id="reservations-per-page" class="form-select form-select-solid w-auto" aria-label="Rows per page">
-                    @foreach ($pageSizes as $size)
-                        <option value="{{ $size }}" @selected($filters['per_page'] === $size)>{{ $size }} per page
-                        </option>
-                    @endforeach
-                </select>
+            <div class="card-toolbar">
+                @include('admin.partials.filter-bar', [
+                    'id' => 'reservations-filter',
+                    'fields' => [
+                        [
+                            'key' => 'range',
+                            'label' => 'Date',
+                            'default' => 'all',
+                            'placeholder' => 'Any date',
+                            'options' => [
+                                'all' => 'Any date',
+                                'today' => 'Today only',
+                                'upcoming' => 'Today and ahead',
+                                'past' => 'Past visits',
+                                'custom' => 'Custom range…',
+                            ],
+                            'value' => $filters['range'],
+                        ],
+                        [
+                            'key' => 'from',
+                            'label' => 'From',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'when' => 'range:custom',
+                            'value' => $filters['from'],
+                        ],
+                        [
+                            'key' => 'to',
+                            'label' => 'To',
+                            'type' => 'date',
+                            'width' => 'col-6',
+                            'when' => 'range:custom',
+                            'value' => $filters['to'],
+                        ],
+                        [
+                            'key' => 'status',
+                            'label' => 'Status',
+                            'default' => 'all',
+                            'placeholder' => 'Every status',
+                            'options' =>
+                                [
+                                    'all' => 'Every status',
+                                    'open' => 'Still open',
+                                    'needs_decision' => 'Needing a decision',
+                                ] + collect($statuses)->mapWithKeys(fn($status) => [$status->value => $status->label()])->all(),
+                            'value' => $filters['status'],
+                        ],
+                        [
+                            'key' => 'workshop',
+                            'label' => 'Session',
+                            'default' => 'all',
+                            'placeholder' => 'All sessions',
+                            'options' =>
+                                ['all' => 'All sessions'] +
+                                collect($workshops)->mapWithKeys(fn($workshop) => [$workshop->id => $workshop->title])->all(),
+                            'value' => $filters['workshop'],
+                        ],
+                        [
+                            'key' => 'per_page',
+                            'label' => 'Rows per page',
+                            'default' => 25,
+                            'options' => collect($pageSizes)->mapWithKeys(fn($size) => [$size => $size . ' per page'])->all(),
+                            'value' => $filters['per_page'],
+                        ],
+                    ],
+                ])
             </div>
         </div>
 
@@ -183,6 +212,9 @@
         };
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
+    {{-- The shared filter menu. Must load before any register script that calls
+         Shunno.filterBar(). --}}
+    <script src="{{ asset('js/admin/filters.js') }}"></script>
     <script src="{{ asset('js/admin/reservations.js') }}"></script>
     {{-- PHASE 13B — message history, resend, and copying the payment link.
          Delegated from the document, so it works inside drawers that the other

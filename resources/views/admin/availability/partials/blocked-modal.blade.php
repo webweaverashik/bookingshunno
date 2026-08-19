@@ -24,7 +24,13 @@
 
                     <div class="mb-6">
                         <label class="required form-label">Date</label>
-                        <input type="date" name="date" class="form-control form-control-solid" />
+                        {{-- Flatpickr, like every other date field in the panel.
+                             Submits Y-m-d, shows "14 Aug 2026". data-min-date
+                             stops somebody closing a day that has already been
+                             and gone — the server refuses it anyway, but the
+                             picker should not offer it. --}}
+                        <input type="text" name="date" class="form-control form-control-solid shunno-datepicker"
+                            data-min-date="{{ now()->toDateString() }}" placeholder="Choose a date" />
                         <div class="invalid-feedback d-block" data-error-for="date"></div>
                     </div>
 
@@ -40,14 +46,17 @@
                     <div class="row g-5 mb-6" id="block-times" hidden>
                         <div class="col-6">
                             <label class="required form-label">From</label>
-                            <input type="time" step="1800" name="starts_at"
-                                class="form-control form-control-solid" />
+                            {{-- Half-hour steps, matching the slot grid. A
+                                 native time input happily accepts 18:07 and
+                                 leaves the server to reject it afterwards. --}}
+                            <input type="text" name="starts_at"
+                                class="form-control form-control-solid shunno-timepicker" placeholder="From" />
                             <div class="invalid-feedback d-block" data-error-for="starts_at"></div>
                         </div>
                         <div class="col-6">
                             <label class="required form-label">Until</label>
-                            <input type="time" step="1800" name="ends_at"
-                                class="form-control form-control-solid" />
+                            <input type="text" name="ends_at"
+                                class="form-control form-control-solid shunno-timepicker" placeholder="Until" />
                             <div class="invalid-feedback d-block" data-error-for="ends_at"></div>
                         </div>
                     </div>

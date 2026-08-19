@@ -28,12 +28,26 @@
         var toggle = row.querySelector('[data-closed-toggle]');
         if (!toggle) return;
 
-        // A disabled input is not submitted, which is exactly what a closed day
-        // needs — but the state has to follow the checkbox immediately, or the
-        // admin sees editable times on a day marked closed.
-        row.querySelectorAll('input[type="time"]').forEach(function (input) {
+        /*
+         | A disabled input is not submitted, which is exactly what a closed day
+         | needs — but the state has to follow the checkbox immediately, or the
+         | admin sees editable times on a day marked closed.
+         |
+         | Selected by data-hours-time rather than by input[type="time"]: these
+         | are Flatpickr fields now, and a flatpickr field is a plain text input
+         | with a SECOND visible input beside it. Both have to be disabled, and
+         | clearing has to go through the instance, or the real field empties
+         | while the visible one keeps showing a time.
+         */
+        row.querySelectorAll('[data-hours-time]').forEach(function (input) {
             input.disabled = toggle.checked;
-            if (toggle.checked) input.value = '';
+
+            if (input._flatpickr) {
+                input._flatpickr.altInput.disabled = toggle.checked;
+                if (toggle.checked) input._flatpickr.clear();
+            } else if (toggle.checked) {
+                input.value = '';
+            }
         });
     }
 
@@ -70,6 +84,10 @@
             Shunno.request(hoursForm.action, { method: 'POST', body: body })
                 .then(function (payload) {
                     hoursRows.innerHTML = payload.data.html;
+
+                    // Rows re-rendered by the server carry no pickers: the
+                    // DOM-ready scan ran long before this markup existed.
+                    Shunno.timepickers(hoursRows);
                     refreshHoursRows();
 
                     // A workshop that no longer fits is a real operational

@@ -208,23 +208,55 @@
         };
     }
 
+    /**
+     * The ceiling in force right now.
+     *
+     * Two ceilings exist and the tighter one wins: the session's own
+     * max_participants, and the seats still free at the chosen start time. The
+     * server has already resolved them into one number per slot; this only
+     * reads it off the selected option, and returns null before a time is
+     * chosen, when the session's own limit is all we know.
+     */
+    function slotLimit() {
+        var option = el.time.options[el.time.selectedIndex];
+
+        if (!option || option.disabled) return null;
+
+        var max = parseInt(option.dataset.max, 10);
+
+        return isFinite(max) && max > 0
+            ? { max: max, note: option.dataset.note || '' }
+            : null;
+    }
+
     function applyPeopleLimits(clamp) {
         var experience = chosenExperience();
         if (!experience) return;
 
         var limits = limitsFor(experience);
+        var slot = slotLimit();
         var value = parseInt(el.people.value, 10);
+
+        // A slot that is nearly full narrows the field below the session's own
+        // maximum. This is the whole point of the phase: eight people must not
+        // be typeable into a slot with four seats left.
+        var capped = slot !== null && slot.max < limits.max;
+
+        if (capped) limits.max = slot.max;
 
         el.people.min = limits.min;
         el.people.max = limits.max;
 
         if (el.peopleHelp) {
-            el.peopleHelp.textContent = 'Up to ' + limits.max + ' for this session. ' +
+            el.peopleHelp.textContent = capped
+                ? slot.note + ' at that time. Choose another time if you need more room.'
+                : 'Up to ' + limits.max + ' for this session. ' +
                 config.discount.min + ' or more gets ' + config.discount.percent + '% off.';
         }
 
-        // Clamped on a session change, where the number is no longer the
-        // visitor's fault; flagged rather than rewritten while they are typing.
+        // Clamped when the constraint changed under them — a new session, a new
+        // start time — where the number is no longer the visitor's fault.
+        // Flagged rather than rewritten while they are typing.
         if (clamp && isFinite(value) && value > limits.max) {
             el.people.value = limits.max;
             value = limits.max;
@@ -237,7 +269,9 @@
 
         if (el.peopleError) {
             el.peopleError.textContent = over
-                ? 'This session takes up to ' + limits.max + ' people. Message us for a larger group.'
+                ? (capped
+                    ? 'That start time has ' + slot.note + '. Pick another time for a larger group.'
+                    : 'This session takes up to ' + limits.max + ' people. Message us for a larger group.')
                 : (under ? 'This session runs for ' + limits.min + ' people or more.' : '');
         }
 
@@ -271,9 +305,16 @@
             // sees "6:00 PM - fully booked" understands the studio is busy,
             // where a silently shortened list just looks broken.
             option.textContent = slot.available
-                ? slot.label + (slot.seats_left !== null ? ' \u00b7 ' + slot.seats_left + ' left' : '')
+                ? slot.label + (slot.note ? ' \u00b7 ' + slot.note : '')
                 : slot.label + ' \u2014 ' + slot.reason;
             option.disabled = !slot.available;
+
+            // The largest party this start time can still take, and the phrase
+            // that explains why, both resolved by the server. Nothing here
+            // subtracts anything.
+            option.dataset.max = slot.max;
+            option.dataset.note = slot.note || '';
+
             el.time.appendChild(option);
         });
     }
@@ -347,6 +388,10 @@
                 }
 
                 el.time.value = kept ? previous : firstSelectable();
+
+                // The chosen slot may be tighter than the session. Clamped
+                // rather than flagged: the visitor did not pick this time.
+                applyPeopleLimits(true);
             })
             .catch(function () {
                 if (ticket !== slotRequest) return;
@@ -542,12 +587,24 @@
             refreshSlots();
             refreshTotal();
         }
+
+        // A new start time can mean a new ceiling.
+        if (event.target === el.time) {
+            applyPeopleLimits(true);
+            refreshTotal();
+        }
+
         if (event.target === el.people) {
             applyPeopleLimits(false);
             refreshTotal();
-            // Only meaningful once capacity enforcement is switched on, but
-            // then a larger group can turn an available slot unavailable.
-            refreshSlots();
+
+            /*
+             | No longer reloads the slots. It used to, on the theory that a
+             | larger group could turn a slot unavailable — but availability
+             | now depends only on the session's minimum, and the ceiling
+             | travels on the option. Reloading here threw away the visitor's
+             | chosen time every few keystrokes.
+             */
         }
     });
 

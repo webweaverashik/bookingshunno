@@ -403,6 +403,23 @@ class VoucherController extends Controller
             $query->where('type', $filters['type']);
         }
 
+        /*
+         | Ranged on when the voucher was ISSUED, not on when it expires or was
+         | spent. "What did we give away in August" is the question the studio
+         | asks of this register — the other two are the voucher report's job.
+         |
+         | Either end may be left open: "everything since 1 June" is a real
+         | question, and demanding both would make somebody type a date they do
+         | not care about.
+         */
+        if ($filters['issued_from'] !== '') {
+            $query->whereDate('created_at', '>=', $filters['issued_from']);
+        }
+
+        if ($filters['issued_to'] !== '') {
+            $query->whereDate('created_at', '<=', $filters['issued_to']);
+        }
+
         return $query
             ->orderBy(self::VOUCHER_SORTABLE[$filters['sort']], $filters['dir'])
             ->orderByDesc('id')
@@ -430,10 +447,25 @@ class VoucherController extends Controller
             'q'        => trim((string) $request->query('q', '')),
             'status'   => in_array($status, $statuses, true) ? $status : 'usable',
             'type'     => in_array($type, $types, true) ? $type : 'all',
+
+            // Shape-checked here. They are bound as values by the query
+            // builder, so a malformed one is a wrong answer rather than a
+            // danger — but a wrong answer nobody can see is worse than none.
+            'issued_from' => $this->date($request->query('issued_from')),
+            'issued_to'   => $this->date($request->query('issued_to')),
+
             'sort'     => array_key_exists($sort, self::VOUCHER_SORTABLE) ? $sort : 'created',
             'dir'      => in_array($dir, ['asc', 'desc'], true) ? $dir : 'desc',
             'per_page' => in_array($perPage, self::VOUCHER_PAGE_SIZES, true) ? $perPage : 25,
         ];
+    }
+
+    /** A Y-m-d string, or empty. Anything else is not a date and is discarded. */
+    private function date(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 
     /** @return array{html:string,total:int} */

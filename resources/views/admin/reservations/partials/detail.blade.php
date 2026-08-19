@@ -1,11 +1,11 @@
 {{--
-    The full record, rendered server-side and dropped into the drawer. HTML
-    rather than JSON so status badges, money and dates keep the same Blade
-    formatting as every other screen.
+The full record, rendered server-side and dropped into the drawer. HTML
+rather than JSON so status badges, money and dates keep the same Blade
+formatting as every other screen.
 
-    Decisions are deliberately only available here and not from a list row:
-    approving a request without having read the notes, the party size and the
-    visitor's history is exactly the mistake a one-click row button invites.
+Decisions are deliberately only available here and not from a list row:
+approving a request without having read the notes, the party size and the
+visitor's history is exactly the mistake a one-click row button invites.
 --}}
 
 @php
@@ -31,15 +31,17 @@
         <span class="badge badge-light-{{ $reservation->status->colour() }} fs-7">
             {{ $reservation->status->label() }}
         </span>
-        @if ($reservation->isMoneyLocked())
-            <div class="text-muted fs-8 mt-1">Visit details locked</div>
+        @if ($reservation->status->isClosed())
+            <div class="text-muted fs-8 mt-1">Closed — nothing can be changed</div>
+        @elseif ($reservation->isMoneyLocked())
+            <div class="text-muted fs-8 mt-1">Price locked</div>
         @endif
     </div>
 </div>
 
 {{-- PHASE 10A. An escalated request is waiting on a specific person's
-     judgement, and the reason it was escalated is the most important thing on
-     the screen for whoever opens it next. --}}
+judgement, and the reason it was escalated is the most important thing on
+the screen for whoever opens it next. --}}
 @if ($reservation->status === ReservationStatus::Escalated)
     <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
         <i class="ki-outline ki-arrow-up-right fs-2 text-primary me-3"></i>
@@ -57,8 +59,8 @@
 @endif
 
 {{-- Live availability verdict. Only shown while the request is undecided —
-     re-checking a declined one tells nobody anything, and a confirmed one would
-     flag its own seats as a conflict with itself. --}}
+re-checking a declined one tells nobody anything, and a confirmed one would
+flag its own seats as a conflict with itself. --}}
 @if ($availability['checked'] && !$availability['ok'])
     <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-4 mb-5">
         <i class="ki-outline ki-information-5 fs-2 text-danger me-3"></i>
@@ -187,10 +189,10 @@
 
     @if ($reservation->hasManualPrice())
         {{-- PHASE 10A. Both figures, always, and the gap between them. A single
-             number here would make an agreed price indistinguishable from the
-             price list — and would hide an override left stale by a later
-             change to the party size, which amend() deliberately does not
-             clear on the visitor's behalf. --}}
+    number here would make an agreed price indistinguishable from the
+    price list — and would hide an override left stale by a later
+    change to the party size, which amend() deliberately does not
+    clear on the visitor's behalf. --}}
         <div class="d-flex justify-content-between fs-7 mb-1">
             <span class="text-muted">Calculated total</span>
             <span class="text-muted text-decoration-line-through">
@@ -209,8 +211,8 @@
                 </span>
                 @if (abs($reservation->manualPriceDelta()) >= 0.01)
                     <span class="fs-8 text-{{ $reservation->manualPriceDelta() < 0 ? 'success' : 'warning' }}">
-                        {{ $reservation->manualPriceDelta() < 0 ? '&minus;' : '+' }}
-                        BDT {{ number_format(abs($reservation->manualPriceDelta())) }}
+                        {{ $reservation->manualPriceDelta() < 0 ? '&minus;' : '+' }} BDT
+                        {{ number_format(abs($reservation->manualPriceDelta())) }}
                     </span>
                 @endif
             </div>
@@ -275,15 +277,16 @@
                 @if ($latestPayment->isOpen())
                     &middot;
                     <span class="{{ $latestPayment->isOverdue() ? 'text-danger fw-semibold' : '' }}">
-                        due {{ $latestPayment->due_at->format('j M, g:i A') }}{{ $latestPayment->isOverdue() ? ' — overdue' : '' }}
+                        due
+                        {{ $latestPayment->due_at->format('j M, g:i A') }}{{ $latestPayment->isOverdue() ? ' — overdue' : '' }}
                     </span>
                 @endif
             </span>
 
             {{-- Recording and withdrawing live on the payments register, not
-                 here. One screen owns the money actions, which keeps the audit
-                 trail and the error messages in one place rather than
-                 duplicated across two drawers that would drift. --}}
+        here. One screen owns the money actions, which keeps the audit
+        trail and the error messages in one place rather than
+        duplicated across two drawers that would drift. --}}
             @can('payments.view')
                 <a class="fs-8 ms-auto"
                     href="{{ route('admin.payments.index', ['q' => $latestPayment->reference, 'status' => 'all']) }}">
@@ -346,15 +349,29 @@
 {{-- ================= Decisions ================= --}}
 @php
     /*
-     | Every button is gated by the policy, which asks both "may this person"
-     | and "does the lifecycle allow it from here". A Manager sees Escalate
-     | where an Admin sees Approve, because approval now needs
-     | reservations.approve and Manager no longer holds it.
-     |
-     | data-* carries what the shared decision modal needs. The JavaScript sets
-     | text and a form action from these; it does not build markup.
-     */
+| Every button is gated by the policy, which asks both "may this person"
+| and "does the lifecycle allow it from here". A Manager sees Escalate
+| where an Admin sees Approve, because approval now needs
+| reservations.approve and Manager no longer holds it.
+|
+| data-* carries what the shared decision modal needs. The JavaScript sets
+| text and a form action from these; it does not build markup.
+*/
     $actions = collect([
+        [
+            'ability' => 'complete',
+            'url' => route('admin.reservations.complete', $reservation),
+            'label' => 'Mark as completed',
+            'icon' => 'verify',
+            'class' => 'btn-success',
+            'title' => 'Mark this visit as completed?',
+            'prompt' =>
+                'Anything worth recording? (optional) This is the last change anyone can make to this reservation.',
+            'placeholder' => 'All eight came; ran twenty minutes over',
+            'confirm' => 'Mark completed',
+            'required' => false,
+            'override' => false,
+        ],
         [
             'ability' => 'approve',
             'url' => route('admin.reservations.approve', $reservation),
@@ -436,18 +453,18 @@
     ])->filter(fn($action) => auth()->user()->can($action['ability'], $reservation));
 
     /*
-     | PHASE 10B — who each VISIBLE decision writes to, derived rather than
-     | stated.
-     |
-     | The paragraph below used to name approving, declining and cancelling
-     | unconditionally. A Manager can now do none of the three, so it described
-     | three buttons that were not on screen — which reads as a bug to the
-     | person who cannot find them.
-     |
-     | Grouping earns its keep for an Admin too. "Back to review queue" emails
-     | nobody, and that is worth knowing before you reach for it instead of
-     | asking the visitor for information.
-     */
+| PHASE 10B — who each VISIBLE decision writes to, derived rather than
+| stated.
+|
+| The paragraph below used to name approving, declining and cancelling
+| unconditionally. A Manager can now do none of the three, so it described
+| three buttons that were not on screen — which reads as a bug to the
+| person who cannot find them.
+|
+| Grouping earns its keep for an Admin too. "Back to review queue" emails
+| nobody, and that is worth knowing before you reach for it instead of
+| asking the visitor for information.
+*/
     $audience = [
         'approve' => 'visitor',
         'decline' => 'visitor',
@@ -455,6 +472,7 @@
         'requestInfo' => 'visitor',
         'escalate' => 'staff',
         'returnToReview' => 'silent',
+        'complete' => 'silent',
     ];
 
     $notify = $actions
@@ -462,15 +480,28 @@
         ->map(fn($group) => $group->pluck('label')->join(', '));
 @endphp
 
+{{-- Why the Complete button is not here yet. Shown only to somebody who would
+     otherwise be hunting for it — see completionVerdict(). --}}
+@if ($completion['pending'])
+    <div class="separator my-5"></div>
+    <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-5">
+        <i class="ki-outline ki-timer fs-2 text-primary me-3"></i>
+        <div class="fs-7 text-gray-700">
+            <strong>Not ready to complete.</strong>
+            <div class="mt-1">{{ $completion['reason'] }}</div>
+        </div>
+    </div>
+@endif
+
 @if ($actions->isNotEmpty())
     <div class="separator my-5"></div>
 
     <div class="fw-bold text-gray-800 mb-1">Decision</div>
     <div class="text-muted fs-8 mb-4">
         {{-- PHASE 11 replaced the "nothing is emailed yet" warning that stood
-             here. Saying which decisions write to whom is worth the line: an
-             admin about to type a decline reason should know the visitor is
-             going to read it. PHASE 10B made it reflect what is on screen. --}}
+    here. Saying which decisions write to whom is worth the line: an
+    admin about to type a decline reason should know the visitor is
+    going to read it. PHASE 10B made it reflect what is on screen. --}}
         @if ($notify->has('visitor'))
             <span class="fw-semibold text-gray-700">Emails the visitor:</span> {{ $notify['visitor'] }}.
         @endif

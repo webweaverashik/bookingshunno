@@ -23,10 +23,12 @@
     if (!listEl) return;
 
     var summaryEl = document.getElementById('report-summary');
-    var fromEl = document.getElementById('report-from');
-    var toEl = document.getElementById('report-to');
-    var statusEl = document.getElementById('report-status');
-    var perPageEl = document.getElementById('report-per-page');
+    var windowEl = document.querySelector('[data-report-window]');
+
+    // The dates, the period, the status and the page size all live in the
+    // shared filter menu now — see js/admin/filters.js. Created further down,
+    // once load() exists for it to call.
+    var filters = null;
 
     // Guards against a slow response landing after a faster later one and
     // overwriting it — the same counter pattern the other registers use.
@@ -36,22 +38,43 @@
        Reading the filters
        ===================================================================== */
 
+    /*
+     | values(), not changed().
+     |
+     | On a register, sending only what differs from the default keeps the URL
+     | short and lets the server's defaults stand. Here the dates ARE the
+     | report: leaving them out because they match what the page opened with
+     | would hand the server no window at all and get back its default month.
+     | Every filter goes on every request.
+     */
     function params(extra) {
         var query = new URLSearchParams();
+        var current = filters ? filters.values() : {};
+
         extra = extra || {};
 
+        Object.keys(current).forEach(function (key) {
+            /*
+             | 'range' is the menu's own control, not a filter the server
+             | keeps — a named period is resolved once into dates and the
+             | dates are what travel from then on. It is passed explicitly
+             | through `extra` when it is actually being requested.
+             */
+            if (key === 'range') return;
+
+            if (current[key] !== '') query.set(key, current[key]);
+        });
+
         /*
-         | When a named range is being requested, the from/to inputs still hold
-         | the PREVIOUS range — they are only updated once the response comes
-         | back. Sending them alongside would be sending two answers to the same
-         | question, so they are left out and the server's own resolution wins.
+         | When a named period is being requested, the from/to fields still hold
+         | the PREVIOUS window — they are only updated once the response comes
+         | back. Sending them alongside would be two answers to the same
+         | question, so they are dropped and the server's resolution wins.
          */
-        if (!extra.range) {
-            if (fromEl && fromEl.value) query.set('from', fromEl.value);
-            if (toEl && toEl.value) query.set('to', toEl.value);
+        if (extra.range) {
+            query.delete('from');
+            query.delete('to');
         }
-        if (statusEl) query.set('status', statusEl.value);
-        if (perPageEl) query.set('per_page', perPageEl.value);
 
         Object.keys(extra).forEach(function (key) {
             query.set(key, extra[key]);
@@ -112,74 +135,67 @@
     }
 
     /* =====================================================================
-       Filter bindings
-       ===================================================================== */
+       The filter menu
+       =====================================================================
+       Apply reads the whole set. A named period — "last month" — is sent as a
+       KEY and the server decides what it means, then sends the resolved dates
+       back for applyRange() to display.
 
-    // Shunno.onChange, not addEventListener. The status filter is a Select2 and
-    // Select2 announces a selection through jQuery's .trigger('change'), which
-    // a native listener never sees — the helper binds through jQuery for those
-    // and natively for everything else.
-    [fromEl, toEl, statusEl, perPageEl].forEach(function (el) {
-        Shunno.onChange(el, function () {
+       No date arithmetic in the browser, deliberately. An earlier version built
+       both dates here, which made the meaning of a range depend on the clock
+       and timezone of whichever machine had the page open, and left the picker
+       and the table able to disagree about which month was on screen.
+    */
+
+    filters = Shunno.filterBar({
+        root: document.getElementById('reports-filter'),
+
+        onApply: function (changed, all) {
+            if (all.range && all.range !== 'custom') {
+                load({ page: 1, range: all.range });
+                return;
+            }
+
             load({ page: 1 });
-        });
+        }
     });
 
-    /* =====================================================================
-       Date pickers
-       ===================================================================== */
-
-    // Attached before anything reads the fields. Shunno.datepickers() guards
-    // against double-initialising, which is what previously left these showing
-    // a date the table was not filtered by — see the note in shunno.js.
-    var pickers = Shunno.datepickers(document);
-
-    function fromPicker() { return pickers[0] || null; }
-    function toPicker() { return pickers[1] || null; }
-
     /**
-     * Write the range the SERVER resolved back into the pickers.
+     * Write the range the SERVER resolved back into the menu and the heading.
      *
      * setDate's second argument is false so this does NOT fire change — load()
      * has already run, and letting the write trigger another would loop.
+     *
+     * The DEFAULTS move with the values, and that is the point of doing it here
+     * rather than leaving the fields alone. A report always has a range, so
+     * counting it as an active filter would leave the badge permanently reading
+     * two; keeping the default in step means the badge counts what somebody has
+     * narrowed BEYOND the window on screen, which is the useful reading.
      */
     function applyRange(range) {
         if (!range) return;
 
-        if (fromPicker()) {
-            fromPicker().setDate(range.from, false);
-        } else if (fromEl) {
-            fromEl.value = range.from;
-        }
+        ['from', 'to'].forEach(function (key) {
+            var field = document.querySelector('[data-filter-field="' + key + '"]');
+            if (!field) return;
 
-        if (toPicker()) {
-            toPicker().setDate(range.to, false);
-        } else if (toEl) {
-            toEl.value = range.to;
-        }
-    }
+            field.dataset.filterDefault = range[key];
 
-    /* =====================================================================
-       Quick ranges
-       =====================================================================
-       No date arithmetic here any more. The button posts a KEY and the server
-       decides what "last month" means, then sends the resolved dates back for
-       applyRange() to display.
-
-       The old version built two dates in the browser, which made the meaning of
-       a range depend on the clock and timezone of whichever machine had the
-       page open, and left the picker and the table able to disagree.
-    */
-
-    document.querySelectorAll('[data-report-range]').forEach(function (button) {
-        button.addEventListener('click', function () {
-            document.querySelectorAll('[data-report-range]').forEach(function (other) {
-                other.classList.toggle('active', other === button);
-            });
-
-            load({ page: 1, range: this.getAttribute('data-report-range') });
+            if (field._flatpickr) {
+                field._flatpickr.setDate(range[key], false);
+            } else {
+                field.value = range[key];
+            }
         });
-    });
+
+        // from_label / to_label are formatted by PHP — "14 Aug 2026" — so the
+        // heading never contains a date this file has formatted itself.
+        if (windowEl && range.from_label) {
+            windowEl.textContent = range.from_label + ' \u2013 ' + range.to_label;
+        }
+
+        if (filters) filters.refresh();
+    }
 
     /* =====================================================================
        Paging
@@ -204,104 +220,25 @@
        AJAX rather than a link, so a refusal arrives as a message instead of a
        downloaded file containing an error page.
 
-       Shunno.request is not used here — it parses JSON, and two of these three
-       responses are binary. Raw fetch, then branch on the content type: JSON
-       means the server refused (too many rows for PDF, say) and the message is
-       worth reading; anything else is the file.
+       PHASE 29 moved the download itself into Shunno.download(): the same
+       routine now serves the index registers, and two copies of it would drift
+       the first time one of them learned something the other did not. This is
+       left with the one thing that is specific to this page — which filters the
+       export should carry.
     */
-
-    var FORMAT_LABELS = {
-        csv: 'CSV',
-        xlsx: 'Excel workbook',
-        pdf: 'PDF'
-    };
-
-    function downloadExport(format) {
-        var query = params({ format: format });
-        var trigger = document.getElementById('report-export');
-
-        Shunno.busy(trigger, true);
-
-        /*
-         | A blocking dialog, not just a spinner on the button.
-         |
-         | A PDF of a year of reservations takes seconds — long enough that
-         | somebody wonders whether the click registered and clicks again, and
-         | the second click builds the entire file a second time. The dialog
-         | makes the wait visible and takes the button out of reach while it
-         | lasts.
-         |
-         | The message names the format, because "Preparing your PDF" is the
-         | difference between waiting and wondering whether the wrong menu item
-         | was hit.
-         */
-        Shunno.progress(
-            'Preparing your ' + (FORMAT_LABELS[format] || 'file'),
-            format === 'pdf'
-                ? 'Laying out the pages. Larger ranges take a moment.'
-                : 'Gathering the rows.'
-        );
-
-        fetch(config.exportUrl + '?' + query.toString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            credentials: 'same-origin'
-        })
-            .then(function (response) {
-                var type = response.headers.get('content-type') || '';
-
-                if (type.indexOf('application/json') !== -1) {
-                    return response.json().then(function (payload) {
-                        throw { message: payload.message || 'Export failed.' };
-                    });
-                }
-
-                if (!response.ok) {
-                    throw { message: 'Export failed. Please try again.' };
-                }
-
-                // The server already worked out the filename, range included.
-                // Parsing it back off the header beats rebuilding it here and
-                // getting a different answer.
-                var disposition = response.headers.get('content-disposition') || '';
-                var match = disposition.match(/filename="?([^"]+)"?/);
-
-                return response.blob().then(function (blob) {
-                    return { blob: blob, name: match ? match[1] : 'report.' + format };
-                });
-            })
-            .then(function (file) {
-                var url = URL.createObjectURL(file.blob);
-                var link = document.createElement('a');
-
-                link.href = url;
-                link.download = file.name;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                // Released, or the whole file stays in memory until the tab is
-                // closed — which for someone exporting a year of reservations
-                // several times over is worth caring about.
-                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-            })
-            .catch(function (error) {
-                Shunno.toast('error', error.message || 'Export failed.');
-            })
-            .then(function () {
-                // In the final then, not in each branch: this runs whether the
-                // export succeeded, was refused for being too large, or the
-                // connection dropped. A dialog left open after a failure is
-                // worse than never showing one, because it says the work is
-                // still going.
-                Shunno.progressDone();
-                Shunno.busy(trigger, false);
-            });
-    }
 
     document.querySelectorAll('[data-row-export]').forEach(function (item) {
         item.addEventListener('click', function (event) {
             event.preventDefault();
-            downloadExport(this.getAttribute('data-row-export'));
+
+            var format = this.getAttribute('data-row-export');
+            var query = params({ format: format });
+
+            Shunno.download(
+                config.exportUrl + '?' + query.toString(),
+                format,
+                document.getElementById('report-export')
+            );
         });
     });
 

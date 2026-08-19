@@ -6,8 +6,8 @@ use App\Enums\Reservation\ReservationSource;
 use App\Enums\Reservation\ReservationStatus;
 use App\Events\Reservation\ReservationRequested;
 use App\Events\Reservation\ReservationStatusChanged;
-use App\Models\Reservation\Reservation;
 use App\Models\Auth\User;
+use App\Models\Reservation\Reservation;
 use App\Models\Reservation\VisitPurpose;
 use App\Models\Workshop\Workshop;
 use Illuminate\Support\Facades\DB;
@@ -17,9 +17,7 @@ use RuntimeException;
 
 class ReservationService
 {
-    public function __construct(private readonly PricingService $pricing)
-    {
-    }
+    public function __construct(private readonly PricingService $pricing) {}
 
     /**
      * Turn a validated public request into a reservation.
@@ -34,52 +32,50 @@ class ReservationService
         $workshop = Workshop::active()->where('slug', $data['experience'])->firstOrFail();
 
         $reservation = DB::transaction(function () use ($data, $workshop, $ip) {
-            $user    = $this->resolveVisitor($data);
+            $user = $this->resolveVisitor($data);
             $pricing = $this->pricing->forWorkshop($workshop, (int) $data['participants']);
 
             $start = $data['time'];
-            $end   = date('H:i', strtotime($start) + $workshop->duration_minutes * 60);
+            $end = date('H:i', strtotime($start) + $workshop->duration_minutes * 60);
 
             $reservation = new Reservation([
-                'reference_code'   => $this->generateReference(),
-                'user_id'          => $user->id,
-                'reserved_date'    => $data['date'],
-                'start_time'       => $start,
-                'end_time'         => $end,
-                'participants'     => (int) $data['participants'],
+                'reference_code' => $this->generateReference(),
+                'user_id' => $user->id,
+                'reserved_date' => $data['date'],
+                'start_time' => $start,
+                'end_time' => $end,
+                'participants' => (int) $data['participants'],
                 'special_requests' => $data['notes'] ?? null,
-                'source'           => ReservationSource::Web,
-                'submitted_ip'     => $ip,
+                'source' => ReservationSource::Web,
+                'submitted_ip' => $ip,
             ]);
 
             // Guarded columns: set here, never mass-assigned from the form.
-            $reservation->status          = ReservationStatus::Pending;
-            $reservation->subtotal        = $pricing['subtotal'];
+            $reservation->status = ReservationStatus::Pending;
+            $reservation->subtotal = $pricing['subtotal'];
             $reservation->discount_amount = $pricing['discount'];
-            $reservation->total_amount    = $pricing['total'];
+            $reservation->total_amount = $pricing['total'];
             $reservation->discount_reason = $pricing['discount_reason'];
             $reservation->save();
 
             $reservation->items()->create([
-                'workshop_id'      => $workshop->id,
-                'title_snapshot'   => $workshop->title,
-                'unit_price'       => $workshop->price,
-                'quantity'         => (int) $data['participants'],
-                'line_total'       => $pricing['subtotal'],
+                'workshop_id' => $workshop->id,
+                'title_snapshot' => $workshop->title,
+                'unit_price' => $workshop->price,
+                'quantity' => (int) $data['participants'],
+                'line_total' => $pricing['subtotal'],
                 'duration_minutes' => $workshop->duration_minutes,
             ]);
 
             if (! empty($data['purposes'])) {
-                $reservation->purposes()->sync(
-                    VisitPurpose::whereIn('slug', $data['purposes'])->pluck('id')
-                );
+                $reservation->purposes()->sync(VisitPurpose::whereIn('slug', $data['purposes'])->pluck('id'));
             }
 
             $reservation->statusHistory()->create([
                 'from_status' => null,
-                'to_status'   => ReservationStatus::Pending,
-                'changed_by'  => null,          // submitted by the visitor
-                'note'        => 'Request submitted from the website.',
+                'to_status' => ReservationStatus::Pending,
+                'changed_by' => null, // submitted by the visitor
+                'note' => 'Request submitted from the website.',
             ]);
 
             $user->increment('total_reservations');
@@ -128,15 +124,15 @@ class ReservationService
      *
      * @param  array<string,mixed>  $changes
      */
-    public function amend(
-        Reservation $reservation,
-        array $changes,
-        User $actor,
-        ?string $note = null,
-        bool $overrode = false,
-    ): Reservation {
+    public function amend(Reservation $reservation, array $changes, User $actor, ?string $note = null, bool $overrode = false): Reservation
+    {
         return DB::transaction(function () use ($reservation, $changes, $actor, $note, $overrode) {
             $item = $reservation->items()->first();
+
+            // amountPaid() reads the payments COLLECTION and does not lazy-load
+            // per call by design. One record, one query, and the alternative is
+            // a balance line that silently reads zero.
+            $reservation->loadMissing('payments');
 
             $summary = [];
 
@@ -155,7 +151,7 @@ class ReservationService
                 $was = $reservation->reserved_date?->toDateString();
 
                 if ($was !== $changes['reserved_date']) {
-                    $summary[] = 'date ' . $was . ' to ' . $changes['reserved_date'];
+                    $summary[] = 'date '.$was.' to '.$changes['reserved_date'];
                 }
 
                 $reservation->reserved_date = $changes['reserved_date'];
@@ -165,7 +161,7 @@ class ReservationService
                 $was = substr((string) $reservation->start_time, 0, 5);
 
                 if ($was !== $changes['start_time']) {
-                    $summary[] = 'time ' . $was . ' to ' . $changes['start_time'];
+                    $summary[] = 'time '.$was.' to '.$changes['start_time'];
                 }
 
                 $reservation->start_time = $changes['start_time'];
@@ -175,9 +171,7 @@ class ReservationService
                 // booking was still sold at the old length.
                 $minutes = (int) ($item?->duration_minutes ?: 0);
 
-                $reservation->end_time = $minutes > 0
-                    ? date('H:i', strtotime($changes['start_time']) + $minutes * 60)
-                    : $reservation->end_time;
+                $reservation->end_time = $minutes > 0 ? date('H:i', strtotime($changes['start_time']) + $minutes * 60) : $reservation->end_time;
             }
 
             if (isset($changes['participants'])) {
@@ -193,16 +187,16 @@ class ReservationService
                 // Re-priced from the item's own unit price, so a change to the
                 // workshop's price since this was booked does not silently
                 // reprice a request the visitor has already seen a figure for.
-                $unit    = (float) ($item?->unit_price ?? 0);
+                $unit = (float) ($item?->unit_price ?? 0);
                 $pricing = $this->pricing->calculate($unit, $now);
 
-                $reservation->subtotal        = $pricing['subtotal'];
+                $reservation->subtotal = $pricing['subtotal'];
                 $reservation->discount_amount = $pricing['discount'];
-                $reservation->total_amount    = $pricing['total'];
+                $reservation->total_amount = $pricing['total'];
                 $reservation->discount_reason = $pricing['discount_reason'];
 
                 $item?->update([
-                    'quantity'   => $now,
+                    'quantity' => $now,
                     'line_total' => $pricing['subtotal'],
                 ]);
 
@@ -218,8 +212,19 @@ class ReservationService
                  | so a stale override is visible rather than merely present.
                  */
                 if ($reservation->hasManualPrice() && $was !== $now) {
-                    $summary[] = 'agreed price of ' . number_format((float) $reservation->total_override)
-                        . ' left in place and now needs review';
+                    $summary[] = 'agreed price of '.number_format((float) $reservation->total_override).' left in place and now needs review';
+                }
+
+                /*
+                 | Editing after money has arrived is now permitted, and this
+                 | line is the price of permitting it. Re-pricing a booking
+                 | somebody has already paid against changes what they owe, and
+                 | nothing emails them about it — so the history has to say so
+                 | plainly enough that whoever reads it back can act on it.
+                 */
+                if ($was !== $now && $reservation->amountPaid() > 0.009) {
+                    $summary[] = 'already paid against — balance is now BDT '
+                        .number_format(max(0, $reservation->payableTotal() - $reservation->amountPaid()));
                 }
             }
 
@@ -237,16 +242,11 @@ class ReservationService
                 $old = $reservation->total_override === null ? null : (float) $reservation->total_override;
 
                 if ($new !== $old) {
-                    $summary[] = $new === null
-                        ? 'agreed price removed, back to ' . number_format($reservation->calculatedTotal())
-                        : 'price set to ' . number_format($new)
-                            . ' (calculated ' . number_format($reservation->calculatedTotal()) . ')';
+                    $summary[] = $new === null ? 'agreed price removed, back to '.number_format($reservation->calculatedTotal()) : 'price set to '.number_format($new).' (calculated '.number_format($reservation->calculatedTotal()).')';
                 }
 
-                $reservation->total_override        = $new;
-                $reservation->total_override_reason = $new === null
-                    ? null
-                    : ($changes['total_override_reason'] ?? null);
+                $reservation->total_override = $new;
+                $reservation->total_override_reason = $new === null ? null : $changes['total_override_reason'] ?? null;
             }
 
             $reservation->save();
@@ -258,23 +258,21 @@ class ReservationService
                 return $reservation->fresh(['items', 'purposes', 'user', 'statusHistory.changedBy']);
             }
 
-            $line = $summary === []
-                ? 'Edited.'
-                : 'Edited: ' . implode('; ', $summary) . '.';
+            $line = $summary === [] ? 'Edited.' : 'Edited: '.implode('; ', $summary).'.';
 
             if ($overrode) {
                 $line .= ' Availability rules overridden.';
             }
 
             if ($note) {
-                $line .= ' ' . $note;
+                $line .= ' '.$note;
             }
 
             $reservation->statusHistory()->create([
                 'from_status' => $reservation->status,
-                'to_status'   => $reservation->status,
-                'changed_by'  => $actor->id,
-                'note'        => $line,
+                'to_status' => $reservation->status,
+                'changed_by' => $actor->id,
+                'note' => $line,
             ]);
 
             return $reservation->fresh(['items', 'purposes', 'user', 'statusHistory.changedBy']);
@@ -298,9 +296,9 @@ class ReservationService
     {
         $reservation->statusHistory()->create([
             'from_status' => $reservation->status,
-            'to_status'   => $reservation->status,
-            'changed_by'  => $actor?->id,
-            'note'        => $note,
+            'to_status' => $reservation->status,
+            'changed_by' => $actor?->id,
+            'note' => $note,
         ]);
 
         return $reservation;
@@ -310,12 +308,8 @@ class ReservationService
      * Move a reservation to a new status, refusing transitions the lifecycle
      * does not allow, and recording who did it.
      */
-    public function transition(
-        Reservation $reservation,
-        ReservationStatus $to,
-        ?User $actor = null,
-        ?string $note = null,
-    ): Reservation {
+    public function transition(Reservation $reservation, ReservationStatus $to, ?User $actor = null, ?string $note = null): Reservation
+    {
         $from = $reservation->status;
 
         if ($from === $to) {
@@ -323,32 +317,30 @@ class ReservationService
         }
 
         if (! $from->canTransitionTo($to)) {
-            throw new RuntimeException(
-                "A reservation cannot go from {$from->label()} to {$to->label()}."
-            );
+            throw new RuntimeException("A reservation cannot go from {$from->label()} to {$to->label()}.");
         }
 
         $reservation = DB::transaction(function () use ($reservation, $from, $to, $actor, $note) {
             $reservation->status = $to;
 
             match ($to) {
-                ReservationStatus::Approved  => $reservation->forceFill([
+                ReservationStatus::Approved => $reservation->forceFill([
                     'approved_at' => now(),
                     'approved_by' => $actor?->id,
                 ]),
-                ReservationStatus::Declined  => $reservation->forceFill(['declined_at' => now()]),
+                ReservationStatus::Declined => $reservation->forceFill(['declined_at' => now()]),
                 ReservationStatus::Confirmed => $reservation->forceFill(['confirmed_at' => now()]),
                 ReservationStatus::Cancelled => $reservation->forceFill(['cancelled_at' => now()]),
-                default                      => $reservation,
+                default => $reservation,
             };
 
             $reservation->save();
 
             $reservation->statusHistory()->create([
                 'from_status' => $from,
-                'to_status'   => $to,
-                'changed_by'  => $actor?->id,
-                'note'        => $note,
+                'to_status' => $to,
+                'changed_by' => $actor?->id,
+                'note' => $note,
             ]);
 
             return $reservation;
@@ -388,10 +380,14 @@ class ReservationService
 
             // Keep the most recent contact details, but never overwrite a name
             // or number with an empty one.
-            $user->fill(array_filter([
-                'name'  => $data['name'] ?? null,
-                'phone' => $data['phone'] ?? null,
-            ]))->save();
+            $user
+                ->fill(
+                    array_filter([
+                        'name' => $data['name'] ?? null,
+                        'phone' => $data['phone'] ?? null,
+                    ]),
+                )
+                ->save();
 
             if (! $user->hasRole(User::ROLE_VISITOR) && ! $user->isStaff()) {
                 $user->assignRole(User::ROLE_VISITOR);
@@ -401,13 +397,13 @@ class ReservationService
         }
 
         $user = User::create([
-            'name'      => $data['name'],
-            'email'     => $data['email'],
-            'phone'     => $data['phone'],
-            'whatsapp'  => $data['phone'],
-            'password'  => Hash::make(Str::random(64)),
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'whatsapp' => $data['phone'],
+            'password' => Hash::make(Str::random(64)),
             'is_active' => true,
-            'source'    => ReservationSource::Web,
+            'source' => ReservationSource::Web,
         ]);
 
         $user->assignRole(User::ROLE_VISITOR);
@@ -421,14 +417,14 @@ class ReservationService
      */
     private function generateReference(): string
     {
-        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I, O, 0, 1
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0, 1
 
         do {
             $suffix = '';
             for ($i = 0; $i < 4; $i++) {
                 $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
             }
-            $code = 'SHN-' . now()->format('ym') . '-' . $suffix;
+            $code = 'SHN-'.now()->format('ym').'-'.$suffix;
         } while (Reservation::withTrashed()->where('reference_code', $code)->exists());
 
         return $code;

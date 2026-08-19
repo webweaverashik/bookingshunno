@@ -48,72 +48,94 @@
         <div class="card-header border-0 pt-6">
 
             <div class="card-title flex-column align-items-start">
-                <div class="d-flex align-items-center gap-3 flex-wrap">
-                    {{-- Flatpickr, per the project convention for every date
-                         input. Type is text, not date: a native picker would
-                         render its own control on top of Flatpickr's and the two
-                         would fight over the same field.
-
-                         Shunno.datepickers() attaches them. The field submits
-                         Y-m-d and displays "14 Aug 2026" through altInput, so
-                         ReportController::filters() still parses an exact mask
-                         and nothing downstream has to read a formatted date. --}}
-                    <input type="text" id="report-from" name="from"
-                        class="form-control form-control-solid w-150px shunno-datepicker"
-                        value="{{ $filters['from']->format('Y-m-d') }}" aria-label="From" autocomplete="off">
-                    <span class="text-muted fs-7">to</span>
-                    <input type="text" id="report-to" name="to"
-                        class="form-control form-control-solid w-150px shunno-datepicker"
-                        value="{{ $filters['to']->format('Y-m-d') }}" aria-label="To" autocomplete="off">
-
-                    {{-- The four windows anyone actually asks for. --}}
-                    <div class="btn-group btn-group-sm" role="group" aria-label="Quick ranges">
-                        <button type="button" class="btn btn-light" data-report-range="this-month">This
-                            month</button>
-                        <button type="button" class="btn btn-light" data-report-range="last-month">Last month</button>
-                        <button type="button" class="btn btn-light" data-report-range="quarter">Last 90
-                            days</button>
-                        <button type="button" class="btn btn-light" data-report-range="year">This year</button>
-                    </div>
-                </div>
-
-                <span class="text-muted fs-8 mt-2">{{ $report->rangeBasis() }}</span>
+                {{-- The window currently on screen, in words. It moved out of
+                     the toolbar and into the filter menu, so this line is now
+                     the only thing saying which dates the table covers — and it
+                     matters more than it looks: the same rows give four
+                     different totals depending on which date column the range
+                     runs on, and rangeBasis() is what says which. --}}
+                <h3 class="fw-bold m-0" data-report-window>
+                    {{ $filters['from']->format('j M Y') }} &ndash; {{ $filters['to']->format('j M Y') }}
+                </h3>
+                <span class="text-muted fs-8 mt-1">{{ $report->rangeBasis() }}</span>
             </div>
 
+            {{-- One toolbar, everything in it. A card header is a flex row with
+                 space-between, so a second .card-toolbar would push these groups
+                 to opposite ends and leave Filter marooned in the middle. --}}
             <div class="card-toolbar gap-3">
-                @if (count($statuses) > 1)
-                    {{-- Select2. This is the long searchable list the Phase 6
-                         rule reserves it for: the reservations report offers
-                         fourteen options, and scrolling a native dropdown for
-                         "Payment requested" is worse than typing three letters.
+                @include('admin.partials.filter-bar', [
+                    'id' => 'reports-filter',
+                    'fields' => array_values(
+                        array_filter([
+                            [
+                                'key' => 'range',
+                                'label' => 'Period',
+                                'default' => 'custom',
+                                'placeholder' => 'Custom range',
+                                'options' => [
+                                    'custom' => 'Custom range',
+                                    'this-month' => 'This month',
+                                    'last-month' => 'Last month',
+                                    'quarter' => 'Last 90 days',
+                                    'year' => 'This year',
+                                ],
+                                'value' => 'custom',
+                            ],
+                            [
+                                'key' => 'from',
+                                'label' => 'From',
+                                'type' => 'date',
+                                'width' => 'col-6',
+                                'when' => 'range:custom',
 
-                         It works as a filter because Shunno.onChange() binds
-                         through jQuery when it sees data-control="select2" —
-                         Select2 announces a selection with jQuery's .trigger(),
-                         which never reaches a native addEventListener. That is
-                         the reason every other filter in this panel is a plain
-                         form-select, and it is now handled rather than avoided. --}}
-                    <select id="report-status" class="form-select form-select-solid w-225px"
-                        data-control="select2" data-placeholder="Filter">
-                        @foreach ($statuses as $value => $label)
-                            <option value="{{ $value }}" @selected($filters['status'] === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                @endif
+                                // Default AND value are the window on screen, so the
+                                // badge counts a narrowing rather than the range the
+                                // report always has. reports.js keeps the default in
+                                // step when the server resolves a named period.
+                                'default' => $filters['from']->format('Y-m-d'),
+                                'value' => $filters['from']->format('Y-m-d'),
+                            ],
+                            [
+                                'key' => 'to',
+                                'label' => 'To',
+                                'type' => 'date',
+                                'width' => 'col-6',
+                                'when' => 'range:custom',
+                                'default' => $filters['to']->format('Y-m-d'),
+                                'value' => $filters['to']->format('Y-m-d'),
+                            ],
 
-                {{-- Plain form-select, deliberately. Three numeric options with
-                     nothing to search: Select2 here would add a search box over
-                     "25, 50, 100" and a dropdown that takes two frames to open. --}}
-                <select id="report-per-page" class="form-select form-select-solid w-auto">
-                    @foreach ($pageSizes as $size)
-                        <option value="{{ $size }}" @selected($filters['per_page'] === $size)>{{ $size }} per page
-                        </option>
-                    @endforeach
-                </select>
+                            // The reservations report offers fourteen statuses; the
+                            // email log offers one, and a dropdown with a single
+                            // option is furniture. array_filter drops it.
+                            count($statuses) > 1
+                                ? [
+                                    'key' => 'status',
+                                    'label' => 'Filter',
+                                    'default' => array_key_first($statuses),
+                                    'placeholder' => reset($statuses),
+                                    'options' => $statuses,
+                                    'value' => $filters['status'],
+                                ]
+                                : null,
+                            [
+                                'key' => 'per_page',
+                                'label' => 'Rows per page',
+                                'default' => 25,
+                                'options' => collect($pageSizes)->mapWithKeys(fn($size) => [$size => $size . ' per page'])->all(),
+                                'value' => $filters['per_page'],
+                            ],
+                        ]),
+                    ),
+                ])
 
+                {{-- Clearing and exporting are in the toolbar but NOT in the
+                     filter menu: neither is a filter, and burying a destructive
+                     action behind an Apply button would be the wrong shape. --}}
                 @if ($report->isClearable())
                     @can('reports.clear')
-                        {{-- Only the two logs carry this. The other four are
+                        {{-- Only the two logs carry this. The other reports are
                              views over reservations, payments and vouchers — a
                              clear button on those would be a delete button on
                              the studio's own records. --}}
@@ -125,8 +147,7 @@
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-250px py-4"
                                 data-kt-menu="true">
                                 <div class="menu-item px-3">
-                                    <a href="#" class="menu-link px-3" data-log-clear="365">Older than a
-                                        year</a>
+                                    <a href="#" class="menu-link px-3" data-log-clear="365">Older than a year</a>
                                 </div>
                                 <div class="menu-item px-3">
                                     <a href="#" class="menu-link px-3" data-log-clear="90">Older than 90 days</a>
@@ -147,20 +168,24 @@
                     {{--
                         Three formats, one endpoint, one set of rows.
 
-                        AJAX rather than a plain link, at your request: the
-                        response comes back as a blob and is saved from memory,
-                        which is what lets a failure — "that is 40,000 rows, too
-                        many for PDF" — arrive as a message rather than as a
-                        downloaded file full of an error page. See
-                        downloadExport() in reports.js.
+                        Deliberately NOT the filter menu's own export dropdown.
+                        That one sends only the filters that differ from their
+                        defaults, which is right for a register — but on this
+                        page the dates ARE the report, and an export that
+                        silently fell back to the server's default window would
+                        be a spreadsheet of the wrong month. reports.js sends the
+                        whole set through params().
+
+                        AJAX rather than a plain link: the response comes back as
+                        a blob and is saved from memory, which is what lets a
+                        refusal — "that is 40,000 rows, too many for PDF" —
+                        arrive as a message rather than as a downloaded file full
+                        of an error page. See Shunno.download().
                     --}}
                     <div class="dropdown d-inline-block">
                         <button type="button" class="btn btn-light-primary" id="report-export"
                             data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                            <i class="ki-duotone ki-exit-up fs-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>Export
+                            <i class="ki-outline ki-exit-up fs-2"></i>Export
                         </button>
                         <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px py-4"
                             data-kt-menu="true">
@@ -177,6 +202,7 @@
                     </div>
                 @endcan
             </div>
+
         </div>
 
         <div class="card-body pt-0">
@@ -201,5 +227,8 @@
         };
     </script>
     <script src="{{ asset('js/admin/shunno.js') }}"></script>
+    {{-- The shared filter menu. Must load before reports.js, which calls
+         Shunno.filterBar(). --}}
+    <script src="{{ asset('js/admin/filters.js') }}"></script>
     <script src="{{ asset('js/admin/reports.js') }}"></script>
 @endpush

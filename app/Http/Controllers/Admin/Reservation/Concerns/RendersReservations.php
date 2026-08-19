@@ -75,6 +75,22 @@ trait RendersReservations
             default    => null,
         };
 
+        /*
+         | An open-ended custom range is deliberately allowed. "Everything from
+         | 1 June" and "everything up to today" are both real questions, and
+         | insisting on both ends would make somebody type a date they do not
+         | care about just to get past the form.
+         */
+        if ($filters['range'] === 'custom') {
+            if ($filters['from'] !== '') {
+                $query->whereDate('reserved_date', '>=', $filters['from']);
+            }
+
+            if ($filters['to'] !== '') {
+                $query->whereDate('reserved_date', '<=', $filters['to']);
+            }
+        }
+
         $column = self::SORTABLE[$filters['sort']];
 
         $query->orderBy($column, $filters['dir']);
@@ -93,12 +109,23 @@ trait RendersReservations
     }
 
     /**
-     * @return array{q:string,status:string,range:string,workshop:string,sort:string,dir:string,per_page:int}
+     * @return array{q:string,status:string,range:string,from:string,to:string,workshop:string,sort:string,dir:string,per_page:int}
      */
     protected function reservationFilters(Request $request): array
     {
-        $status   = (string) $request->query('status', 'open');
-        $range    = (string) $request->query('range', 'upcoming');
+        /*
+         | DEFAULTS — any date, every status, on the client's instruction.
+         |
+         | The register used to open on "still open, today and ahead", which is
+         | the right view for working the queue and the wrong one for the
+         | commonest reason to come here at all: finding the booking somebody is
+         | asking about on the phone, which is as likely to be last month's and
+         | already cancelled. The four counters at the top of the page still
+         | carry the queue, and the filter badge now says when a view has been
+         | narrowed — which is what made the old default safe to drop.
+         */
+        $status   = (string) $request->query('status', 'all');
+        $range    = (string) $request->query('range', 'all');
         $workshop = (string) $request->query('workshop', 'all');
         $sort     = (string) $request->query('sort', '');
         $dir      = strtolower((string) $request->query('dir', ''));
@@ -109,27 +136,48 @@ trait RendersReservations
             array_column(ReservationStatus::cases(), 'value'),
         );
 
-        $range = in_array($range, ['all', 'today', 'upcoming', 'past'], true) ? $range : 'upcoming';
+        $range = in_array($range, ['all', 'today', 'upcoming', 'past', 'custom'], true) ? $range : 'all';
 
-        // Upcoming work reads forwards — the next visit first. History reads
-        // backwards. Sorting both the same way would put the useful end of one
-        // of them on the last page, so the DEFAULT direction depends on the
-        // range; an explicit choice from the user always wins.
-        $defaultDir = in_array($range, ['today', 'upcoming'], true) ? 'asc' : 'desc';
+        /*
+         | Sorting follows the range, because the useful end of the list moves.
+         |
+         | A forward-looking range reads forwards, earliest first; history reads
+         | backwards. "Any date" sorts on when the request ARRIVED rather than
+         | on the visit date — the top of an unfiltered register should be what
+         | happened most recently, not a booking eight months out. An explicit
+         | choice from the user always wins over both.
+         */
+        $forward     = in_array($range, ['today', 'upcoming', 'custom'], true);
+        $defaultDir  = $forward ? 'asc' : 'desc';
+        $defaultSort = $range === 'all' ? 'created' : 'date';
 
         return [
             'q' => trim((string) $request->query('q', '')),
 
             // Whitelisted rather than passed through: each of these reaches a
             // query builder and a Blade selected() check.
-            'status'   => in_array($status, $allowedStatuses, true) ? $status : 'open',
+            'status'   => in_array($status, $allowedStatuses, true) ? $status : 'all',
             'range'    => $range,
             'workshop' => ctype_digit($workshop) ? $workshop : 'all',
 
-            'sort'     => array_key_exists($sort, self::SORTABLE) ? $sort : 'date',
+            // Shape-checked here. They are bound as values by the query
+            // builder, so a malformed one is a wrong answer rather than a
+            // danger — but a wrong answer nobody can see is worse than none.
+            'from' => $this->reservationDate($request->query('from')),
+            'to'   => $this->reservationDate($request->query('to')),
+
+            'sort'     => array_key_exists($sort, self::SORTABLE) ? $sort : $defaultSort,
             'dir'      => in_array($dir, ['asc', 'desc'], true) ? $dir : $defaultDir,
             'per_page' => in_array($perPage, self::PAGE_SIZES, true) ? $perPage : 25,
         ];
+    }
+
+    /** A Y-m-d string, or empty. Anything else is not a date and is discarded. */
+    private function reservationDate(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 
     /** @return array<int,int> */
@@ -179,7 +227,54 @@ trait RendersReservations
         return view('admin.reservations.partials.detail', [
             'reservation'  => $reservation,
             'availability' => $this->availabilityVerdict($reservation),
+            'completion'   => $this->completionVerdict($reservation),
         ])->render();
+    }
+
+    /**
+     * Why the Complete button is not there yet.
+     *
+     * Only ever addressed to somebody who would otherwise be looking for it: a
+     * user holding the permission, on a reservation sitting at Confirmed. For
+     * everyone else it says nothing, because "you cannot complete this" is not
+     * information to a Manager who never could.
+     *
+     * The reasoning lives here rather than in Blade because it reads an opening
+     * hour and a balance, and both are business rules.
+     *
+     * @return array{pending:bool,reason:?string}
+     */
+    protected function completionVerdict(Reservation $reservation): array
+    {
+        $user = request()->user();
+        $none = ['pending' => false, 'reason' => null];
+
+        if (! $user?->can('reservations.complete') || $reservation->status !== ReservationStatus::Confirmed) {
+            return $none;
+        }
+
+        // The button is on screen; there is nothing to explain.
+        if ($user->can('complete', $reservation)) {
+            return $none;
+        }
+
+        if (! $reservation->hasNothingLeftToPay()) {
+            return [
+                'pending' => true,
+                'reason'  => 'BDT ' . number_format($reservation->outstandingTotal())
+                    . ' is still outstanding. Record the balance in Payments and this becomes available.',
+            ];
+        }
+
+        $opens = app(AvailabilityService::class)->window(
+            CarbonImmutable::parse($reservation->reserved_date->toDateString())
+        )['opens'] ?? null;
+
+        return [
+            'pending' => true,
+            'reason'  => 'Available on ' . $reservation->reserved_date->format('j F')
+                . ($opens ? ', from ' . $opens->format('g:i A') . ' when the studio opens.' : '.'),
+        ];
     }
 
     /**
@@ -205,6 +300,10 @@ trait RendersReservations
             $reservation->reserved_date->toDateString(),
             substr((string) $reservation->start_time, 0, 5),
             (int) $reservation->participants,
+
+            // Or a reservation that holds capacity fails its own check: its own
+            // people are already counted in the slot it is sitting in.
+            except: $reservation,
         );
 
         return [

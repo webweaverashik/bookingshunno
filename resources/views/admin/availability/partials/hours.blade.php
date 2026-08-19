@@ -22,18 +22,20 @@
         </td>
 
         <td>
-            <input type="time" step="1800"
+            {{-- Flatpickr, like every other time field in the panel. Submits
+                 H:i and shows 10:00 AM; half-hour steps match the slot grid. --}}
+            <input type="text" data-hours-time
                 name="days[{{ $index }}][opens_at]"
-                class="form-control form-control-sm form-control-solid w-125px"
+                class="form-control form-control-sm form-control-solid w-125px shunno-timepicker"
                 value="{{ $opens }}"
                 {{ $day->is_closed || !$canManage ? 'disabled' : '' }}>
             <div class="invalid-feedback d-block fs-8" data-error-for="days.{{ $index }}.opens_at"></div>
         </td>
 
         <td>
-            <input type="time" step="1800"
+            <input type="text" data-hours-time
                 name="days[{{ $index }}][closes_at]"
-                class="form-control form-control-sm form-control-solid w-125px"
+                class="form-control form-control-sm form-control-solid w-125px shunno-timepicker"
                 value="{{ $closes }}"
                 {{ $day->is_closed || !$canManage ? 'disabled' : '' }}>
             <div class="invalid-feedback d-block fs-8" data-error-for="days.{{ $index }}.closes_at"></div>

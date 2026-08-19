@@ -50,15 +50,15 @@ class ReservationDecisionRequest extends FormRequest
     {
         return match ($this->action()) {
             'decline', 'cancel' => [
-                'note'     => ['required', 'string', 'min:3', 'max:500'],
+                'note' => ['required', 'string', 'min:3', 'max:500'],
                 'override' => ['nullable', 'boolean'],
             ],
             'requestInfo', 'escalate' => [
-                'note'     => ['required', 'string', 'min:3', 'max:1000'],
+                'note' => ['required', 'string', 'min:3', 'max:1000'],
                 'override' => ['nullable', 'boolean'],
             ],
             default => [
-                'note'     => ['nullable', 'string', 'max:500'],
+                'note' => ['nullable', 'string', 'max:500'],
                 'override' => ['nullable', 'boolean'],
             ],
         };
@@ -68,11 +68,11 @@ class ReservationDecisionRequest extends FormRequest
     {
         return [
             'note.required' => match ($this->action()) {
-                'decline'     => 'Please give a reason. The visitor will be told this.',
-                'cancel'      => 'Please say why this is being cancelled.',
+                'decline' => 'Please give a reason. The visitor will be told this.',
+                'cancel' => 'Please say why this is being cancelled.',
                 'requestInfo' => 'Please write what you need from the visitor.',
-                'escalate'    => 'Please say what the Admin needs to decide.',
-                default       => 'Please add a note.',
+                'escalate' => 'Please say what the Admin needs to decide.',
+                default => 'Please add a note.',
             },
             'note.min' => 'That is too short to be useful to whoever reads it next.',
         ];
@@ -98,29 +98,18 @@ class ReservationDecisionRequest extends FormRequest
                 }
 
                 $reservation = $this->reservation();
-                $workshop    = $reservation->workshop();
+                $workshop = $reservation->workshop();
 
                 if (! $workshop) {
-                    $validator->errors()->add(
-                        'note',
-                        'This reservation has no workshop attached, so availability cannot be verified. Please raise it with the developer.'
-                    );
+                    $validator->errors()->add('note', 'This reservation has no workshop attached, so availability cannot be verified. Please raise it with the developer.');
 
                     return;
                 }
 
-                $result = app(AvailabilityService::class)->check(
-                    $workshop,
-                    $reservation->reserved_date->toDateString(),
-                    substr((string) $reservation->start_time, 0, 5),
-                    (int) $reservation->participants,
-                );
+                $result = app(AvailabilityService::class)->check($workshop, $reservation->reserved_date->toDateString(), substr((string) $reservation->start_time, 0, 5), (int) $reservation->participants, except: $reservation);
 
                 if (! $result['ok']) {
-                    $validator->errors()->add(
-                        'note',
-                        $result['reason'] . ' Move the booking first, or approve it anyway if this is deliberate.'
-                    );
+                    $validator->errors()->add('note', $result['reason'].' Move the booking first, or approve it anyway if this is deliberate.');
                 }
             },
         ];
@@ -129,8 +118,7 @@ class ReservationDecisionRequest extends FormRequest
     /** Requested AND permitted. A Manager ticking it in the DOM gets nothing. */
     public function wantsOverride(): bool
     {
-        return $this->boolean('override')
-            && Gate::allows('overrideAvailability', $this->reservation());
+        return $this->boolean('override') && Gate::allows('overrideAvailability', $this->reservation());
     }
 
     protected function prepareForValidation(): void

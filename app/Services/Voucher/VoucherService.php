@@ -9,12 +9,12 @@ use App\Models\Auth\User;
 use App\Models\Payment\Payment;
 use App\Models\Reservation\Reservation;
 use App\Models\Voucher\Voucher;
+use App\Services\Setting\SettingsRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
-use App\Services\Setting\SettingsRepository;
 
 /**
  * PHASE 14A — issuing and redeeming, in one place.
@@ -26,9 +26,7 @@ use App\Services\Setting\SettingsRepository;
  */
 class VoucherService
 {
-    public function __construct(private readonly SettingsRepository $settings)
-    {
-    }
+    public function __construct(private readonly SettingsRepository $settings) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -71,23 +69,23 @@ class VoucherService
          | coupon that expired before they had even been to the studio.
          */
         $visitDate = CarbonImmutable::parse($reservation->reserved_date);
-        $days      = (int) $this->settings->get('cafe_credit.validity_days', 30) ?: 30;
+        $days = (int) $this->settings->get('cafe_credit.validity_days', 30) ?: 30;
 
         try {
-            return DB::transaction(function () use ($reservation, $value, $visitDate, $days, $payment) {
-                $voucher = new Voucher();
+            return DB::transaction(function () use ($reservation, $value, $visitDate, $days) {
+                $voucher = new Voucher;
 
                 $voucher->forceFill([
-                    'code'            => $this->generateCode(VoucherType::CafeCredit),
-                    'type'            => VoucherType::CafeCredit,
-                    'status'          => VoucherStatus::Active,
-                    'value'           => $value,
-                    'reservation_id'  => $reservation->id,
-                    'valid_from'      => $visitDate->toDateString(),
-                    'expires_at'      => $visitDate->addDays($days)->toDateString(),
-                    'issued_to_name'  => $reservation->user?->name,
+                    'code' => $this->generateCode(VoucherType::CafeCredit),
+                    'type' => VoucherType::CafeCredit,
+                    'status' => VoucherStatus::Active,
+                    'value' => $value,
+                    'reservation_id' => $reservation->id,
+                    'valid_from' => $visitDate->toDateString(),
+                    'expires_at' => $visitDate->addDays($days)->toDateString(),
+                    'issued_to_name' => $reservation->user?->name,
                     'issued_to_email' => $reservation->user?->email,
-                    'note'            => 'Issued automatically on payment.',
+                    'note' => 'Issued automatically on payment.',
                 ])->save();
 
                 VoucherIssued::dispatch($voucher);
@@ -107,7 +105,7 @@ class VoucherService
              */
             Log::info('Café credit already issued for this reservation.', [
                 'reservation' => $reservation->reference_code,
-                'payment'     => $payment?->reference,
+                'payment' => $payment?->reference,
             ]);
 
             return Voucher::where('reservation_id', $reservation->id)
@@ -161,23 +159,23 @@ class VoucherService
         $code = self::normaliseCode($data['code'] ?? '') ?: $this->suggestCode(VoucherType::Gift);
 
         return DB::transaction(function () use ($data, $actor, $code) {
-            $voucher = new Voucher();
+            $voucher = new Voucher;
 
             $voucher->forceFill([
-                'code'            => $code,
-                'type'            => VoucherType::Gift,
-                'status'          => VoucherStatus::Active,
-                'value'           => round((float) $data['value'], 2),
-                'workshop_id'     => $data['workshop_id'] ?? null,
+                'code' => $code,
+                'type' => VoucherType::Gift,
+                'status' => VoucherStatus::Active,
+                'value' => round((float) $data['value'], 2),
+                'workshop_id' => $data['workshop_id'] ?? null,
 
                 // Usable immediately. A gift voucher has no visit to wait for.
-                'valid_from'      => null,
-                'expires_at'      => $data['expires_at'] ?? null,
+                'valid_from' => null,
+                'expires_at' => $data['expires_at'] ?? null,
 
-                'issued_to_name'  => $data['issued_to_name'] ?? null,
+                'issued_to_name' => $data['issued_to_name'] ?? null,
                 'issued_to_email' => $data['issued_to_email'] ?? null,
-                'note'            => $data['note'] ?? null,
-                'issued_by'       => $actor->id,
+                'note' => $data['note'] ?? null,
+                'issued_by' => $actor->id,
             ]);
 
             $this->saveOrExplainDuplicate($voucher, $code);
@@ -228,18 +226,18 @@ class VoucherService
             }
 
             $before = [
-                'code'  => $voucher->code,
+                'code' => $voucher->code,
                 'value' => (float) $voucher->value,
             ];
 
             $voucher->forceFill([
-                'code'            => $code,
-                'value'           => round((float) $data['value'], 2),
-                'workshop_id'     => $data['workshop_id'] ?? null,
-                'expires_at'      => $data['expires_at'] ?? null,
-                'issued_to_name'  => $data['issued_to_name'] ?? null,
+                'code' => $code,
+                'value' => round((float) $data['value'], 2),
+                'workshop_id' => $data['workshop_id'] ?? null,
+                'expires_at' => $data['expires_at'] ?? null,
+                'issued_to_name' => $data['issued_to_name'] ?? null,
                 'issued_to_email' => $data['issued_to_email'] ?? null,
-                'note'            => $data['note'] ?? null,
+                'note' => $data['note'] ?? null,
             ]);
 
             $this->saveOrExplainDuplicate($voucher, $code);
@@ -252,9 +250,9 @@ class VoucherService
              */
             Log::info('voucher.updated', [
                 'voucher_id' => $voucher->id,
-                'actor_id'   => $actor->id,
-                'from'       => $before,
-                'to'         => ['code' => $voucher->code, 'value' => (float) $voucher->value],
+                'actor_id' => $actor->id,
+                'from' => $before,
+                'to' => ['code' => $voucher->code, 'value' => (float) $voucher->value],
             ]);
 
             return $voucher;
@@ -289,10 +287,10 @@ class VoucherService
             // to describe.
             Log::warning('voucher.deleted', [
                 'voucher_id' => $voucher->id,
-                'code'       => $voucher->code,
-                'value'      => (float) $voucher->value,
-                'status'     => $voucher->status->value,
-                'actor_id'   => $actor->id,
+                'code' => $voucher->code,
+                'value' => (float) $voucher->value,
+                'status' => $voucher->status->value,
+                'actor_id' => $actor->id,
             ]);
 
             $voucher->delete();
@@ -390,7 +388,7 @@ class VoucherService
 
             if (! in_array($voucher->workshop_id, $booked, true)) {
                 throw new RuntimeException(
-                    'This voucher is only valid for ' . ($voucher->workshop?->title ?? 'another experience') . '.'
+                    'This voucher is only valid for '.($voucher->workshop?->title ?? 'another experience').'.'
                 );
             }
         }
@@ -408,11 +406,18 @@ class VoucherService
      * per the client's decision. A balance ledger is a different feature and
      * would need its own redemption history.
      *
+     * $actor is NULL when the visitor spends the voucher themselves on the
+     * payment portal. There is no session there — the payment token is the
+     * credential — so there is no user to record, which is why redeemed_by is
+     * nullable on the table. Everything that reads it already handles null; the
+     * redemption note carries the payment reference, so the trail is intact
+     * either way.
+     *
      * @throws RuntimeException when it cannot be spent.
      */
     public function redeem(
         Voucher $voucher,
-        User $actor,
+        ?User $actor = null,
         ?Reservation $against = null,
         ?string $note = null,
     ): Voucher {
@@ -424,11 +429,11 @@ class VoucherService
             $this->assertUsable($voucher, $against);
 
             $voucher->forceFill([
-                'status'                      => VoucherStatus::Redeemed,
-                'redeemed_at'                 => CarbonImmutable::now(),
-                'redeemed_by'                 => $actor->id,
+                'status' => VoucherStatus::Redeemed,
+                'redeemed_at' => CarbonImmutable::now(),
+                'redeemed_by' => $actor?->id,
                 'redeemed_for_reservation_id' => $against?->id,
-                'redemption_note'             => $note,
+                'redemption_note' => $note,
             ])->save();
 
             return $voucher;
@@ -437,7 +442,7 @@ class VoucherService
 
     public function cancel(Voucher $voucher, User $actor, string $reason): Voucher
     {
-        return DB::transaction(function () use ($voucher, $actor, $reason) {
+        return DB::transaction(function () use ($voucher, $reason) {
             $voucher = Voucher::whereKey($voucher->getKey())->lockForUpdate()->firstOrFail();
 
             if ($voucher->status === VoucherStatus::Redeemed) {
@@ -447,7 +452,7 @@ class VoucherService
             }
 
             $voucher->forceFill([
-                'status'              => VoucherStatus::Cancelled,
+                'status' => VoucherStatus::Cancelled,
                 'cancellation_reason' => $reason,
             ])->save();
 
@@ -495,7 +500,7 @@ class VoucherService
             for ($i = 0; $i < 4; $i++) {
                 $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
             }
-            $code = $type->prefix() . '-' . now()->format('ym') . '-' . $suffix;
+            $code = $type->prefix().'-'.now()->format('ym').'-'.$suffix;
         } while (Voucher::where('code', $code)->exists());
 
         return $code;

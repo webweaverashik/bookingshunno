@@ -33,9 +33,7 @@ class ReservationDecisionController extends Controller
 {
     use RendersReservations;
 
-    public function __construct(private readonly ReservationService $reservations)
-    {
-    }
+    public function __construct(private readonly ReservationService $reservations) {}
 
     public function approve(ReservationDecisionRequest $request, Reservation $reservation): JsonResponse
     {
@@ -109,6 +107,29 @@ class ReservationDecisionController extends Controller
         );
     }
 
+    /**
+     * The visit happened.
+     *
+     * Sends nothing: ReservationMailKind::forStatus() returns null for
+     * Completed, which is deliberate — the visitor has been and gone, and an
+     * email telling them so is a message with no purpose.
+     *
+     * This is the last thing anyone can do to the reservation. Completed is a
+     * closed status, so from here isEditable() is false, allowedNext() is empty
+     * and both the edit form and every decision button disappear for Admin and
+     * Manager alike.
+     */
+    public function complete(ReservationDecisionRequest $request, Reservation $reservation): JsonResponse
+    {
+        return $this->decide(
+            $request,
+            $reservation,
+            ReservationStatus::Completed,
+            'complete',
+            "{$reservation->reference_code} is complete. Nothing further can be changed on it.",
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Internals
@@ -130,7 +151,7 @@ class ReservationDecisionController extends Controller
         $note = $request->validated()['note'] ?? null;
 
         if ($request->wantsOverride() && $to === ReservationStatus::Approved) {
-            $note = trim(($note ? $note . ' ' : '') . 'Approved despite the slot being unavailable.');
+            $note = trim(($note ? $note.' ' : '').'Approved despite the slot being unavailable.');
         }
 
         try {
@@ -141,7 +162,7 @@ class ReservationDecisionController extends Controller
             // sequence rather than saying "failed".
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage() . ' It may have been decided by someone else — reopen it to see where it stands.',
+                'message' => $e->getMessage().' It may have been decided by someone else — reopen it to see where it stands.',
             ], 409);
         }
 
@@ -152,8 +173,8 @@ class ReservationDecisionController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data'    => [
-                'list'   => $this->reservationListPayload($request),
+            'data' => [
+                'list' => $this->reservationListPayload($request),
                 'detail' => $this->reservationDetailHtml($reservation->refresh()),
             ],
         ]);

@@ -11,10 +11,12 @@ use App\Http\Controllers\Admin\Reservation\ReservationDecisionController;
 use App\Http\Controllers\Admin\Setting\SettingController;
 use App\Http\Controllers\Admin\Staff\ProfileController;
 use App\Http\Controllers\Admin\Staff\UserController;
+use App\Http\Controllers\Admin\System\CacheController;
 use App\Http\Controllers\Admin\Visitor\VisitorController;
 use App\Http\Controllers\Admin\Voucher\VoucherController;
 use App\Http\Controllers\Admin\Workshop\WorkshopController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Payment\PayslipController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
@@ -26,11 +28,7 @@ Route::prefix('admin')
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('/logout', fn () => redirect()->back())->name('logout.get');
 
-        Route::get('clear-cache', function () {
-            clearServerCache();
-
-            return response()->json(['success' => true]);
-        })->name('clear.cache');
+        Route::get('clear-cache', CacheController::class)->name('clear.cache');
 
         /*
         |----------------------------------------------------------------------
@@ -70,6 +68,7 @@ Route::prefix('admin')
                 Route::post('{reservation}/request-info', [ReservationDecisionController::class, 'requestInfo'])->name('request-info');
                 Route::post('{reservation}/return-to-review', [ReservationDecisionController::class, 'returnToReview'])->name('return-to-review');
                 Route::post('{reservation}/cancel', [ReservationDecisionController::class, 'cancel'])->name('cancel');
+                Route::post('{reservation}/complete', [ReservationDecisionController::class, 'complete'])->name('complete');
             });
 
         /*
@@ -183,6 +182,19 @@ Route::prefix('admin')
                 Route::post('request/{reservation}', [PaymentController::class, 'store'])->name('store');
 
                 Route::get('{payment:reference}', [PaymentController::class, 'show'])->name('show');
+
+                /*
+                 | The staff copy of a receipt. Same controller and same view as
+                 | the visitor's copy behind /receipt/{token} — one document, two
+                 | credentials — so the studio and the visitor can never be
+                 | holding two different statements about the same money.
+                 |
+                 | Three segments, so it cannot collide with {payment:reference}
+                 | above; no ordering rule to observe here.
+                 */
+                Route::get('{payment:reference}/receipts/{transaction:reference}', [PayslipController::class, 'staff'])
+                    ->name('payslip');
+
                 Route::post('{payment:reference}/record', [PaymentController::class, 'record'])->name('record');
                 Route::post('{payment:reference}/cancel', [PaymentController::class, 'cancel'])->name('cancel');
             });

@@ -2,6 +2,8 @@
 
 namespace App\Enums\Report;
 
+use App\Models\Auth\User;
+
 /**
  * PHASE 16 — the four reports, and the one thing that separates them.
  *
@@ -203,5 +205,41 @@ enum ReportType: string
     public static function all(): array
     {
         return self::cases();
+    }
+
+    /**
+     * A record of what the SYSTEM did, rather than of what the studio earned.
+     *
+     * The three of them sit behind reports.logs, which only Admin holds. The
+     * line is not about sensitivity in the abstract — it is about what each one
+     * exposes. The email log carries the body of every message sent to a
+     * visitor; the gateway log carries transaction identifiers, risk scores and
+     * the gateway's own failure reasons; the settings log names who changed a
+     * credential and when. None of that is needed to run the floor, and all of
+     * it is useful to somebody who should not have it.
+     *
+     * The four business reports stay open to Manager, deliberately: whoever
+     * runs the floor is the person asked how last month went.
+     */
+    public function isLog(): bool
+    {
+        return in_array($this, [self::Emails, self::Gateway, self::Changes], true);
+    }
+
+    /**
+     * The reports this person may open, in tab order.
+     *
+     * One list, used by the tab strip AND by the guard in the controller, so a
+     * hidden tab and a forbidden URL cannot disagree — hiding a link is not
+     * authorisation, and this is what stops it being treated as if it were.
+     *
+     * @return array<int,self>
+     */
+    public static function for(?User $user): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $report) => ! $report->isLog() || (bool) $user?->can('reports.logs'),
+        ));
     }
 }

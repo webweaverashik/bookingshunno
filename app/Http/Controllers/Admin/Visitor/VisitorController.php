@@ -68,6 +68,11 @@ class VisitorController extends Controller
         $visitor->load([
             'reservations.items',
             'reservations.purposes',
+
+            // For the "Paid to date" card. amountPaid() reads the payments
+            // COLLECTION and deliberately does not lazy-load, so it has to be
+            // eager-loaded here or the figure silently reads zero.
+            'reservations.payments',
         ]);
 
         $confirmed = $visitor->reservations->whereIn('status', [
@@ -81,6 +86,25 @@ class VisitorController extends Controller
                 'html' => view('admin.visitors.partials.detail', [
                     'visitor'   => $visitor,
                     'lifetime'  => $confirmed->sum(fn ($r) => (float) $r->total_amount),
+
+                    /*
+                     | What this visitor has actually HANDED OVER, across every
+                     | reservation they have ever made.
+                     |
+                     | Not the same figure as lifetime value and the difference
+                     | is the point: lifetime value is what their confirmed
+                     | visits were worth, this is what has been received. A 50%
+                     | booking fee makes them differ by half; an unpaid balance
+                     | or a voucher redemption makes them differ by more. Both
+                     | are worth seeing side by side before somebody rings a
+                     | visitor about money.
+                     |
+                     | Counted across ALL reservations, not just confirmed ones:
+                     | money received against a booking later cancelled was
+                     | still received, and hiding it would understate what the
+                     | studio owes back.
+                     */
+                    'paid'      => $visitor->reservations->sum(fn ($r) => $r->amountPaid()),
                     'attended'  => $visitor->reservations
                         ->where('status', ReservationStatus::Completed)->count(),
                     'cancelled' => $visitor->reservations
@@ -143,13 +167,19 @@ class VisitorController extends Controller
             ->when($filters['status'] === 'inactive', fn ($q) => $q->where('is_active', false))
             ->when($filters['status'] === 'returning', fn ($q) => $q->where('total_reservations', '>', 1))
             ->when($filters['status'] === 'never', fn ($q) => $q->where('total_reservations', 0))
+
+            // Ranged on when the account was created — "who joined us in
+            // August". Either end may be left open.
+            ->when($filters['joined_from'] !== '', fn ($q) => $q->whereDate('created_at', '>=', $filters['joined_from']))
+            ->when($filters['joined_to'] !== '', fn ($q) => $q->whereDate('created_at', '<=', $filters['joined_to']))
+
             ->orderByDesc('last_reservation_at')
             ->orderByDesc('created_at')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
     }
 
-    /** @return array{q:string,status:string} */
+    /** @return array{q:string,status:string,joined_from:string,joined_to:string} */
     private function filters(Request $request): array
     {
         $status = (string) $request->query('status', 'all');
@@ -161,7 +191,21 @@ class VisitorController extends Controller
             'status' => in_array($status, ['all', 'active', 'inactive', 'returning', 'never'], true)
                 ? $status
                 : 'all',
+
+            // Shape-checked here. They are bound as values by the query
+            // builder, so a malformed one is a wrong answer rather than a
+            // danger — but a wrong answer nobody can see is worse than none.
+            'joined_from' => $this->date($request->query('joined_from')),
+            'joined_to'   => $this->date($request->query('joined_to')),
         ];
+    }
+
+    /** A Y-m-d string, or empty. Anything else is not a date and is discarded. */
+    private function date(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 
     private function stats(): array

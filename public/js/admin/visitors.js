@@ -15,7 +15,11 @@
 
     var listEl = document.getElementById('visitors-list');
     var search = document.getElementById('visitors-search');
-    var status = document.getElementById('visitors-status');
+
+    // Visitor type and join date live in the shared filter menu now — see
+    // js/admin/filters.js. Created further down, once loadList() exists for it
+    // to call.
+    var filters = null;
 
     if (!listEl) return;
 
@@ -33,11 +37,13 @@
 
     var listRequest = 0;
 
+    // changed() returns only the filters that are NOT at their default, so the
+    // address bar stays readable and the server's own defaults stand where
+    // nothing was chosen.
     function currentQuery(extra) {
-        var params = new URLSearchParams();
+        var params = new URLSearchParams(filters ? filters.changed() : {});
 
         if (search && search.value.trim()) params.set('q', search.value.trim());
-        if (status && status.value !== 'all') params.set('status', status.value);
         if (extra && extra.page) params.set('page', extra.page);
 
         return params.toString();
@@ -95,11 +101,12 @@
         });
     }
 
-    if (status) {
-        status.addEventListener('change', function () {
+    filters = Shunno.filterBar({
+        root: document.getElementById('visitors-filter'),
+        onApply: function () {
             loadList();
-        });
-    }
+        }
+    });
 
     /* =====================================================================
        Pagination and row actions

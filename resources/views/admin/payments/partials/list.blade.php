@@ -124,7 +124,7 @@
             @empty
                 <tr>
                     <td colspan="7" class="text-center text-muted py-10">
-                        @if ($filters['q'] !== '' || $filters['status'] !== 'open')
+                        @if ($filters['q'] !== '' || $filters['status'] !== 'open' || $filters['from'] !== '' || $filters['to'] !== '')
                             No payment matches those filters.
                         @else
                             Nothing awaiting payment. Requests appear here once an Admin asks a visitor to pay.

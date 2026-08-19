@@ -131,7 +131,7 @@
             @empty
                 <tr>
                     <td colspan="6" class="text-center text-muted py-10">
-                        @if ($filters['q'] !== '' || $filters['status'] !== 'usable' || $filters['type'] !== 'all')
+                        @if ($filters['q'] !== '' || $filters['status'] !== 'usable' || $filters['type'] !== 'all' || $filters['issued_from'] !== '' || $filters['issued_to'] !== '')
                             No voucher matches those filters.
                         @else
                             No vouchers in circulation. Café credit appears here automatically once a

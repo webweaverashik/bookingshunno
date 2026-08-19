@@ -27,16 +27,12 @@
     var listEl = document.getElementById('vouchers-list');
     if (!listEl) return;
 
-    var defaults = config.defaults || { type: 'all', status: 'usable', per_page: '25' };
-
     var search = document.getElementById('vouchers-search');
-    var typeFilter = document.getElementById('vouchers-type');
-    var statusFilter = document.getElementById('vouchers-status');
-    var perPage = document.getElementById('vouchers-per-page');
 
-    var filterApply = document.getElementById('vouchers-filter-apply');
-    var filterReset = document.getElementById('vouchers-filter-reset');
-    var filterCount = document.getElementById('vouchers-filter-count');
+    // Kind, status, issue date and page size live in the shared filter menu now
+    // — see js/admin/filters.js. It is created further down, once loadList()
+    // exists for it to call.
+    var filters = null;
 
     var drawerEl = document.getElementById('voucher-modal');
     var drawerBody = document.getElementById('voucher-modal-body');
@@ -169,18 +165,23 @@
     function currentQuery(extra) {
         var params = new URLSearchParams(window.location.search);
 
-        // Rebuilt rather than patched, so clearing the search box actually
-        // clears the parameter instead of leaving a stale one behind.
-        ['q', 'type', 'status', 'per_page', 'page'].forEach(function (key) {
+        // Rebuilt rather than patched, so clearing the search box or resetting
+        // a filter actually drops the parameter instead of leaving a stale one.
+        ['q', 'type', 'status', 'issued_from', 'issued_to', 'per_page', 'page'].forEach(function (key) {
             params.delete(key);
         });
 
-        // Only non-default values are sent, so the address bar stays readable
-        // and a shared link carries exactly what somebody chose.
         if (search && search.value.trim()) params.set('q', search.value.trim());
-        if (typeFilter && typeFilter.value !== defaults.type) params.set('type', typeFilter.value);
-        if (statusFilter && statusFilter.value !== defaults.status) params.set('status', statusFilter.value);
-        if (perPage && perPage.value !== defaults.per_page) params.set('per_page', perPage.value);
+
+        // changed() returns only the filters that are NOT at their default, so
+        // the address bar stays readable and a shared link carries exactly what
+        // somebody chose.
+        if (filters) {
+            var active = filters.changed();
+            Object.keys(active).forEach(function (key) {
+                params.set(key, active[key]);
+            });
+        }
 
         if (extra) {
             Object.keys(extra).forEach(function (key) {
@@ -236,61 +237,26 @@
     /* ---------------------------------------------------------------------
        The filter menu
 
-       Nothing here listens for change, and that is the point. The three selects
-       are Select2, which announces a selection through jQuery's .trigger(),
-       which does not reach addEventListener — the gap the Phase 6 rule exists
-       to avoid. Reading .value on Apply sidesteps it entirely: the underlying
-       <select> always holds the right value whoever set it.
+       Roughly sixty lines used to live here: the Select2 wiring, the reset, the
+       badge count, the defaults table. Phase 29 moved all of it into
+       Shunno.filterBar(), which does the same job for every register in the
+       panel — including the two things this file got right and the others did
+       not, the Apply button that avoids three page loads for three choices and
+       the badge that tells a filtered view from a full one.
 
-       Going the other way still needs a nudge. Setting .value on a native
-       select does NOT redraw Select2's own markup, so Reset dispatches a native
-       change afterwards — which Select2 does hear, since jQuery .on() is a real
-       addEventListener underneath.
+       Two things worth keeping from the old comment, because they are the
+       reasons the shared version is built the way it is. Nothing listens for
+       change, so Select2 is safe here; and Reset dispatches a NATIVE change
+       event rather than jQuery's .trigger(), because a native one reaches both
+       Select2 and any plain listener while .trigger() reaches only the first.
        --------------------------------------------------------------------- */
 
-    function setFilter(el, value) {
-        if (!el) return;
-        el.value = value;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    function activeFilterCount() {
-        var count = 0;
-        if (typeFilter && typeFilter.value !== defaults.type) count++;
-        if (statusFilter && statusFilter.value !== defaults.status) count++;
-        if (perPage && perPage.value !== defaults.per_page) count++;
-        return count;
-    }
-
-    // A closed menu looks the same whether it is filtering everything out or
-    // nothing at all. The badge is the only thing that says which.
-    function paintFilterBadge() {
-        if (!filterCount) return;
-
-        var count = activeFilterCount();
-        filterCount.textContent = String(count);
-        filterCount.classList.toggle('d-none', count === 0);
-    }
-
-    if (filterApply) {
-        filterApply.addEventListener('click', function () {
+    filters = Shunno.filterBar({
+        root: document.getElementById('vouchers-filter'),
+        onApply: function () {
             loadList({ page: null });
-            paintFilterBadge();
-        });
-    }
-
-    if (filterReset) {
-        filterReset.addEventListener('click', function () {
-            setFilter(typeFilter, defaults.type);
-            setFilter(statusFilter, defaults.status);
-            setFilter(perPage, defaults.per_page);
-
-            loadList({ page: null });
-            paintFilterBadge();
-        });
-    }
-
-    paintFilterBadge();
+        }
+    });
 
     listEl.addEventListener('click', function (event) {
         var sortLink = event.target.closest('a[data-vouchers-sort]');

@@ -50,8 +50,10 @@
 
     if (listEl) {
         var search = document.getElementById('payments-search');
-        var status = document.getElementById('payments-status');
-        var perPage = document.getElementById('payments-per-page');
+
+        // Status, date range and page size live in the shared filter menu now.
+        // Created further down, once loadList() exists for it to call.
+        var filters = null;
 
         var detailModalEl = document.getElementById('payment-modal');
         var detailBody = document.getElementById('payment-modal-body');
@@ -72,15 +74,25 @@
             var params = new URLSearchParams(window.location.search);
 
             // Rebuilt from the controls rather than patched, so a cleared search
-            // box actually clears the parameter instead of leaving a stale one.
+            // box or a reset filter actually drops the parameter instead of
+            // leaving a stale one in the address bar.
             params.delete('q');
             params.delete('status');
+            params.delete('from');
+            params.delete('to');
             params.delete('per_page');
             params.delete('page');
 
             if (search && search.value.trim()) params.set('q', search.value.trim());
-            if (status && status.value !== 'open') params.set('status', status.value);
-            if (perPage && perPage.value !== '25') params.set('per_page', perPage.value);
+
+            // changed() returns only the filters that are NOT at their default,
+            // so the server's own defaults stand where nothing was chosen.
+            if (filters) {
+                var active = filters.changed();
+                Object.keys(active).forEach(function (key) {
+                    params.set(key, active[key]);
+                });
+            }
 
             if (extra) {
                 Object.keys(extra).forEach(function (key) {
@@ -143,14 +155,11 @@
             });
         }
 
-        // Native listeners on plain selects. Metronic's Select2 would need
-        // jQuery's .trigger() to reach and would not fire these — Phase 6
-        // settled that short filter dropdowns stay native.
-        [status, perPage].forEach(function (el) {
-            if (!el) return;
-            el.addEventListener('change', function () {
+        filters = Shunno.filterBar({
+            root: document.getElementById('payments-filter'),
+            onApply: function () {
                 loadList({ page: null });
-            });
+            }
         });
 
         /* ----- Pagination, sorting, row actions ----- */

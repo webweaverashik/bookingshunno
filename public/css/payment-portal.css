@@ -23,7 +23,9 @@
     --pay-warn: #9a6a1f;
 }
 
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     margin: 0;
@@ -36,7 +38,10 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-.pay { max-width: 620px; margin: 0 auto; }
+.pay {
+    max-width: 620px;
+    margin: 0 auto;
+}
 
 /* ---------- Head ---------- */
 
@@ -68,12 +73,21 @@ body {
 /* ---------- Lede and terminal states ---------- */
 
 .pay-lede h1,
-.pay-state h1 { margin: 0 0 6px; font-size: 25px; line-height: 1.25; }
+.pay-state h1 {
+    margin: 0 0 6px;
+    font-size: 25px;
+    line-height: 1.25;
+}
 
 .pay-lede p,
-.pay-state p { margin: 0; color: var(--pay-muted); }
+.pay-state p {
+    margin: 0;
+    color: var(--pay-muted);
+}
 
-.pay-lede { margin-bottom: 24px; }
+.pay-lede {
+    margin-bottom: 24px;
+}
 
 .pay-state {
     margin-bottom: 24px;
@@ -85,8 +99,13 @@ body {
 
 /* A withdrawn request is not a failure and should not look like one — the
    visitor did nothing wrong. Muted, not red. */
-.pay-state--off { border-left-color: var(--pay-line); }
-.pay-state--done { border-left-color: var(--pay-accent); }
+.pay-state--off {
+    border-left-color: var(--pay-line);
+}
+
+.pay-state--done {
+    border-left-color: var(--pay-accent);
+}
 
 /* ---------- Cards ---------- */
 
@@ -136,19 +155,35 @@ form.pay-option {
 
 /* ---------- Visit details ---------- */
 
-.pay-dl { margin: 0; display: flex; flex-wrap: wrap; gap: 18px 32px; }
-.pay-dl > div { min-width: 130px; }
+.pay-dl {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px 32px;
+}
+
+.pay-dl>div {
+    min-width: 130px;
+}
+
 .pay-dl dt {
     font-size: 11.5px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--pay-muted);
 }
-.pay-dl dd { margin: 2px 0 0; font-weight: 600; }
+
+.pay-dl dd {
+    margin: 2px 0 0;
+    font-weight: 600;
+}
 
 /* ---------- Money ---------- */
 
-.pay-table { width: 100%; border-collapse: collapse; }
+.pay-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
 .pay-table td {
     padding: 9px 0;
@@ -156,7 +191,9 @@ form.pay-option {
     font-size: 14px;
 }
 
-.pay-table td:first-child { color: var(--pay-muted); }
+.pay-table td:first-child {
+    color: var(--pay-muted);
+}
 
 .pay-table td:last-child {
     text-align: right;
@@ -164,7 +201,9 @@ form.pay-option {
     white-space: nowrap;
 }
 
-.pay-table tr:last-child td { border-bottom: 0; }
+.pay-table tr:last-child td {
+    border-bottom: 0;
+}
 
 /* The figure the visitor is actually being asked for. */
 .pay-table__due td {
@@ -173,19 +212,32 @@ form.pay-option {
     color: var(--pay-ink);
 }
 
-.pay-note { margin: 14px 0 0; font-size: 13px; color: var(--pay-muted); }
+.pay-note {
+    margin: 14px 0 0;
+    font-size: 13px;
+    color: var(--pay-muted);
+}
+
 .pay-note--quote {
     padding-left: 12px;
     border-left: 2px solid var(--pay-line);
     font-style: italic;
 }
 
-.pay-deadline { margin: 16px 0 0; font-size: 14px; }
-.pay-deadline.is-late { color: var(--pay-warn); }
+.pay-deadline {
+    margin: 16px 0 0;
+    font-size: 14px;
+}
+
+.pay-deadline.is-late {
+    color: var(--pay-warn);
+}
 
 /* ---------- Payment options ---------- */
 
-.pay-card--actions { background: var(--pay-paper); }
+.pay-card--actions {
+    background: var(--pay-paper);
+}
 
 .pay-option {
     display: flex;
@@ -196,9 +248,14 @@ form.pay-option {
     border-bottom: 1px solid var(--pay-line);
 }
 
-.pay-option:last-of-type { border-bottom: 0; }
+.pay-option:last-of-type {
+    border-bottom: 0;
+}
 
-.pay-option__title { display: block; font-weight: 600; }
+.pay-option__title {
+    display: block;
+    font-weight: 600;
+}
 
 .pay-option__sub {
     display: block;
@@ -230,7 +287,10 @@ form.pay-option {
 
 /* ---------- Voucher entry ---------- */
 
-.pay-option--voucher > div { flex: 1; min-width: 0; }
+.pay-option--voucher>div {
+    flex: 1;
+    min-width: 0;
+}
 
 .pay-voucher-code {
     display: block;
@@ -281,7 +341,10 @@ form.pay-option {
     font-variant-numeric: tabular-nums;
 }
 
-.pay-voucher-confirm p { margin: 0 0 8px; font-size: 14px; }
+.pay-voucher-confirm p {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
 
 /* The forfeit warning. Coloured, but not red — nothing has gone wrong, and
    alarming somebody out of a choice they may still want to make is its own kind
@@ -316,10 +379,25 @@ form.pay-option {
     border-bottom: 1px solid var(--pay-line);
 }
 
-.pay-receipt:last-child { border-bottom: 0; }
-.pay-receipt__ref { display: block; font-weight: 600; font-size: 14px; }
-.pay-receipt__meta { display: block; font-size: 12.5px; color: var(--pay-muted); }
-.pay-receipt__right { text-align: right; }
+.pay-receipt:last-child {
+    border-bottom: 0;
+}
+
+.pay-receipt__ref {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.pay-receipt__meta {
+    display: block;
+    font-size: 12.5px;
+    color: var(--pay-muted);
+}
+
+.pay-receipt__right {
+    text-align: right;
+}
 
 .pay-receipt__amount {
     display: block;
@@ -328,7 +406,10 @@ form.pay-option {
     font-variant-numeric: tabular-nums;
 }
 
-.pay-receipt__right a { font-size: 12.5px; color: var(--pay-muted); }
+.pay-receipt__right a {
+    font-size: 12.5px;
+    color: var(--pay-muted);
+}
 
 /* ---------- Foot ---------- */
 
@@ -339,14 +420,63 @@ form.pay-option {
     color: var(--pay-muted);
 }
 
-.pay-foot p { margin: 0 0 6px; }
-.pay-foot__small { font-size: 11.5px; }
+.pay-foot p {
+    margin: 0 0 6px;
+}
 
-a { color: var(--pay-accent); }
+.pay-foot__small {
+    font-size: 11.5px;
+}
+
+a {
+    color: var(--pay-accent);
+}
 
 @media (max-width: 520px) {
-    body { padding: 18px 12px 40px; }
-    .pay-card, .pay-state { padding: 18px 16px; }
-    .pay-option { flex-direction: column; align-items: flex-start; }
-    .pay-option button { width: 100%; }
+    body {
+        padding: 18px 12px 40px;
+    }
+
+    .pay-card,
+    .pay-state {
+        padding: 18px 16px;
+    }
+
+    .pay-option {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .pay-option button {
+        width: 100%;
+    }
+}
+
+/* Neither good news nor bad: a voucher applied, with a balance still to pay.
+   Colouring that red would tell somebody something went wrong when nothing did. */
+.pay-flash--note {
+    background: #f6f1e6;
+    color: #6f4e14;
+    border-left: 3px solid var(--pay-warn);
+}
+
+/* In flight. The button is disabled by the script; this is the visible half. */
+.pay-option.is-busy button,
+.is-busy .pay-voucher-confirm__go {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+/* Backing out. A quiet button rather than a second solid one — going ahead and
+   changing your mind should not look like an equal pair of choices. */
+.pay-voucher-confirm__cancel {
+    margin-left: 12px;
+    padding: 11px 8px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--pay-muted);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-decoration: underline;
 }

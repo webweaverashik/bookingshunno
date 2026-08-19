@@ -93,7 +93,7 @@
             @empty
                 <tr>
                     <td colspan="6" class="text-center text-muted py-10">
-                        @if ($filters['q'] !== '' || $filters['status'] !== 'all')
+                        @if ($filters['q'] !== '' || $filters['status'] !== 'all' || $filters['joined_from'] !== '' || $filters['joined_to'] !== '')
                             No visitor matches those filters.
                         @else
                             No visitors yet. They are created automatically when a reservation request comes in.

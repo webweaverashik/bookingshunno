@@ -6,9 +6,10 @@ use App\Models\Availability\BlockedDate;
 use App\Models\Availability\OperatingHour;
 use App\Models\Reservation\Reservation;
 use App\Models\Workshop\Workshop;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 use App\Services\Setting\SettingsRepository;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 /**
  * The single authority on whether a given session can be booked at a given time.
@@ -51,9 +52,7 @@ class AvailabilityService
      */
     private array $blocks = [];
 
-    public function __construct(private readonly SettingsRepository $settings)
-    {
-    }
+    public function __construct(private readonly SettingsRepository $settings) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -76,9 +75,31 @@ class AvailabilityService
         }
 
         return [
-            'opens'  => $date->setTimeFromTimeString($hours->opens_at),
+            'opens' => $date->setTimeFromTimeString($hours->opens_at),
             'closes' => $date->setTimeFromTimeString($hours->closes_at),
         ];
+    }
+
+    /**
+     * Has the studio's opening hour on this date already passed?
+     *
+     * Gates the Complete button. The client asked for the studio's opening
+     * time rather than the session's start, which is the more forgiving of the
+     * two and the right one: staff mark visits off during the day, not at the
+     * minute each session begins.
+     *
+     * Falls back to midnight when the studio is closed that weekday. There are
+     * reservations on closed days — an Admin can override availability to place
+     * one — and refusing to ever complete them would leave those bookings
+     * stranded at Confirmed for good.
+     */
+    public function hasOpenedOn(string|CarbonInterface $date, ?CarbonImmutable $now = null): bool
+    {
+        $day = $date instanceof CarbonInterface ? CarbonImmutable::parse($date->toDateString()) : CarbonImmutable::parse($date)->startOfDay();
+
+        $opens = $this->window($day)['opens'] ?? $day->startOfDay();
+
+        return ($now ?? CarbonImmutable::now())->greaterThanOrEqualTo($opens);
     }
 
     /**
@@ -95,7 +116,7 @@ class AvailabilityService
                 continue;
             }
 
-            $opens  = CarbonImmutable::createFromTimeString($hours->opens_at);
+            $opens = CarbonImmutable::createFromTimeString($hours->opens_at);
             $closes = CarbonImmutable::createFromTimeString($hours->closes_at);
 
             $longest = max($longest, (int) $opens->diffInMinutes($closes));
@@ -116,8 +137,8 @@ class AvailabilityService
      */
     public function weekSummary(): array
     {
-        $open    = [];
-        $closed  = [];
+        $open = [];
+        $closed = [];
         $opensAt = null;
         $closesAt = null;
 
@@ -126,20 +147,21 @@ class AvailabilityService
 
             if (! $hours || $hours->is_closed || ! $hours->opens_at || ! $hours->closes_at) {
                 $closed[] = $day;
+
                 continue;
             }
 
             $open[] = $day;
 
-            $opensAt  = $opensAt === null ? $hours->opens_at : min($opensAt, $hours->opens_at);
+            $opensAt = $opensAt === null ? $hours->opens_at : min($opensAt, $hours->opens_at);
             $closesAt = $closesAt === null ? $hours->closes_at : max($closesAt, $hours->closes_at);
         }
 
         return [
-            'open_days'   => $open,
+            'open_days' => $open,
             'closed_days' => $closed,
-            'opens_at'    => $opensAt,
-            'closes_at'   => $closesAt,
+            'opens_at' => $opensAt,
+            'closes_at' => $closesAt,
         ];
     }
 
@@ -166,28 +188,23 @@ class AvailabilityService
         $leadHours = (int) $this->settings->get('availability.min_lead_hours', 24);
 
         if ($date->endOfDay()->lessThan(now()->addHours($leadHours))) {
-            return $leadHours >= 24
-                ? 'We need at least ' . round($leadHours / 24) . ' day of notice. Please choose a later date.'
-                : "We need at least {$leadHours} hours of notice. Please choose a later date.";
+            return $leadHours >= 24 ? 'We need at least '.round($leadHours / 24).' day of notice. Please choose a later date.' : "We need at least {$leadHours} hours of notice. Please choose a later date.";
         }
 
         $maxAdvance = (int) $this->settings->get('availability.max_advance_days', 120);
 
         if ($date->greaterThan($today->addDays($maxAdvance))) {
-            return 'That date is too far ahead. Please choose one within the next '
-                . round($maxAdvance / 30) . ' months.';
+            return 'That date is too far ahead. Please choose one within the next '.round($maxAdvance / 30).' months.';
         }
 
         if (! $this->window($date)) {
-            return 'We are closed on ' . $date->format('l') . 's. Please choose another day.';
+            return 'We are closed on '.$date->format('l').'s. Please choose another day.';
         }
 
         $block = $this->fullDayBlock($date);
 
         if ($block) {
-            return $block->reason
-                ? 'The studio is closed that day: ' . $block->reason
-                : 'The studio is closed that day.';
+            return $block->reason ? 'The studio is closed that day: '.$block->reason : 'The studio is closed that day.';
         }
 
         return null;
@@ -206,9 +223,9 @@ class AvailabilityService
      */
     public function bookableRange(): array
     {
-        $today     = CarbonImmutable::today();
+        $today = CarbonImmutable::today();
         $leadHours = (int) $this->settings->get('availability.min_lead_hours', 24);
-        $maxDays   = (int) $this->settings->get('availability.max_advance_days', 120);
+        $maxDays = (int) $this->settings->get('availability.max_advance_days', 120);
 
         $min = $today;
 
@@ -259,33 +276,29 @@ class AvailabilityService
             }
 
             $days[] = [
-                'date'       => $day->toDateString(),
-                'day'        => $day->day,
-                'weekday'    => $day->dayOfWeek,
+                'date' => $day->toDateString(),
+                'day' => $day->day,
+                'weekday' => $day->dayOfWeek,
                 'selectable' => $problem === null,
-                'reason'     => $problem,
-                'is_today'   => $day->isSameDay($today),
+                'reason' => $problem,
+                'is_today' => $day->isSameDay($today),
             ];
         }
 
         $previous = $month->subMonth();
-        $next     = $month->addMonth();
+        $next = $month->addMonth();
 
         return [
-            'month'         => $month->format('Y-m'),
-            'label'         => $month->format('F Y'),
+            'month' => $month->format('Y-m'),
+            'label' => $month->format('F Y'),
             // Which column the 1st sits in. 0 = Sunday, matching the header the
             // picker renders and the day_of_week convention used everywhere else.
             'first_weekday' => $month->dayOfWeek,
-            'days'          => $days,
-            'prev'          => $previous->endOfMonth()->greaterThanOrEqualTo($range['min'])
-                ? $previous->format('Y-m')
-                : null,
-            'next'          => $next->startOfMonth()->lessThanOrEqualTo($range['max'])
-                ? $next->format('Y-m')
-                : null,
-            'min'           => $range['min']->toDateString(),
-            'max'           => $range['max']->toDateString(),
+            'days' => $days,
+            'prev' => $previous->endOfMonth()->greaterThanOrEqualTo($range['min']) ? $previous->format('Y-m') : null,
+            'next' => $next->startOfMonth()->lessThanOrEqualTo($range['max']) ? $next->format('Y-m') : null,
+            'min' => $range['min']->toDateString(),
+            'max' => $range['max']->toDateString(),
         ];
     }
 
@@ -298,7 +311,7 @@ class AvailabilityService
         $range = $this->bookableRange();
 
         $first = $range['min']->startOfMonth();
-        $last  = $range['max']->startOfMonth();
+        $last = $range['max']->startOfMonth();
 
         return $month->lessThan($first) ? $first : ($month->greaterThan($last) ? $last : $month);
     }
@@ -317,12 +330,18 @@ class AvailabilityService
      * visitor who sees "6:00 PM — fully booked" understands the studio is busy,
      * where a silently shortened list looks like a broken form.
      *
-     * $withCapacity is off for the calendar sweep only. Everything a visitor
-     * actually acts on — the time dropdown and check() — leaves it on.
+     * EACH SLOT CARRIES ITS OWN CEILING. `max` is the largest party that can
+     * still join this particular start time — the session's own limit, or the
+     * seats actually left, whichever bites first. It is resolved here rather
+     * than left to the caller because two callers would otherwise each have
+     * their own opinion, and one of them is a browser.
      *
-     * @return array<int,array{value:string,label:string,available:bool,seats_left:?int,reason:?string}>
+     * $withCapacity is off for the calendar sweep only. Everything a visitor
+     * acts on — the time dropdown and check() — leaves it on.
+     *
+     * @return array<int,array{value:string,label:string,available:bool,seats_left:?int,max:int,note:?string,reason:?string}>
      */
-    public function slotsFor(Workshop $workshop, CarbonImmutable $date, bool $withCapacity = true): array
+    public function slotsFor(Workshop $workshop, CarbonImmutable $date, bool $withCapacity = true, ?Reservation $except = null): array
     {
         $window = $this->window($date);
 
@@ -330,36 +349,49 @@ class AvailabilityService
             return [];
         }
 
-        $step  = (int) $this->settings->get('availability.slot_step_minutes', 30);
+        $step = (int) $this->settings->get('availability.slot_step_minutes', 30);
+        $limits = $this->participantLimits($workshop);
+        $counting = $withCapacity && $this->enforcesCapacity();
         $slots = [];
 
-        for (
-            $start = $window['opens'];
-            $start->addMinutes($workshop->duration_minutes)->lessThanOrEqualTo($window['closes']);
-            $start = $start->addMinutes($step)
-        ) {
+        for ($start = $window['opens']; $start->addMinutes($workshop->duration_minutes)->lessThanOrEqualTo($window['closes']); $start = $start->addMinutes($step)) {
             $end = $start->addMinutes($workshop->duration_minutes);
 
-            $reason    = null;
+            $reason = null;
             $seatsLeft = null;
+            $max = $limits['max'];
 
             if ($this->overlapsPartialBlock($date, $start, $end)) {
                 $reason = 'Studio unavailable';
-            } elseif ($withCapacity && $this->enforcesCapacity()) {
-                $taken     = $this->seatsTaken($workshop, $date, $start, $end);
+            } elseif ($counting) {
+                $taken = $this->seatsTaken($workshop, $date, $start, $end, $except);
                 $seatsLeft = max(0, $workshop->max_participants - $taken);
+                $max = min($limits['max'], $seatsLeft);
 
-                if ($seatsLeft < $workshop->min_participants) {
+                // Unbookable rather than merely tight: nobody can make a party
+                // smaller than the session's own minimum.
+                if ($seatsLeft < $limits['min']) {
                     $reason = 'Fully booked';
                 }
             }
 
             $slots[] = [
-                'value'      => $start->format('H:i'),
-                'label'      => $start->format('g:i A'),
-                'available'  => $reason === null,
+                'value' => $start->format('H:i'),
+                'label' => $start->format('g:i A'),
+                'available' => $reason === null,
                 'seats_left' => $seatsLeft,
-                'reason'     => $reason,
+                'max' => $max,
+
+                /*
+                 | Only when the remaining seats are the binding constraint. A
+                 | slot with the full house free saying "12 places left" is
+                 | noise on every line of the dropdown; a slot saying "4 places
+                 | left" is the one piece of information the visitor needs
+                 | before they type 8.
+                 */
+                'note' => $reason === null && $seatsLeft !== null && $seatsLeft < $limits['max'] ? $seatsLeft.' '.str('place')->plural($seatsLeft).' left' : null,
+
+                'reason' => $reason,
             ];
         }
 
@@ -427,7 +459,7 @@ class AvailabilityService
      *
      * @return array{ok: bool, field: ?string, reason: ?string}
      */
-    public function check(Workshop $workshop, string $date, string $time, int $participants): array
+    public function check(Workshop $workshop, string $date, string $time, int $participants, ?Reservation $except = null): array
     {
         $day = CarbonImmutable::parse($date)->startOfDay();
 
@@ -442,24 +474,21 @@ class AvailabilityService
 
         if ($participants < $limits['min']) {
             return [
-                'ok'     => false,
-                'field'  => 'participants',
-                'reason' => $limits['min'] === 1
-                    ? 'Please enter at least one person.'
-                    : "This session runs for {$limits['min']} people or more.",
+                'ok' => false,
+                'field' => 'participants',
+                'reason' => $limits['min'] === 1 ? 'Please enter at least one person.' : "This session runs for {$limits['min']} people or more.",
             ];
         }
 
         if ($participants > $limits['max']) {
             return [
-                'ok'     => false,
-                'field'  => 'participants',
-                'reason' => "This session takes up to {$limits['max']} people. "
-                    . 'For a larger group, please message us and we will arrange it directly.',
+                'ok' => false,
+                'field' => 'participants',
+                'reason' => "This session takes up to {$limits['max']} people. ".'For a larger group, please message us and we will arrange it directly.',
             ];
         }
 
-        $slots = $this->slotsFor($workshop, $day);
+        $slots = $this->slotsFor($workshop, $day, except: $except);
         $match = null;
 
         foreach ($slots as $slot) {
@@ -471,36 +500,34 @@ class AvailabilityService
 
         if (! $match) {
             return [
-                'ok'     => false,
-                'field'  => 'time',
+                'ok' => false,
+                'field' => 'time',
                 'reason' => 'That start time does not leave enough room for this session. Please pick another.',
             ];
         }
 
         if (! $match['available']) {
             return [
-                'ok'     => false,
-                'field'  => 'time',
-                'reason' => $match['reason'] === 'Fully booked'
-                    ? 'That time has just filled up. Please choose another.'
-                    : 'The studio is not available at that time. Please choose another.',
+                'ok' => false,
+                'field' => 'time',
+                'reason' => $match['reason'] === 'Fully booked' ? 'That time has just filled up. Please choose another.' : 'The studio is not available at that time. Please choose another.',
             ];
         }
 
-        if ($this->enforcesCapacity()) {
-            $start = $day->setTimeFromTimeString($time);
-            $end   = $start->addMinutes($workshop->duration_minutes);
-            $free  = $workshop->max_participants - $this->seatsTaken($workshop, $day, $start, $end);
+        /*
+         | Against the slot's own ceiling, which slotsFor() has already worked
+         | out. Recomputing the seat count here was a second query AND a second
+         | definition of "how many can still come", and the two could disagree
+         | the day either one changed.
+         */
+        if ($this->enforcesCapacity() && $participants > $match['max']) {
+            $free = (int) $match['seats_left'];
 
-            if ($participants > $free) {
-                return [
-                    'ok'     => false,
-                    'field'  => 'participants',
-                    'reason' => $free > 0
-                        ? "Only {$free} " . str('place')->plural($free) . ' left at that time. Please reduce the group or choose another slot.'
-                        : 'That time has just filled up. Please choose another.',
-                ];
-            }
+            return [
+                'ok' => false,
+                'field' => 'participants',
+                'reason' => $free > 0 ? "Only {$free} ".str('place')->plural($free).' left at that time. Please reduce the group or choose another slot.' : 'That time has just filled up. Please choose another.',
+            ];
         }
 
         return ['ok' => true, 'field' => null, 'reason' => null];
@@ -534,26 +561,23 @@ class AvailabilityService
      * one starting at 17:30 are different slots but the same people and the
      * same tables.
      *
-     * OPEN QUESTION: this counts per workshop. If the real constraint is the
-     * room rather than the session — two different workshops running at once
-     * sharing the same tables — this needs to drop the workshop filter and
-     * compare against a studio-wide seat count instead. That is a one-line
-     * change here and nowhere else, which is why the filter lives in this
-     * method rather than in the callers.
+     * $except takes a reservation OUT of the count, and exists for one case:
+     * re-checking a booking that is already in the register. An Approved or
+     * Confirmed reservation holds capacity, so asking "does this fit?" about
+     * the very booking occupying the slot would count its four people against
+     * its own four seats and refuse an edit that changes nothing. Phase 27 made
+     * confirmed bookings editable, which is what turned this from theoretical
+     * into reachable.
+     *
+     * OPEN QUESTION, unchanged: this counts per workshop. If the real
+     * constraint is the room rather than the session — two workshops running at
+     * once sharing the same tables — this drops the workshop filter and
+     * compares against a studio-wide seat count instead. One line here and
+     * nowhere else, which is why the filter lives in this method.
      */
-    public function seatsTaken(
-        Workshop $workshop,
-        CarbonImmutable $date,
-        CarbonImmutable $start,
-        CarbonImmutable $end,
-    ): int {
-        return (int) Reservation::query()
-            ->onDate($date->toDateString())
-            ->holdingCapacity()
-            ->whereHas('items', fn ($q) => $q->where('workshop_id', $workshop->id))
-            ->where('start_time', '<', $end->format('H:i:s'))
-            ->where('end_time', '>', $start->format('H:i:s'))
-            ->sum('participants');
+    public function seatsTaken(Workshop $workshop, CarbonImmutable $date, CarbonImmutable $start, CarbonImmutable $end, ?Reservation $except = null): int
+    {
+        return (int) Reservation::query()->onDate($date->toDateString())->holdingCapacity()->when($except?->exists, fn ($q) => $q->whereKeyNot($except->getKey()))->whereHas('items', fn ($q) => $q->where('workshop_id', $workshop->id))->where('start_time', '<', $end->format('H:i:s'))->where('end_time', '>', $start->format('H:i:s'))->sum('participants');
     }
 
     /*
@@ -576,14 +600,11 @@ class AvailabilityService
         $key = $date->format('Y-m');
 
         $this->blocks[$key] ??= BlockedDate::query()
-            ->whereBetween('date', [
-                $date->startOfMonth()->toDateString(),
-                $date->endOfMonth()->toDateString(),
-            ])
+            ->whereBetween('date', [$date->startOfMonth()->toDateString(), $date->endOfMonth()->toDateString()])
             ->get()
             ->groupBy(fn (BlockedDate $block) => $block->date->toDateString());
 
-        return $this->blocks[$key]->get($date->toDateString()) ?? new Collection();
+        return $this->blocks[$key]->get($date->toDateString()) ?? new Collection;
     }
 
     private function fullDayBlock(CarbonImmutable $date): ?BlockedDate
@@ -591,13 +612,10 @@ class AvailabilityService
         return $this->blocksOn($date)->firstWhere('is_full_day', true);
     }
 
-    private function overlapsPartialBlock(
-        CarbonImmutable $date,
-        CarbonImmutable $start,
-        CarbonImmutable $end,
-    ): bool {
+    private function overlapsPartialBlock(CarbonImmutable $date, CarbonImmutable $start, CarbonImmutable $end): bool
+    {
         $from = $start->format('H:i:s');
-        $to   = $end->format('H:i:s');
+        $to = $end->format('H:i:s');
 
         return $this->blocksOn($date)->contains(function (BlockedDate $block) use ($from, $to) {
             if ($block->is_full_day || ! $block->starts_at || ! $block->ends_at) {
@@ -613,9 +631,7 @@ class AvailabilityService
     /** @return array<int,OperatingHour> keyed by day_of_week */
     private function allHours(): array
     {
-        return self::$hours ??= OperatingHour::all()
-            ->keyBy('day_of_week')
-            ->all();
+        return self::$hours ??= OperatingHour::all()->keyBy('day_of_week')->all();
     }
 
     private function hoursFor(int $dayOfWeek): ?OperatingHour

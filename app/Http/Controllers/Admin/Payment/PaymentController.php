@@ -280,6 +280,27 @@ class PaymentController extends Controller
             default   => $query->where('status', $filters['status']),
         };
 
+        /*
+         | Ranged on when the request was CREATED, not on its deadline.
+         |
+         | "Show me what we asked for in August" is the question this register
+         | gets asked; ranging on due_at would answer a different one and would
+         | move a request from one month to the next every time somebody
+         | extended a deadline. Money that ARRIVED in a window is the payments
+         | report's job, which ranges on the transaction — see ReportType.
+         |
+         | Either end may be left open: "everything since 1 June" is a real
+         | question, and demanding both would make somebody type a date they do
+         | not care about.
+         */
+        if ($filters['from'] !== '') {
+            $query->whereDate('created_at', '>=', $filters['from']);
+        }
+
+        if ($filters['to'] !== '') {
+            $query->whereDate('created_at', '<=', $filters['to']);
+        }
+
         $query->orderBy(self::PAYMENT_SORTABLE[$filters['sort']], $filters['dir']);
 
         // Stable second key. Without it, two requests created in the same second
@@ -292,7 +313,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * @return array{q:string,status:string,sort:string,dir:string,per_page:int}
+     * @return array{q:string,status:string,from:string,to:string,sort:string,dir:string,per_page:int}
      */
     private function filters(Request $request): array
     {
@@ -309,6 +330,13 @@ class PaymentController extends Controller
         return [
             'q'        => trim((string) $request->query('q', '')),
             'status'   => in_array($status, $allowed, true) ? $status : 'open',
+
+            // Shape-checked here. They are bound as values by the query
+            // builder, so a malformed one is a wrong answer rather than a
+            // danger — but a wrong answer nobody can see is worse than none.
+            'from'     => $this->date($request->query('from')),
+            'to'       => $this->date($request->query('to')),
+
             'sort'     => array_key_exists($sort, self::PAYMENT_SORTABLE) ? $sort : 'due',
 
             // Soonest deadline first by default: the register's job is to show
@@ -316,6 +344,14 @@ class PaymentController extends Controller
             'dir'      => in_array($dir, ['asc', 'desc'], true) ? $dir : 'asc',
             'per_page' => in_array($perPage, self::PAYMENT_PAGE_SIZES, true) ? $perPage : 25,
         ];
+    }
+
+    /** A Y-m-d string, or empty. Anything else is not a date and is discarded. */
+    private function date(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 
     /** @return array{html:string,total:int} */

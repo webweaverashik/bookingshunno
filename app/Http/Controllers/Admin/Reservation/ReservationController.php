@@ -31,11 +31,7 @@ class ReservationController extends Controller
 {
     use RendersReservations;
 
-    public function __construct(
-        private readonly ReservationService $reservations,
-        private readonly AvailabilityService $availability,
-    ) {
-    }
+    public function __construct(private readonly ReservationService $reservations, private readonly AvailabilityService $availability) {}
 
     public function index(Request $request): View
     {
@@ -43,11 +39,13 @@ class ReservationController extends Controller
 
         return view('admin.reservations.index', [
             'reservations' => $this->reservationQuery($request),
-            'filters'      => $this->reservationFilters($request),
-            'pageSizes'    => $this->reservationPageSizes(),
-            'stats'        => $this->stats(),
-            'workshops'    => Workshop::query()->orderBy('title')->get(['id', 'title']),
-            'statuses'     => ReservationStatus::cases(),
+            'filters' => $this->reservationFilters($request),
+            'pageSizes' => $this->reservationPageSizes(),
+            'stats' => $this->stats(),
+            'workshops' => Workshop::query()
+                ->orderBy('title')
+                ->get(['id', 'title']),
+            'statuses' => ReservationStatus::cases(),
         ]);
     }
 
@@ -58,7 +56,7 @@ class ReservationController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $this->reservationListPayload($request),
+            'data' => $this->reservationListPayload($request),
         ]);
     }
 
@@ -72,8 +70,8 @@ class ReservationController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'html'      => $this->reservationDetailHtml($reservation),
+            'data' => [
+                'html' => $this->reservationDetailHtml($reservation),
                 'reference' => $reservation->reference_code,
             ],
         ]);
@@ -94,16 +92,16 @@ class ReservationController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'html'       => view('admin.reservations.partials.edit-form', [
+            'data' => [
+                'html' => view('admin.reservations.partials.edit-form', [
                     'reservation' => $reservation,
-                    'slots'       => $this->slotsFor($reservation, $reservation->reserved_date->toDateString()),
+                    'slots' => $this->slotsFor($reservation, $reservation->reserved_date->toDateString()),
                     'canOverride' => Gate::allows('overrideAvailability', $reservation),
                     'canSetPrice' => Gate::allows('setPrice', $reservation),
                 ])->render(),
                 'update_url' => route('admin.reservations.update', $reservation),
-                'reference'  => $reservation->reference_code,
-                'editable'   => $reservation->isEditable(),
+                'reference' => $reservation->reference_code,
+                'editable' => $reservation->isEditable(),
             ],
         ]);
     }
@@ -119,9 +117,9 @@ class ReservationController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => [
+            'data' => [
                 'html' => view('admin.reservations.partials.slot-options', [
-                    'slots'    => $this->slotsFor($reservation, $date),
+                    'slots' => $this->slotsFor($reservation, $date),
                     'selected' => substr((string) $reservation->start_time, 0, 5),
                 ])->render(),
             ],
@@ -142,8 +140,8 @@ class ReservationController extends Controller
         if ($reservation->isEditable()) {
             $changes += [
                 'reserved_date' => $data['reserved_date'],
-                'start_time'    => $data['start_time'],
-                'participants'  => (int) $data['participants'],
+                'start_time' => $data['start_time'],
+                'participants' => (int) $data['participants'],
             ];
         }
 
@@ -151,19 +149,13 @@ class ReservationController extends Controller
         // touched — which is different from being set to null.
         $changes += $request->priceChanges();
 
-        $this->reservations->amend(
-            $reservation,
-            $changes,
-            $request->user(),
-            $data['note'] ?? null,
-            $request->wantsOverride(),
-        );
+        $this->reservations->amend($reservation, $changes, $request->user(), $data['note'] ?? null, $request->wantsOverride());
 
         return response()->json([
             'success' => true,
             'message' => "{$reservation->reference_code} has been updated.",
-            'data'    => [
-                'list'   => $this->reservationListPayload($request),
+            'data' => [
+                'list' => $this->reservationListPayload($request),
                 'detail' => $this->reservationDetailHtml($reservation->refresh()),
             ],
         ]);
@@ -189,19 +181,13 @@ class ReservationController extends Controller
             // the studio how much is outstanding.
             'pending' => Reservation::query()->needingDecision()->count(),
 
-            'escalated' => Reservation::query()
-                ->where('status', ReservationStatus::Escalated)
+            'escalated' => Reservation::query()->where('status', ReservationStatus::Escalated)->count(),
+
+            'awaitingPayment' => Reservation::query()
+                ->whereIn('status', [ReservationStatus::Approved->value, ReservationStatus::PaymentRequested->value])
                 ->count(),
 
-            'awaitingPayment' => Reservation::query()->whereIn('status', [
-                ReservationStatus::Approved->value,
-                ReservationStatus::PaymentRequested->value,
-            ])->count(),
-
-            'upcoming' => Reservation::query()
-                ->where('status', ReservationStatus::Confirmed)
-                ->whereDate('reserved_date', '>=', $today)
-                ->count(),
+            'upcoming' => Reservation::query()->where('status', ReservationStatus::Confirmed)->whereDate('reserved_date', '>=', $today)->count(),
         ];
     }
 
@@ -224,6 +210,6 @@ class ReservationController extends Controller
             return [];
         }
 
-        return $this->availability->slotsFor($workshop, $day);
+        return $this->availability->slotsFor($workshop, $day, except: $reservation);
     }
 }

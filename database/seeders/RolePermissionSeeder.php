@@ -92,6 +92,14 @@ class RolePermissionSeeder extends Seeder
             'reports.export',
 
             /*
+             | The three system logs — emails, gateway attempts, settings
+             | changes. Admin only, and separate from reports.view because
+             | reading how the studio is doing and reading the body of every
+             | email it has sent are different acts. See ReportType::isLog().
+             */
+            'reports.logs',
+
+            /*
              | PHASE 20 — clearing a log is not the same act as reading one, so
              | it is not the same permission. Admin only; Manager keeps view and
              | export below.

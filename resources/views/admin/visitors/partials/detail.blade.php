@@ -33,8 +33,9 @@
         ['Attended', $attended],
         ['Cancelled / no show', $cancelled],
         ['Lifetime value', 'BDT ' . number_format($lifetime)],
+        ['Paid to date', 'BDT ' . number_format($paid)],
     ] as [$label, $value])
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
             <div class="border border-gray-300 border-dashed rounded p-3 text-center">
                 <div class="fs-5 fw-bold text-gray-900">{{ $value }}</div>
                 <div class="fs-8 text-muted">{{ $label }}</div>
@@ -43,9 +44,15 @@
     @endforeach
 </div>
 
-{{-- Lifetime value counts confirmed and completed reservations only: a pending
-     request is not money, and treating it as such would overstate every
-     visitor on the list. --}}
+{{-- LIFETIME VALUE counts confirmed and completed reservations only: a pending
+     request is not money, and treating it as such would overstate every visitor
+     on the list.
+
+     PAID TO DATE is a different figure and deliberately so — what has actually
+     been received, across every reservation including cancelled ones. On a 50%
+     booking fee the two differ by half, and the gap is the balance still due at
+     the studio. Money taken against a booking later cancelled still shows here,
+     because it is still money the studio is holding. --}}
 
 <h4 class="fs-6 fw-bold text-gray-800 mb-3">Reservation history</h4>
 

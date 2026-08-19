@@ -41,15 +41,15 @@ class ReservationEditRequest extends FormRequest
     {
         $rules = [
             'special_requests' => ['nullable', 'string', 'max:1000'],
-            'note'             => ['nullable', 'string', 'max:500'],
+            'note' => ['nullable', 'string', 'max:500'],
         ];
 
         if ($this->reservation()->isEditable()) {
             $rules += [
                 'reserved_date' => ['required', 'date_format:Y-m-d'],
-                'start_time'    => ['required', 'date_format:H:i'],
-                'participants'  => ['required', 'integer', 'min:1', 'max:200'],
-                'override'      => ['nullable', 'boolean'],
+                'start_time' => ['required', 'date_format:H:i'],
+                'participants' => ['required', 'integer', 'min:1', 'max:200'],
+                'override' => ['nullable', 'boolean'],
             ];
         }
 
@@ -58,7 +58,7 @@ class ReservationEditRequest extends FormRequest
                 // Zero is allowed and meaningful: a comped visit for a partner
                 // school is a real thing a studio does. Blank means "no agreed
                 // price, use the price list".
-                'total_override'        => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
+                'total_override' => ['nullable', 'numeric', 'min:0', 'max:9999999.99'],
                 'total_override_reason' => ['nullable', 'string', 'max:255'],
             ];
         }
@@ -69,18 +69,15 @@ class ReservationEditRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'note.max'                 => 'Keep the reason under 500 characters.',
-            'total_override.numeric'   => 'Enter the agreed total as a number, without the currency.',
-            'total_override.min'       => 'A total cannot be negative. Use 0 for a complimentary visit.',
+            'note.max' => 'Keep the reason under 500 characters.',
+            'total_override.numeric' => 'Enter the agreed total as a number, without the currency.',
+            'total_override.min' => 'A total cannot be negative. Use 0 for a complimentary visit.',
         ];
     }
 
     public function after(): array
     {
-        return [
-            fn (Validator $validator) => $this->validatePrice($validator),
-            fn (Validator $validator) => $this->validateAvailability($validator),
-        ];
+        return [fn (Validator $validator) => $this->validatePrice($validator), fn (Validator $validator) => $this->validateAvailability($validator)];
     }
 
     /**
@@ -100,10 +97,7 @@ class ReservationEditRequest extends FormRequest
         }
 
         if (trim((string) $this->input('total_override_reason')) === '') {
-            $validator->errors()->add(
-                'total_override_reason',
-                'Say why this price was agreed. It goes into the reservation history.'
-            );
+            $validator->errors()->add('total_override_reason', 'Say why this price was agreed. It goes into the reservation history.');
         }
     }
 
@@ -130,10 +124,7 @@ class ReservationEditRequest extends FormRequest
         $workshop = $reservation->workshop();
 
         if (! $workshop) {
-            $validator->errors()->add(
-                'reserved_date',
-                'This reservation has no workshop attached, so availability cannot be checked. Please raise it with the developer.'
-            );
+            $validator->errors()->add('reserved_date', 'This reservation has no workshop attached, so availability cannot be checked. Please raise it with the developer.');
 
             return;
         }
@@ -141,10 +132,7 @@ class ReservationEditRequest extends FormRequest
         $limits = app(AvailabilityService::class)->participantLimits($workshop);
 
         if ((int) $this->input('participants') > $limits['max']) {
-            $validator->errors()->add(
-                'participants',
-                "{$workshop->title} seats {$limits['max']}. Raise the workshop's maximum first if this is a real change."
-            );
+            $validator->errors()->add('participants', "{$workshop->title} seats {$limits['max']}. Raise the workshop's maximum first if this is a real change.");
 
             return;
         }
@@ -158,16 +146,20 @@ class ReservationEditRequest extends FormRequest
             (string) $this->input('reserved_date'),
             (string) $this->input('start_time'),
             (int) $this->input('participants'),
+
+            // Or a confirmed booking fails its own availability check: its four
+            // people are already counted in the slot it is sitting in.
+            except: $reservation,
         );
 
         if (! $result['ok']) {
             $validator->errors()->add(
                 match ($result['field']) {
-                    'time'         => 'start_time',
+                    'time' => 'start_time',
                     'participants' => 'participants',
-                    default        => 'reserved_date',
+                    default => 'reserved_date',
                 },
-                $result['reason'] . ' Tick "save anyway" to book it regardless.'
+                $result['reason'].' Tick "save anyway" to book it regardless.',
             );
         }
     }
@@ -175,8 +167,7 @@ class ReservationEditRequest extends FormRequest
     /** Requested AND permitted. A Manager ticking it in the DOM gets nothing. */
     public function wantsOverride(): bool
     {
-        return $this->boolean('override')
-            && Gate::allows('overrideAvailability', $this->reservation());
+        return $this->boolean('override') && Gate::allows('overrideAvailability', $this->reservation());
     }
 
     public function canSetPrice(): bool
@@ -198,10 +189,10 @@ class ReservationEditRequest extends FormRequest
         }
 
         $amount = $this->input('total_override');
-        $blank  = $amount === null || $amount === '';
+        $blank = $amount === null || $amount === '';
 
         return [
-            'total_override'        => $blank ? null : round((float) $amount, 2),
+            'total_override' => $blank ? null : round((float) $amount, 2),
             'total_override_reason' => $blank ? null : trim((string) $this->input('total_override_reason')),
         ];
     }

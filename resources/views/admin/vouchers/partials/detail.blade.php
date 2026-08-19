@@ -89,6 +89,8 @@
             Used {{ $voucher->redeemed_at?->format('l, j F Y, g:i A') }}
             @if ($voucher->redeemedBy)
                 by {{ $voucher->redeemedBy->name }}
+            @elseif ($voucher->redeemed_for_reservation_id)
+                by the visitor, online
             @endif
             @if ($voucher->redeemedForReservation)
                 against {{ $voucher->redeemedForReservation->reference_code }}
@@ -123,8 +125,7 @@
                  expired — the service refuses with a reason the person can read
                  out. A hidden button would leave staff unable to explain. --}}
             <button type="button" class="btn btn-sm btn-success" data-action="redeem-voucher"
-                data-url="{{ route('admin.vouchers.redeem', $voucher) }}"
-                data-code="{{ $voucher->code }}"
+                data-url="{{ route('admin.vouchers.redeem', $voucher) }}" data-code="{{ $voucher->code }}"
                 data-value="{{ number_format((float) $voucher->value) }}">
                 <i class="ki-outline ki-check-circle fs-5"></i>
                 Mark as used
@@ -145,8 +146,7 @@
 
         @can('cancel', $voucher)
             <button type="button" class="btn btn-sm btn-light-danger" data-action="cancel-voucher"
-                data-url="{{ route('admin.vouchers.cancel', $voucher) }}"
-                data-code="{{ $voucher->code }}">
+                data-url="{{ route('admin.vouchers.cancel', $voucher) }}" data-code="{{ $voucher->code }}">
                 <i class="ki-outline ki-cross-circle fs-5"></i>
                 Cancel it
             </button>
@@ -158,8 +158,7 @@
                  why; this leaves nothing. It is for a voucher that should not
                  have existed, not for one somebody is holding. --}}
             <button type="button" class="btn btn-sm btn-light" data-action="delete-voucher"
-                data-url="{{ route('admin.vouchers.destroy', $voucher) }}"
-                data-code="{{ $voucher->code }}">
+                data-url="{{ route('admin.vouchers.destroy', $voucher) }}" data-code="{{ $voucher->code }}">
                 <i class="ki-outline ki-trash fs-5"></i>
                 Delete
             </button>

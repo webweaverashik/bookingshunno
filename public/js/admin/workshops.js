@@ -201,26 +201,12 @@
             return;
         }
 
-        if (action === 'delete') {
-            Shunno.confirm({
-                title: 'Delete this workshop?',
-                text: trigger.dataset.title + ' will be removed from the website and the admin list.',
-                confirmText: 'Yes, delete it'
-            }).then(function (ok) {
-                if (!ok) return;
-
-                Shunno.request(url, { method: 'DELETE' })
-                    .then(function (payload) {
-                        applyRows(payload.data);
-                        Shunno.toast('success', payload.message);
-                    })
-                    .catch(function (error) {
-                        if (error.handled) return;
-                        // 409 is the business rule "this one has reservations".
-                        Shunno.toast(error.status === 409 ? 'warning' : 'error', error.message);
-                    });
-            });
-        }
+        /*
+         | No 'delete' branch. Workshops are deactivated, never removed — the
+         | Live/Hidden toggle above is the whole story. See
+         | WorkshopPolicy::delete() for why; the route and controller method are
+         | still there and now answer 403, so nothing here needs to guard it.
+         */
     });
 
     /*
