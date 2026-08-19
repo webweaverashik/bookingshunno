@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Setting\SettingController;
 use App\Http\Controllers\Admin\Staff\ProfileController;
 use App\Http\Controllers\Admin\Staff\UserController;
 use App\Http\Controllers\Admin\System\CacheController;
+use App\Http\Controllers\Admin\System\MaintenanceController;
 use App\Http\Controllers\Admin\Visitor\VisitorController;
 use App\Http\Controllers\Admin\Voucher\VoucherController;
 use App\Http\Controllers\Admin\Workshop\WorkshopController;
@@ -29,6 +30,17 @@ Route::prefix('admin')
         Route::get('/logout', fn () => redirect()->back())->name('logout.get');
 
         Route::get('clear-cache', CacheController::class)->name('clear.cache');
+
+        
+        // Artisan from the browser: the live host gives no shell. Admin only, and the
+        // command list is a fixed enum — see App\Enums\System\MaintenanceTask.
+        Route::prefix('maintenance')
+            ->name('maintenance.')
+            ->middleware(['role:Admin', 'permission:system.maintenance'])
+            ->group(function () {
+                Route::get('/', [MaintenanceController::class, 'index'])->name('index');
+                Route::post('run', [MaintenanceController::class, 'run'])->name('run');
+            });
 
         /*
         |----------------------------------------------------------------------

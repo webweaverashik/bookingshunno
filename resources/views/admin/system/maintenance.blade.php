@@ -1,0 +1,143 @@
+@extends('layouts.app')
+
+@section('title', 'Maintenance')
+
+@section('content')
+    {{--
+        Artisan from the browser, because the live server has no shell.
+
+        Nine buttons, not a terminal. The list of commands lives in
+        App\Enums\System\MaintenanceTask and cannot be added to from here — the
+        long note at the top of that file explains why a text box would have
+        been the wrong answer to the same problem.
+    --}}
+
+    <div class="app-container container-xxl">
+
+        <div class="card mb-6">
+            <div class="card-body py-5">
+                <div class="d-flex align-items-start">
+                    <i class="ki-outline ki-information-5 fs-2x text-primary me-4 mt-1"></i>
+                    <div>
+                        <div class="fw-bold text-gray-900 mb-1">This runs commands on the live server</div>
+                        <div class="fs-7 text-gray-700">
+                            The hosting has no shell, so this page stands in for one. Anything that changes
+                            data asks for your password first, and every run is written to the log with your
+                            name against it.
+                            <br>
+                            After uploading a release the usual order is
+                            <strong>Check migration status</strong>, then <strong>Run pending
+                                migrations</strong>, then <strong>Clear all caches</strong>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-5">
+            @foreach ($tasks as $task)
+                <div class="col-md-6 col-xl-4">
+                    <div class="card h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="fw-bold text-gray-900 fs-5">{{ $task->label() }}</span>
+
+                                @if ($task->isReadOnly())
+                                    {{-- Marked so somebody working out what is wrong knows which
+                                         buttons they can press freely. Making a status check look
+                                         identical to a migration discourages exactly the diagnosis
+                                         that avoids running a migration blind. --}}
+                                    <span class="badge badge-light-success fs-8 ms-2">Read only</span>
+                                @endif
+                            </div>
+
+                            <p class="fs-7 text-gray-700 flex-grow-1">{{ $task->description() }}</p>
+
+                            <button type="button"
+                                class="btn btn-sm {{ $task->isReadOnly() ? 'btn-light-primary' : 'btn-light-danger' }} align-self-start"
+                                data-maintenance-run="{{ $task->value }}" data-label="{{ $task->label() }}"
+                                data-readonly="{{ $task->isReadOnly() ? '1' : '0' }}"
+                                data-timeout="{{ $task->timeout() }}">
+                                <span class="indicator-label">Run</span>
+                                <span class="indicator-progress">
+                                    Running…
+                                    <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+
+        {{-- Output. Kept on the page rather than in a dialog that has to be
+             dismissed: migrate:status is a table somebody reads next to the
+             buttons, and a modal would make them close it to press the next
+             one. --}}
+        <div class="card mt-6" id="maintenance-output-card" hidden>
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="fw-bold" id="maintenance-output-title">Output</span>
+                </div>
+                <div class="card-toolbar">
+                    <button type="button" class="btn btn-sm btn-light" id="maintenance-output-clear">Clear</button>
+                </div>
+            </div>
+            <div class="card-body pt-0">
+                {{-- Monospace and pre-wrapped: migrate:status is a table and
+                     collapsing its whitespace makes it unreadable. --}}
+                <pre class="bg-light rounded p-4 mb-0 fs-8" id="maintenance-output"
+                    style="white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow-y: auto;"></pre>
+            </div>
+        </div>
+    </div>
+@endsection
+
+@push('modals')
+    {{-- Password confirmation for anything that writes. A stolen session is not
+         a migration. --}}
+    <div class="modal fade" id="maintenance-confirm-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered mw-450px">
+            <div class="modal-content">
+                <form id="maintenance-confirm-form" action="{{ route('admin.maintenance.run') }}" novalidate>
+                    @csrf
+                    <input type="hidden" name="task" value="">
+
+                    <div class="modal-header">
+                        <h3 class="modal-title">Confirm it is you</h3>
+                        <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                            <i class="ki-outline ki-cross fs-1"></i>
+                        </div>
+                    </div>
+
+                    <div class="modal-body">
+                        <p class="fs-7 text-gray-700">
+                            About to run <strong id="maintenance-confirm-label"></strong> on the live server.
+                        </p>
+
+                        <label class="required form-label">Your password</label>
+                        <input type="password" name="password" class="form-control form-control-solid border"
+                            autocomplete="current-password" />
+                        <div class="invalid-feedback d-block" data-error-for="password"></div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger" id="maintenance-confirm-save">
+                            <span class="indicator-label">Run it</span>
+                            <span class="indicator-progress">
+                                Running…
+                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endpush
+
+@push('page-js')
+    <script src="{{ asset('js/admin/shunno.js') }}"></script>
+    <script src="{{ asset('js/admin/maintenance.js') }}"></script>
+@endpush

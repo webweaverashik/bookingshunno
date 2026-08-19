@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -114,6 +113,18 @@ class RolePermissionSeeder extends Seeder
             'reports.logs',
 
             /*
+             | The maintenance page — artisan from the browser, because the live
+             | host has no shell. Admin only, and separate from settings.view for
+             | a reason: reading the SMTP password and migrating the database are
+             | different powers, and a future role that needs the first should
+             | not inherit the second.
+             |
+             | See App\Enums\System\MaintenanceTask for what it can and cannot
+             | run.
+             */
+            'system.maintenance',
+
+            /*
              | PHASE 20 — clearing a log is not the same act as reading one, so
              | it is not the same permission. Admin only; Manager keeps view and
              | export below.
@@ -143,7 +154,7 @@ class RolePermissionSeeder extends Seeder
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
-                'name' => $permission,
+                'name'       => $permission,
                 'guard_name' => 'web',
             ]);
         }
@@ -155,17 +166,17 @@ class RolePermissionSeeder extends Seeder
         */
 
         $admin = Role::firstOrCreate([
-            'name' => 'Admin',
+            'name'       => 'Admin',
             'guard_name' => 'web',
         ]);
 
         $manager = Role::firstOrCreate([
-            'name' => 'Manager',
+            'name'       => 'Manager',
             'guard_name' => 'web',
         ]);
 
         $visitor = Role::firstOrCreate([
-            'name' => 'Visitor',
+            'name'       => 'Visitor',
             'guard_name' => 'web',
         ]);
 
