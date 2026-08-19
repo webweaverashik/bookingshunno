@@ -15,19 +15,19 @@ use App\Models\Payment\Payment;
 use App\Models\Payment\PaymentTransaction;
 use App\Models\Reservation\Reservation;
 use App\Models\Voucher\Voucher;
+use App\Services\Reservation\PricingService;
+use App\Services\Reservation\ReservationService;
+use App\Services\Setting\SettingsRepository;
+use App\Services\Voucher\VoucherService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
-use App\Services\Reservation\PricingService;
-use App\Services\Reservation\ReservationService;
-use App\Services\Setting\SettingsRepository;
-use App\Services\Voucher\VoucherService;
 
 /**
- * The single place a payment request is created or settled.
+ * PHASE 12A — the single place a payment request is created or settled.
  *
  * The controller does not do arithmetic and neither does the browser. Both ask
  * this class, so the figure in the modal, the figure in the database and the
@@ -46,8 +46,7 @@ class PaymentService
         private readonly SettingsRepository $settings,
         private readonly ReservationService $reservations,
         private readonly VoucherService $vouchers,
-    ) {
-    }
+    ) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -70,27 +69,27 @@ class PaymentService
         $total = $reservation->payableTotal();
 
         $booking = $this->pricing->split($total, true);
-        $full    = $this->pricing->split($total, false);
+        $full = $this->pricing->split($total, false);
 
         $hours = $this->defaultDeadlineHours();
 
         return [
             'reservation_total' => $total,
-            'default_hours'     => $hours,
-            'default_due_at'    => $this->deadlineFrom($hours)->format('D, j M Y g:i A'),
-            'has_manual_price'  => $reservation->hasManualPrice(),
-            'types'             => [
+            'default_hours' => $hours,
+            'default_due_at' => $this->deadlineFrom($hours)->format('D, j M Y g:i A'),
+            'has_manual_price' => $reservation->hasManualPrice(),
+            'types' => [
                 PaymentType::BookingFee->value => [
-                    'label'      => PaymentType::BookingFee->describe($booking['percentage']),
+                    'label' => PaymentType::BookingFee->describe($booking['percentage']),
                     'percentage' => $booking['percentage'],
-                    'payable'    => $booking['payable'],
-                    'remaining'  => $booking['remaining'],
+                    'payable' => $booking['payable'],
+                    'remaining' => $booking['remaining'],
                 ],
                 PaymentType::Full->value => [
-                    'label'      => PaymentType::Full->describe($full['percentage']),
+                    'label' => PaymentType::Full->describe($full['percentage']),
                     'percentage' => $full['percentage'],
-                    'payable'    => $full['payable'],
-                    'remaining'  => $full['remaining'],
+                    'payable' => $full['payable'],
+                    'remaining' => $full['remaining'],
                 ],
             ],
         ];
@@ -161,21 +160,21 @@ class PaymentService
 
             $hours = $deadlineHours ?: $this->defaultDeadlineHours();
 
-            $payment = new Payment();
+            $payment = new Payment;
 
             $payment->forceFill([
-                'reference'         => $this->generateReference(),
-                'token'             => $this->generateToken(),
-                'reservation_id'    => $reservation->id,
-                'type'              => $type,
-                'percentage'        => $split['percentage'],
+                'reference' => $this->generateReference(),
+                'token' => $this->generateToken(),
+                'reservation_id' => $reservation->id,
+                'type' => $type,
+                'percentage' => $split['percentage'],
                 'reservation_total' => $total,
-                'amount_due'        => $split['payable'],
-                'amount_paid'       => 0,
-                'status'            => PaymentStatus::Pending,
-                'due_at'            => $this->deadlineFrom($hours),
-                'note'              => $note,
-                'requested_by'      => $actor->id,
+                'amount_due' => $split['payable'],
+                'amount_paid' => 0,
+                'status' => PaymentStatus::Pending,
+                'due_at' => $this->deadlineFrom($hours),
+                'note' => $note,
+                'requested_by' => $actor->id,
             ])->save();
 
             /*
@@ -205,12 +204,12 @@ class PaymentService
                     number_format($total),
                     $payment->due_at->format('j M Y, g:i A'),
                     $payment->reference,
-                    $note ? ' ' . $note : '',
+                    $note ? ' '.$note : '',
                 ),
             );
 
             /*
-             | Dispatched INSIDE the transaction, unlike a textbook
+             | PHASE 12C — dispatched INSIDE the transaction, unlike a textbook
              | afterCommit, and for the same reason transition() is called from
              | in here: SendReservationNotifications catches every Throwable
              | itself and only logs, so a mail failure cannot roll this back.
@@ -267,15 +266,40 @@ class PaymentService
             /*
              | The balance, in SQL rather than in PHP, because the alternative is
              | loading every open reservation to find the handful that owe
-             | something. COALESCE mirrors payableTotal(): an agreed override
-             | wins over the calculated total, and a reservation with no payments
-             | has summed nothing rather than null.
+             | something.
+             |
+             | A CORRELATED SUBQUERY IN `where`, not withSum() and `having`.
+             | That was the first attempt and MySQL rejects it outright —
+             | "Non-grouping field 'total_override' is used in HAVING clause" —
+             | because HAVING without GROUP BY may only see aggregates. WHERE is
+             | where a row-by-row condition belongs anyway.
+             |
+             | Three things it has to get right, all of them mirroring
+             | Reservation::payableTotal() and ::amountPaid():
+             |
+             |   COALESCE on the total, so an agreed override wins over the
+             |   calculated figure
+             |
+             |   COALESCE on the sum, so a reservation with no payments at all
+             |   reads as nothing paid rather than as null
+             |
+             |   CANCELLED PAYMENTS EXCLUDED. amountPaid() rejects them, and a
+             |   query that counted them would show a visit as settled on the
+             |   strength of a withdrawn request — the one disagreement between
+             |   this list and the summary card that would actually lose money.
              |
              | The 0.009 is the same poisha-sized tolerance used everywhere money
              | is compared here — a balance of 0.004 is paid.
              */
-            ->withSum('payments as paid_total', 'amount_paid')
-            ->havingRaw('COALESCE(total_override, total_amount) - COALESCE(paid_total, 0) > 0.009')
+            ->whereRaw(
+                'COALESCE(reservations.total_override, reservations.total_amount) - COALESCE((
+                    select sum(payments.amount_paid)
+                      from payments
+                     where payments.reservation_id = reservations.id
+                       and payments.status <> ?
+                ), 0) > 0.009',
+                [PaymentStatus::Cancelled->value],
+            )
 
             ->orderBy('reserved_date')
             ->orderBy('start_time')
@@ -355,11 +379,11 @@ class PaymentService
                 ));
             }
 
-            $payment = new Payment();
+            $payment = new Payment;
 
             $payment->forceFill([
                 'reference' => $this->generateReference(),
-                'token'     => $this->generateToken(),
+                'token' => $this->generateToken(),
 
                 'reservation_id' => $reservation->id,
 
@@ -370,20 +394,20 @@ class PaymentService
                  | false and the payslip correctly shows no "payable at the
                  | studio" line — there is nothing after this.
                  */
-                'type'       => PaymentType::Full,
+                'type' => PaymentType::Full,
                 'percentage' => 100,
 
                 'reservation_total' => $reservation->payableTotal(),
-                'amount_due'        => $balance,
-                'amount_paid'       => 0,
-                'status'            => PaymentStatus::Pending,
+                'amount_due' => $balance,
+                'amount_paid' => 0,
+                'status' => PaymentStatus::Pending,
 
                 // Already due. The money is on the counter; a deadline in three
                 // days would be a fiction, and an overdue badge on a request
                 // settled thirty seconds later would be noise.
                 'due_at' => CarbonImmutable::now(),
 
-                'note'         => $note,
+                'note' => $note,
                 'requested_by' => $actor->id,
             ])->save();
 
@@ -447,24 +471,24 @@ class PaymentService
             $this->guardCollectable($payment, $amount);
 
             /*
-             | The receipt. PHASE 13 moved the money arithmetic out
+             | PHASE 12B — the receipt. PHASE 13 moved the money arithmetic out
              | into applySettlement(), which the gateway path also uses, so that
              | a card payment and a cash payment cannot drift apart in how they
              | credit a request.
              */
-            $transaction = new PaymentTransaction();
+            $transaction = new PaymentTransaction;
 
             $transaction->forceFill([
-                'reference'          => $this->generateTransactionReference(),
-                'payment_id'         => $payment->id,
-                'channel'            => PaymentChannel::forMethod($method),
-                'method'             => $method,
-                'status'             => TransactionStatus::Success,
-                'amount'             => round($amount, 2),
+                'reference' => $this->generateTransactionReference(),
+                'payment_id' => $payment->id,
+                'channel' => PaymentChannel::forMethod($method),
+                'method' => $method,
+                'status' => TransactionStatus::Success,
+                'amount' => round($amount, 2),
                 'external_reference' => $reference,
-                'note'               => $note,
-                'received_at'        => $paidAt ?? CarbonImmutable::now(),
-                'recorded_by'        => $actor->id,
+                'note' => $note,
+                'received_at' => $paidAt ?? CarbonImmutable::now(),
+                'recorded_by' => $actor->id,
             ])->save();
 
             return $this->applySettlement($payment, $transaction, $actor);
@@ -472,7 +496,7 @@ class PaymentService
     }
 
     /**
-     * Credit a settled attempt to its request.
+     * PHASE 13 — credit a settled attempt to its request.
      *
      * The single place money moves, whichever way it arrived. Assumes the
      * transaction row already exists and is genuinely settled: record() writes
@@ -493,17 +517,17 @@ class PaymentService
         // 4999.99 in floating point often enough to matter when somebody pays
         // the outstanding amount exactly.
         $outstandingPoisha = (int) round($payment->outstanding() * 100);
-        $amountPoisha      = (int) round($amount * 100);
-        $paidPoisha        = (int) round((float) $payment->amount_paid * 100) + $amountPoisha;
-        $settled           = $paidPoisha >= (int) round((float) $payment->amount_due * 100);
+        $amountPoisha = (int) round($amount * 100);
+        $paidPoisha = (int) round((float) $payment->amount_paid * 100) + $amountPoisha;
+        $settled = $paidPoisha >= (int) round((float) $payment->amount_due * 100);
 
         $payment->forceFill([
-            'amount_paid'       => $paidPoisha / 100,
-            'method'            => $transaction->method,
+            'amount_paid' => $paidPoisha / 100,
+            'method' => $transaction->method,
             'gateway_reference' => $transaction->external_reference,
-            'recorded_by'       => $actor?->id,
-            'status'            => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
-            'paid_at'           => $settled ? ($transaction->received_at ?? CarbonImmutable::now()) : null,
+            'recorded_by' => $actor?->id,
+            'status' => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
+            'paid_at' => $settled ? ($transaction->received_at ?? CarbonImmutable::now()) : null,
         ])->save();
 
         // balance_after is snapshotted rather than derived. A receipt the
@@ -523,7 +547,7 @@ class PaymentService
             $payment->reference,
             $transaction->reference,
             $transaction->external_reference ? " Ref {$transaction->external_reference}." : '',
-            $transaction->note ? ' ' . $transaction->note : '',
+            $transaction->note ? ' '.$transaction->note : '',
         );
 
         if (! $settled) {
@@ -534,7 +558,7 @@ class PaymentService
             $this->reservations->note(
                 $reservation,
                 $actor,
-                $line . sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
+                $line.sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
             );
 
             /*
@@ -592,12 +616,12 @@ class PaymentService
             $this->reservations->note(
                 $reservation,
                 $actor,
-                $line . " The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
+                $line." The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
             );
         }
 
         /*
-         | The café coupon, issued only once the request is settled.
+         | PHASE 14A — the café coupon, issued only once the request is settled.
          |
          | On settlement, not on approval: the client's rule is that credit is
          | earned by a paid visit, and issuing it earlier would let somebody
@@ -622,7 +646,7 @@ class PaymentService
     }
 
     /**
-     * The shared guard for anything about to take money.
+     * PHASE 13 — the shared guard for anything about to take money.
      *
      * Run under the row lock in every caller. Throws rather than returning
      * false because each message is something a person needs to READ: an admin
@@ -651,7 +675,7 @@ class PaymentService
 
     /*
     |--------------------------------------------------------------------------
-    | Gateway
+    | Gateway (Phase 13)
     |--------------------------------------------------------------------------
     */
 
@@ -678,19 +702,19 @@ class PaymentService
 
             $this->guardCollectable($payment, $amount);
 
-            $attempt = new PaymentTransaction();
+            $attempt = new PaymentTransaction;
 
             $attempt->forceFill([
-                'reference'  => $this->generateTransactionReference(),
+                'reference' => $this->generateTransactionReference(),
                 'payment_id' => $payment->id,
-                'channel'    => PaymentChannel::Gateway,
-                'method'     => PaymentMethod::Sslcommerz,
-                'status'     => TransactionStatus::Initiated,
-                'amount'     => round($amount, 2),
+                'channel' => PaymentChannel::Gateway,
+                'method' => PaymentMethod::Sslcommerz,
+                'status' => TransactionStatus::Initiated,
+                'amount' => round($amount, 2),
 
                 // Both null until it succeeds. A row with no received_at is not
                 // a receipt, and the payslip route will not render one.
-                'received_at'   => null,
+                'received_at' => null,
                 'balance_after' => null,
             ])->save();
 
@@ -728,14 +752,14 @@ class PaymentService
             }
 
             $attempt->forceFill([
-                'status'               => TransactionStatus::Success,
-                'external_reference'   => $validation['bank_tran_id'] ?? ($validation['val_id'] ?? null),
-                'gateway_val_id'       => $validation['val_id'] ?? null,
+                'status' => TransactionStatus::Success,
+                'external_reference' => $validation['bank_tran_id'] ?? ($validation['val_id'] ?? null),
+                'gateway_val_id' => $validation['val_id'] ?? null,
                 'gateway_bank_tran_id' => $validation['bank_tran_id'] ?? null,
-                'gateway_card_type'    => $validation['card_type'] ?? null,
-                'gateway_payload'      => $validation,
-                'validated_at'         => CarbonImmutable::now(),
-                'received_at'          => CarbonImmutable::now(),
+                'gateway_card_type' => $validation['card_type'] ?? null,
+                'gateway_payload' => $validation,
+                'validated_at' => CarbonImmutable::now(),
+                'received_at' => CarbonImmutable::now(),
             ])->save();
 
             /*
@@ -753,7 +777,7 @@ class PaymentService
                 Log::warning('A gateway payment settled against a request that was no longer open.', [
                     'payment' => $payment->reference,
                     'attempt' => $attempt->reference,
-                    'status'  => $payment->status->value,
+                    'status' => $payment->status->value,
                 ]);
 
                 return $payment;
@@ -783,8 +807,8 @@ class PaymentService
         }
 
         $attempt->forceFill([
-            'status'          => $status,
-            'failure_reason'  => $reason,
+            'status' => $status,
+            'failure_reason' => $reason,
             'gateway_payload' => $payload,
         ])->save();
 
@@ -792,7 +816,7 @@ class PaymentService
     }
 
     /**
-     * Settle a request, in whole or in part, with a voucher.
+     * PHASE 14C — settle a request, in whole or in part, with a voucher.
      *
      * ORDER MATTERS. The voucher is redeemed FIRST, inside this transaction,
      * because that is the operation with a lock on it and the one that must not
@@ -840,26 +864,26 @@ class PaymentService
                 $reservation?->reference_code ?? 'reservation',
             ));
 
-            $transaction = new PaymentTransaction();
+            $transaction = new PaymentTransaction;
 
             $transaction->forceFill([
-                'reference'          => $this->generateTransactionReference(),
-                'payment_id'         => $payment->id,
-                'channel'            => PaymentChannel::Voucher,
-                'method'             => PaymentMethod::Voucher,
-                'status'             => TransactionStatus::Success,
-                'amount'             => round($amount, 2),
+                'reference' => $this->generateTransactionReference(),
+                'payment_id' => $payment->id,
+                'channel' => PaymentChannel::Voucher,
+                'method' => PaymentMethod::Voucher,
+                'status' => TransactionStatus::Success,
+                'amount' => round($amount, 2),
                 'external_reference' => $voucher->code,
-                'note'               => sprintf(
+                'note' => sprintf(
                     'Voucher %s worth BDT %s.%s',
                     $voucher->code,
                     number_format((float) $voucher->value),
                     (float) $voucher->value > $amount
-                        ? ' BDT ' . number_format((float) $voucher->value - $amount) . ' of it was not needed and is now spent.'
+                        ? ' BDT '.number_format((float) $voucher->value - $amount).' of it was not needed and is now spent.'
                         : '',
                 ),
-                'received_at'        => CarbonImmutable::now(),
-                'recorded_by'        => $actor?->id,
+                'received_at' => CarbonImmutable::now(),
+                'recorded_by' => $actor?->id,
             ])->save();
 
             return $this->applySettlement($payment, $transaction, $actor);
@@ -899,7 +923,7 @@ class PaymentService
             }
 
             $payment->forceFill([
-                'status'              => PaymentStatus::Cancelled,
+                'status' => PaymentStatus::Cancelled,
                 'cancellation_reason' => $reason,
             ])->save();
 
@@ -991,7 +1015,7 @@ class PaymentService
             for ($i = 0; $i < 4; $i++) {
                 $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
             }
-            $code = $prefix . '-' . now()->format('ym') . '-' . $suffix;
+            $code = $prefix.'-'.now()->format('ym').'-'.$suffix;
         } while ($taken($code));
 
         return $code;
