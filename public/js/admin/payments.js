@@ -303,6 +303,197 @@
             });
         }
 
+        /* ----- Take payment at the counter -----
+
+           The register lists payment REQUESTS, so a booking fee that settled
+           leaves a visit with a balance and no open request to record it
+           against — which is why staff had no button for money handed over on
+           the day. This starts from the RESERVATION instead.
+
+           A remote Select2 rather than a rendered list: the answer is one
+           reservation out of however many are open, and whoever is at the till
+           knows the name or the reference. The server decides which
+           reservations qualify and formats every figure on the summary card;
+           nothing here works out what is owed.
+        */
+
+        var collectModalEl = document.getElementById('payment-collect-modal');
+        var collectForm = document.getElementById('payment-collect-form');
+
+        function collectPart(name) {
+            return collectModalEl
+                ? collectModalEl.querySelector('[data-collect="' + name + '"]')
+                : null;
+        }
+
+        function openCollect() {
+            if (!collectForm || !config.collectableUrl) return;
+
+            Shunno.clearErrors(collectForm);
+            collectForm.reset();
+
+            // Back to the loading state every time. Reopening the modal after a
+            // payment must not show the previous visitor's summary card while
+            // the picker reloads.
+            collectPart('loading').hidden = false;
+            collectPart('notice').hidden = true;
+            collectPart('body').hidden = true;
+            collectPart('save').hidden = true;
+            collectPart('summary').hidden = true;
+            collectPart('summary').innerHTML = '';
+
+            Shunno.modal(collectModalEl).show();
+
+            /*
+             | One plain fetch before Select2 is wired up, purely to answer "is
+             | there anything to collect at all". Select2's own empty state is a
+             | line of grey text inside a dropdown nobody has opened yet, which
+             | is not where somebody looks to find out that every visit is paid
+             | up.
+             */
+            fetch(config.collectableUrl, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+                credentials: 'same-origin'
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (payload) {
+                    collectPart('loading').hidden = true;
+
+                    if (payload.notice) {
+                        collectPart('notice-text').textContent = payload.notice;
+                        collectPart('notice').hidden = false;
+                        return;
+                    }
+
+                    collectPart('body').hidden = false;
+                    collectPart('save').hidden = false;
+                    initCollectPicker();
+                })
+                .catch(function () {
+                    collectPart('loading').hidden = true;
+                    collectPart('notice-text').textContent =
+                        'Could not load reservations just now. Please try again.';
+                    collectPart('notice').hidden = false;
+                });
+        }
+
+        var collectPickerReady = false;
+
+        function initCollectPicker() {
+            var field = document.getElementById('payment-collect-reservation');
+
+            if (!field || !window.jQuery || !window.jQuery.fn.select2) return;
+
+            if (collectPickerReady) {
+                // Already built. Clear the previous choice rather than
+                // rebuilding, which would leave two instances stacked up.
+                window.jQuery(field).val(null).trigger('change');
+                return;
+            }
+
+            window.jQuery(field).select2({
+                placeholder: field.dataset.placeholder,
+                allowClear: true,
+
+                // The modal, not the body: a dropdown appended to <body> renders
+                // behind the backdrop and cannot be clicked.
+                dropdownParent: window.jQuery(collectModalEl),
+
+                minimumInputLength: 0,
+                ajax: {
+                    url: config.collectableUrl,
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (payload) {
+                        return { results: payload.results || [] };
+                    }
+                },
+                language: {
+                    noResults: function () {
+                        return 'No reservation with a balance matches that.';
+                    }
+                }
+            });
+
+            /*
+             | jQuery's own event, because that is what Select2 fires and this
+             | needs the chosen row's DATA rather than just its value — the
+             | summary card and the prefilled amount both come off it.
+             */
+            window.jQuery(field).on('select2:select', function (event) {
+                var chosen = event.params.data;
+                var summary = collectPart('summary');
+                var amount = document.getElementById('payment-collect-amount');
+
+                summary.innerHTML = chosen.card || '';
+                summary.hidden = !chosen.card;
+
+                // Assigned, not calculated. The server sent this string.
+                if (amount) {
+                    amount.value = chosen.outstanding_input || '';
+                    amount.max = chosen.outstanding_input || '';
+                }
+            });
+
+            window.jQuery(field).on('select2:clear', function () {
+                collectPart('summary').innerHTML = '';
+                collectPart('summary').hidden = true;
+            });
+
+            collectPickerReady = true;
+        }
+
+        document.querySelectorAll('[data-collect="open"]').forEach(function (button) {
+            button.addEventListener('click', openCollect);
+        });
+
+        if (collectForm) {
+            collectForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                var save = collectPart('save');
+
+                Shunno.clearErrors(collectForm);
+                Shunno.busy(save, true);
+
+                Shunno.request(collectForm.action, {
+                    method: 'POST',
+                    body: new FormData(collectForm)
+                })
+                    .then(function (payload) {
+                        Shunno.modal(collectModalEl).hide();
+                        Shunno.toast('success', payload.message);
+                        loadList();
+                    })
+                    .catch(function (error) {
+                        if (error.handled) return;
+
+                        if (error.status === 422 && error.errors) {
+                            Shunno.showErrors(collectForm, error.errors);
+                        }
+
+                        Shunno.toast('error', error.message);
+
+                        /*
+                         | 409 means the state moved under us — somebody else
+                         | settled it, or the reservation was cancelled while
+                         | this modal sat open. The list is refreshed so the
+                         | next attempt starts from the truth.
+                         */
+                        if (error.status === 409) {
+                            Shunno.modal(collectModalEl).hide();
+                            loadList();
+                        }
+                    })
+                    .finally(function () {
+                        Shunno.busy(save, false);
+                    });
+            });
+        }
+
         /* ----- Withdraw ----- */
 
         function openCancel(data) {

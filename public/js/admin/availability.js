@@ -89,6 +89,7 @@
                     // DOM-ready scan ran long before this markup existed.
                     Shunno.timepickers(hoursRows);
                     refreshHoursRows();
+                    retuneBlockPicker(payload.data.closed_weekdays);
 
                     // A workshop that no longer fits is a real operational
                     // problem, so it gets a dialog rather than a toast that
@@ -173,6 +174,36 @@
                 send();
             }
         });
+    }
+
+    /**
+     * Keep the Block a date calendar in step with the weekly pattern.
+     *
+     * Both are on this screen, so closing Mondays and then blocking a date
+     * happens in one sitting — and without this the calendar would still offer
+     * a Monday, having been built from the hours as they were when the page
+     * loaded.
+     *
+     * The date field's data attribute is updated as well as the live instance:
+     * the modal's picker is rebuilt from the field if it is ever
+     * re-initialised, and leaving the attribute stale would undo this quietly.
+     */
+    function retuneBlockPicker(closedWeekdays) {
+        if (!Array.isArray(closedWeekdays)) return;
+
+        var field = document.querySelector('#block-form [name="date"]');
+
+        if (!field) return;
+
+        field.dataset.disableWeekdays = closedWeekdays.join(',');
+
+        if (!field._flatpickr) return;
+
+        field._flatpickr.set('disable', [
+            function (date) {
+                return closedWeekdays.indexOf(date.getDay()) !== -1;
+            },
+        ]);
     }
 
     /* =====================================================================

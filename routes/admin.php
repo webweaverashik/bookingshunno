@@ -181,6 +181,13 @@ Route::prefix('admin')
                 Route::get('request/{reservation}', [PaymentController::class, 'create'])->name('create');
                 Route::post('request/{reservation}', [PaymentController::class, 'store'])->name('store');
 
+                Route::get('list', [PaymentController::class, 'list'])->name('list');
+
+                // Taking money at the counter. Literal segments, so they must sit above the
+                // {payment:reference} routes below or "collectable" is read as a reference.
+                Route::get('collectable', [PaymentController::class, 'collectable'])->name('collectable');
+                Route::post('collect', [PaymentController::class, 'collect'])->name('collect');
+
                 Route::get('{payment:reference}', [PaymentController::class, 'show'])->name('show');
 
                 /*

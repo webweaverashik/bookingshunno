@@ -28,9 +28,24 @@
                              Submits Y-m-d, shows "14 Aug 2026". data-min-date
                              stops somebody closing a day that has already been
                              and gone — the server refuses it anyway, but the
-                             picker should not offer it. --}}
+                             picker should not offer it.
+
+                             WEEKDAYS THE STUDIO IS ALREADY CLOSED are greyed
+                             out too. Blocking a Sunday when Sunday is closed
+                             every week does nothing: it writes a row that
+                             changes no availability and then sits in the list
+                             looking like a decision somebody made. The weekly
+                             pattern is edited in Operating hours above; this
+                             form is for exceptions to it.
+
+                             Dates already blocked are left selectable on
+                             purpose — that is how the modal doubles as the edit
+                             form for one, and the list below is where an
+                             existing block is opened from. --}}
                         <input type="text" name="date" class="form-control form-control-solid shunno-datepicker"
-                            data-min-date="{{ now()->toDateString() }}" placeholder="Choose a date" />
+                            data-min-date="{{ now()->toDateString() }}"
+                            data-disable-weekdays="{{ implode(',', \App\Support\Availability\Closures::closedWeekdays()) }}"
+                            placeholder="Choose a date" />
                         <div class="invalid-feedback d-block" data-error-for="date"></div>
                     </div>
 

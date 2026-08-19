@@ -69,3 +69,34 @@ html[data-bs-theme="dark"] table.ashik-table tbody tr:hover {
 .is-invalid+.select2-container .select2-selection {
       border-color: var(--bs-danger) !important;
 }
+
+/* Days the studio cannot take. Struck through rather than merely dimmed:
+   Flatpickr's default disabled state is a lighter grey, which on a calendar of
+   small grey numbers reads as "slightly further away" rather than as "not
+   available" — and on a phone in daylight it reads as nothing at all.
+
+   The number stays legible on purpose. Somebody looking for the 17th needs to
+   find it and see that it is unavailable, not fail to find it and assume the
+   calendar is broken. So the opacity is raised above Flatpickr's own and the
+   line does the work.
+
+   Applies to both closed weekdays and blocked dates, since Flatpickr gives
+   them the same class — see App\Support\Availability\Closures. */
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+      color: var(--bs-gray-500);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+      cursor: not-allowed;
+      background: transparent;
+      border-color: transparent;
+}
+
+/* Days outside the shown month are disabled too, and those SHOULD stay quiet —
+   striking them through would fill the first and last rows with lines that say
+   nothing about availability. */
+.flatpickr-day.prevMonthDay.flatpickr-disabled,
+.flatpickr-day.nextMonthDay.flatpickr-disabled {
+      text-decoration: none;
+      color: var(--bs-gray-300);
+}

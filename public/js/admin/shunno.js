@@ -277,6 +277,52 @@ window.Shunno = (function () {
                 return field.previousElementSibling._flatpickr;
             }
 
+            /*
+             | Days the studio is shut, greyed out rather than merely refused
+             | after the fact. Both lists are rendered onto the field by PHP —
+             | see App\Support\Availability\Closures — because which days are
+             | closed is a business answer, and a picker working it out from a
+             | settings blob in the browser would be a second opinion able to
+             | disagree with the server.
+             |
+             | data-allow-date always wins. An existing booking may sit on a day
+             | that has since been closed, and a field refusing the date already
+             | in it would stop somebody correcting the party size without also
+             | moving the visit.
+             */
+            var allowed = field.dataset.allowDate || '';
+
+            var closedDates = (field.dataset.disableDates || '')
+                .split(',')
+                .filter(function (date) { return date !== '' && date !== allowed; });
+
+            var closedDays = (field.dataset.disableWeekdays || '')
+                .split(',')
+                .filter(function (day) { return day !== ''; })
+                .map(Number);
+
+            var disable = closedDates.slice();
+
+            if (closedDays.length) {
+                disable.push(function (date) {
+                    /*
+                     | Compared as a local Y-m-d string rather than with
+                     | getTime(). Flatpickr hands this a midnight-LOCAL Date and
+                     | the value in the field is a plain calendar date, so any
+                     | arithmetic between them is a chance to be a day out —
+                     | which on a Sunday-closed studio means greying out
+                     | Saturday.
+                     */
+                    var iso = date.getFullYear()
+                        + '-' + String(date.getMonth() + 1).padStart(2, '0')
+                        + '-' + String(date.getDate()).padStart(2, '0');
+
+                    if (iso === allowed) return false;
+
+                    return closedDays.indexOf(date.getDay()) !== -1;
+                });
+            }
+
             return window.flatpickr(field, Object.assign({
                 dateFormat: 'Y-m-d',
                 altInput: true,
@@ -297,7 +343,15 @@ window.Shunno = (function () {
                 minDate: field.dataset.minDate || null,
                 maxDate: field.dataset.maxDate || null,
                 defaultDate: field.value || null,
-            }, settings));
+                /*
+                 | Concatenated rather than assigned, so a caller passing its own
+                 | disable rules ADDS to the studio's closures instead of
+                 | quietly replacing them. Merged after the spread for the same
+                 | reason — settings.disable must not win outright.
+                 */
+            }, Object.assign({}, settings, {
+                disable: disable.concat(settings.disable || []),
+            })));
         });
     }
 

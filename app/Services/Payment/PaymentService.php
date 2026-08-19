@@ -16,6 +16,7 @@ use App\Models\Payment\PaymentTransaction;
 use App\Models\Reservation\Reservation;
 use App\Models\Voucher\Voucher;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -226,6 +227,193 @@ class PaymentService
 
     /*
     |--------------------------------------------------------------------------
+    | Taking money at the counter
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Reservations that still owe the studio something.
+     *
+     * What the "Take payment" search on the payments register offers. The
+     * register itself lists payment REQUESTS, which is why the balance left
+     * after a settled booking fee was invisible there: that request is closed,
+     * so it has no Record button and nothing else was looking for the money.
+     *
+     * Three statuses, and each is a real counter case:
+     *
+     *   Approved         a walk-in paying for a visit nobody has invoiced yet
+     *   Payment requested a link went out and they would rather pay in person
+     *   Confirmed        the booking fee is settled and this is the balance
+     *
+     * Declined, Cancelled and Completed are excluded on purpose. The first two
+     * are not owed anything, and a completed visit is a closed record — money
+     * arriving against one is a conversation, not a form.
+     *
+     * @return Collection<int,Reservation>
+     */
+    public function collectable(string $search = '', int $limit = 20): Collection
+    {
+        $search = trim($search);
+
+        return Reservation::query()
+            ->with(['user', 'items.workshop', 'payments'])
+            ->whereIn('status', [
+                ReservationStatus::Approved,
+                ReservationStatus::PaymentRequested,
+                ReservationStatus::Confirmed,
+            ])
+            ->when($search !== '', fn ($q) => $q->search($search))
+
+            /*
+             | The balance, in SQL rather than in PHP, because the alternative is
+             | loading every open reservation to find the handful that owe
+             | something. COALESCE mirrors payableTotal(): an agreed override
+             | wins over the calculated total, and a reservation with no payments
+             | has summed nothing rather than null.
+             |
+             | The 0.009 is the same poisha-sized tolerance used everywhere money
+             | is compared here — a balance of 0.004 is paid.
+             */
+            ->withSum('payments as paid_total', 'amount_paid')
+            ->havingRaw('COALESCE(total_override, total_amount) - COALESCE(paid_total, 0) > 0.009')
+
+            ->orderBy('reserved_date')
+            ->orderBy('start_time')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Take money at the counter, whether or not a request exists for it.
+     *
+     * The studio's actual problem: a booking fee settles, the visitor turns up
+     * and hands over the balance, and there is no open request to record it
+     * against. Staff were left with a reservation showing an outstanding amount
+     * and no way to say it had been paid.
+     *
+     * TWO PATHS, and which one runs is decided here rather than by whoever is
+     * standing at the till:
+     *
+     *   An OPEN request already exists — record against it. A second request
+     *   for money already asked for would leave two links for one debt and two
+     *   documents describing it.
+     *
+     *   No open request — raise one for the balance and settle it in the same
+     *   transaction. It is created already due and is never emailed: the
+     *   visitor is standing in front of somebody, and "please pay" arriving
+     *   about money just handed over is worse than useless.
+     *
+     * The receipt email still goes out, because that is the payslip. It is the
+     * one message the visitor actually wants from this.
+     *
+     * @throws RuntimeException when there is nothing to collect, or the amount
+     *                          is more than is owed.
+     */
+    public function collect(
+        Reservation $reservation,
+        float $amount,
+        PaymentMethod $method,
+        User $actor,
+        ?string $reference = null,
+        ?CarbonImmutable $paidAt = null,
+        ?string $note = null,
+    ): Payment {
+        return DB::transaction(function () use ($reservation, $amount, $method, $actor, $reference, $paidAt, $note) {
+            // Locked before anything is decided. Two staff at two tills on the
+            // same reservation is unlikely and not impossible, and the loser of
+            // that race must fail cleanly rather than raise a second request.
+            $reservation = Reservation::whereKey($reservation->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $reservation->load('payments');
+
+            if ($reservation->status->isClosed()) {
+                throw new RuntimeException(
+                    "This reservation is {$reservation->status->label()} and is not owed anything."
+                );
+            }
+
+            $open = $reservation->payments()->open()->first();
+
+            if ($open) {
+                // Straight down the existing path — same guards, same receipt,
+                // same settlement arithmetic.
+                return $this->record($open, $amount, $method, $actor, $reference, $paidAt, $note);
+            }
+
+            $balance = $reservation->outstandingTotal();
+
+            if ($balance <= 0.009) {
+                throw new RuntimeException('This reservation has nothing outstanding.');
+            }
+
+            if ((int) round($amount * 100) > (int) round($balance * 100)) {
+                throw new RuntimeException(sprintf(
+                    'That is more than the BDT %s still outstanding on this reservation.',
+                    number_format($balance),
+                ));
+            }
+
+            $payment = new Payment();
+
+            $payment->forceFill([
+                'reference' => $this->generateReference(),
+                'token'     => $this->generateToken(),
+
+                'reservation_id' => $reservation->id,
+
+                /*
+                 | Full, at 100% of what is left. Not BookingFee: the type
+                 | describes what this request asks for, and this one asks for
+                 | the whole remaining balance. leavesBalance() is therefore
+                 | false and the payslip correctly shows no "payable at the
+                 | studio" line — there is nothing after this.
+                 */
+                'type'       => PaymentType::Full,
+                'percentage' => 100,
+
+                'reservation_total' => $reservation->payableTotal(),
+                'amount_due'        => $balance,
+                'amount_paid'       => 0,
+                'status'            => PaymentStatus::Pending,
+
+                // Already due. The money is on the counter; a deadline in three
+                // days would be a fiction, and an overdue badge on a request
+                // settled thirty seconds later would be noise.
+                'due_at' => CarbonImmutable::now(),
+
+                'note'         => $note,
+                'requested_by' => $actor->id,
+            ])->save();
+
+            /*
+             | A reservation still at Approved has to reach Payment requested
+             | before it can be Confirmed — that is the enum's route and
+             | applySettlement() follows it. Done here, quietly, with a history
+             | line saying why: no PaymentRequestedEvent, so no "please pay"
+             | email chasing money that has already been handed over.
+             */
+            if ($reservation->status === ReservationStatus::Approved) {
+                $this->reservations->transition(
+                    $reservation,
+                    ReservationStatus::PaymentRequested,
+                    $actor,
+                    sprintf(
+                        'Payment taken at the studio: BDT %s of BDT %s. Reference %s. No payment link was sent.',
+                        number_format($amount),
+                        number_format($balance),
+                        $payment->reference,
+                    ),
+                );
+            }
+
+            return $this->record($payment, $amount, $method, $actor, $reference, $paidAt, $note);
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Settling
     |--------------------------------------------------------------------------
     */
@@ -349,14 +537,43 @@ class PaymentService
                 $line . sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
             );
 
-            // Every receipt gets an email, part payment included — the visitor
-            // needs the payslip and needs to know what is left.
-            PaymentReceived::dispatch($payment, $transaction);
+            /*
+             | ONE RECEIPT PER REQUEST, not one per transaction.
+             |
+             | A voucher that does not cover the whole amount is not a payment
+             | the visitor needs telling about — they are still on the payment
+             | page, about to pay the rest, and an email arriving mid-checkout
+             | saying "payment received" for a coupon they just typed is
+             | confusing at best. Worse, it produced a second payslip: the
+             | client reported two documents and two emails for a single
+             | booking, one for the coupon and one for the card.
+             |
+             | The payslip is a statement of the whole REQUEST now — it lists
+             | every receipt, the coupon among them — so waiting until the
+             | request is settled loses nothing. When the card payment lands,
+             | one email goes out and its payslip shows both lines.
+             |
+             | Real money arriving as a part payment still announces itself. If
+             | somebody hands over half at the counter, they get a receipt for
+             | it then and there, because the next one might be weeks away.
+             */
+            if ($transaction->channel !== PaymentChannel::Voucher) {
+                PaymentReceived::dispatch($payment, $transaction);
+            }
 
             return $payment->fresh(['reservation.user', 'recordedBy', 'transactions']);
         }
 
-        if ($reservation->status->canTransitionTo(ReservationStatus::Confirmed)) {
+        if ($reservation->status === ReservationStatus::Confirmed) {
+            /*
+             | Already confirmed, and the money is the balance being settled —
+             | the booking fee closed one request, this closes another. There is
+             | nothing to transition to and nothing wrong; without this branch it
+             | fell through to the refund warning below and told staff a
+             | perfectly ordinary counter payment might need refunding.
+             */
+            $this->reservations->note($reservation, $actor, $line);
+        } elseif ($reservation->status->canTransitionTo(ReservationStatus::Confirmed)) {
             $this->reservations->transition(
                 $reservation,
                 ReservationStatus::Confirmed,

@@ -52,6 +52,26 @@ class PaymentPolicy
     }
 
     /**
+     * Take money at the counter, against a reservation rather than against a
+     * particular request.
+     *
+     * A class-level twin of record(), needed because there is no payment to
+     * pass: the whole point of the Take payment button is the case where no
+     * open request exists and one has to be raised for the balance. Same
+     * permission, so a Manager who can write down money against a request can
+     * write it down against a reservation, which is the same act performed at
+     * the till instead of at a desk.
+     *
+     * Whether there is anything to collect is the service's question — it has
+     * to read the balance under a lock — and this only decides whether the
+     * button is drawn.
+     */
+    public function recordAny(User $user): bool
+    {
+        return $user->can('payments.update-status');
+    }
+
+    /**
      * Withdraw a request.
      *
      * The additional rule that money must not already have been received lives

@@ -113,8 +113,41 @@
                             <label class="required form-label">Maximum participants</label>
                             <input type="number" name="max_participants" class="form-control form-control-solid border"
                                 min="1" max="100" inputmode="numeric" />
-                            <div class="form-text">Phase 7 will enforce this against seats already taken.</div>
+                            <div class="form-text">Enforced against seats already taken once capacity checking is
+                                switched on in Settings.</div>
                             <div class="invalid-feedback d-block" data-error-for="max_participants"></div>
+                        </div>
+
+                        {{--
+                            CAFÉ CREDIT. The column, the validation rule and the
+                            issuing code all existed; this field did not, so the
+                            figure stayed at its default of zero on every
+                            workshop and no coupon was ever minted. That is why
+                            "A visit to the space" was not producing the 50 BDT
+                            credit the proposal describes.
+
+                            Per person and per visit: the coupon is issued once,
+                            worth this figure multiplied by the party size, the
+                            moment the payment request is settled. Zero means
+                            this experience earns nothing, which is right for
+                            every session — the client's rule is that only the
+                            non-session visit types carry it.
+
+                            Deliberately not a discount. Café credit is spent at
+                            the counter on food and drink; it never comes off the
+                            price of the thing that earned it, which is why it
+                            lives nowhere near PricingService.
+                        --}}
+                        <div class="col-md-6">
+                            <label class="form-label">Café credit per person (BDT)</label>
+                            <input type="number" name="cafe_credit_per_person"
+                                class="form-control form-control-solid border" min="0" max="1000" step="1"
+                                inputmode="decimal" />
+                            <div class="form-text">
+                                Issued as a single coupon once the visit is paid for, worth this much per guest.
+                                Leave at 0 for experiences that earn no credit.
+                            </div>
+                            <div class="invalid-feedback d-block" data-error-for="cafe_credit_per_person"></div>
                         </div>
 
                         <div class="col-12 separator my-2"></div>

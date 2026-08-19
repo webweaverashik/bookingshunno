@@ -56,10 +56,33 @@
             <label class="form-label required">Date</label>
             {{-- Flatpickr, like every other date field in the panel. Submits
                  Y-m-d and shows "14 Aug 2026"; it fires a normal change event
-                 on this input, so the slot reload below still hears it. --}}
+                 on this input, so the slot reload below still hears it.
+
+                 CLOSED DAYS ARE GREYED OUT. Sunday, and any date blocked for
+                 the whole day, cannot be picked — the same rule the public
+                 calendar follows, which the admin form was ignoring.
+
+                 Two deliberate exceptions:
+
+                 The reservation's OWN date stays selectable whatever the lists
+                 say, via data-allow-date. A booking may sit on a day closed
+                 since it was made, and refusing it would stop somebody
+                 correcting the party size without also moving the visit.
+
+                 Somebody who can override availability gets an unrestricted
+                 calendar. The studio does open a closed day by arrangement, and
+                 that person is exactly who is allowed to say so — the override
+                 checkbox further down is what records it. For everyone else the
+                 server refuses these dates anyway; this only stops the round
+                 trip. --}}
             <input type="text" name="reserved_date" id="reservation-date"
                 class="form-control form-control-solid shunno-datepicker"
-                value="{{ $reservation->reserved_date->toDateString() }}">
+                value="{{ $reservation->reserved_date->toDateString() }}"
+                @unless ($canOverride)
+                    @foreach (\App\Support\Availability\Closures::pickerAttributes($reservation->reserved_date->toDateString()) as $attribute => $value)
+                        {{ $attribute }}="{{ $value }}"
+                    @endforeach
+                @endunless>
             <div class="invalid-feedback d-block" data-error-for="reserved_date"></div>
         </div>
 

@@ -245,22 +245,29 @@
 
                 <div class="text-end">
                     <div class="fw-bold text-success">BDT {{ number_format((float) $receipt->amount) }}</div>
-                    <a class="fs-8" target="_blank"
-                        href="{{ route('admin.payments.payslip', ['payment' => $payment, 'transaction' => $receipt]) }}">
-                        Payslip
-                    </a>
                 </div>
             </div>
         @endforeach
 
-        {{-- The visitor's own copy sits behind the payment token rather than
-             behind a login, so this is the link that goes in their email. Shown
-             here so staff can send it by hand while 12C is outstanding. --}}
-        <div class="text-muted fs-8 mt-3">
-            The visitor's copy of the most recent receipt:
-            <a target="_blank"
-                href="{{ route('payslip', ['token' => $payment->token, 'transaction' => $receipts->first()]) }}">
-                open it
+        {{-- ONE payslip for the request, not one per receipt.
+
+             It used to be a link on every line, which meant a booking part-paid
+             with a voucher and finished on a card offered two documents, each
+             describing half of what happened. The payslip lists every receipt
+             now, so a link per row would open the same page repeatedly.
+
+             The visitor's copy sits behind the payment token rather than behind
+             a login, which is why it is a different URL rather than the same
+             one — it is the link that goes in their email, and staff can send
+             it by hand from here. --}}
+        <div class="d-flex flex-wrap gap-4 mt-4 pt-3 border-top border-gray-300 border-dashed">
+            <a class="fs-8 fw-semibold" target="_blank"
+                href="{{ route('admin.payments.payslip', ['payment' => $payment, 'transaction' => $receipts->last()]) }}">
+                <i class="ki-outline ki-document fs-6 me-1"></i>Payslip
+            </a>
+            <a class="fs-8 text-muted" target="_blank"
+                href="{{ route('payslip', ['token' => $payment->token, 'transaction' => $receipts->last()]) }}">
+                The visitor's copy
             </a>
         </div>
     </div>

@@ -222,6 +222,76 @@ body {
     color: var(--slip-warn);
 }
 
+/* A voucher line. Deducted, so it reads as a minus rather than as money that
+   moved — somebody scanning the column needs to see at a glance which lines
+   were paid and which were taken off. */
+.slip-row--voucher td {
+    color: var(--slip-warn);
+}
+
+/* ---------- Receipts ----------
+
+   The list behind the summary: every payment taken against this request. It
+   exists because one request can now hold several — a coupon and a card, or a
+   part payment at the counter and the rest online — and a total with nothing
+   behind it is a figure the visitor has to take on trust. */
+
+.slip-receipts {
+    margin-bottom: 24px;
+}
+
+.slip-receipts h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slip-muted);
+}
+
+.slip-table--rows th {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--slip-line);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--slip-muted);
+    text-align: left;
+    font-weight: 600;
+}
+
+/* Overrides the summary table's rule that the last cell is the money column:
+   here the amount is the last column, but the middle ones are text and must
+   stay left-aligned. */
+.slip-table--rows td {
+    vertical-align: top;
+}
+
+.slip-table--rows td:first-child,
+.slip-table--rows td:last-child {
+    color: inherit;
+    text-align: left;
+}
+
+.slip-table--rows .slip-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* The receipt whose link the reader followed. Marked rather than isolated: the
+   document is the whole request, and this only answers "which one did I click".
+   A left rule survives printing in black and white, where a background tint
+   would not. */
+.slip-row--this td {
+    box-shadow: inset 2px 0 0 0 var(--slip-ink);
+    padding-left: 8px;
+}
+
+.slip-table--rows .slip-muted {
+    font-style: normal;
+    font-size: 11.5px;
+}
+
 /* ---------- Notes and foot ---------- */
 
 .slip-notes p {

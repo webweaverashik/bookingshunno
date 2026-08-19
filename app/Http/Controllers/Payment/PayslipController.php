@@ -74,7 +74,13 @@ class PayslipController extends Controller
 
     private function render(Payment $payment, PaymentTransaction $transaction, bool $staff): View
     {
-        $payment->load(['reservation.user', 'reservation.items']);
+        /*
+         | transactions.recordedBy is new: the payslip is a statement of the
+         | whole request now and lists every receipt on it, so receipts() needs
+         | the relation loaded or it reads an empty collection and the document
+         | shows a total with nothing behind it.
+         */
+        $payment->load(['reservation.user', 'reservation.items', 'transactions.recordedBy']);
         $transaction->load('recordedBy');
 
         return view('payslips.show', [

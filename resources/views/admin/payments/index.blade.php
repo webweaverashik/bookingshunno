@@ -111,6 +111,16 @@
                         ],
                     ],
                 ])
+
+                {{-- The counter button. Same permission as recording against an
+                     open request, so a Manager on the floor has it: writing down
+                     money that arrived is a fact, not a decision. --}}
+                @can('recordAny', \App\Models\Payment\Payment::class)
+                    <button type="button" class="btn btn-success" data-collect="open">
+                        <i class="ki-outline ki-dollar fs-4"></i>
+                        Take payment
+                    </button>
+                @endcan
             </div>
         </div>
 
@@ -147,12 +157,24 @@
     @can('payments.update-status')
         @include('admin.payments.partials.record-modal')
     @endcan
+
+    @can('recordAny', \App\Models\Payment\Payment::class)
+        @include('admin.payments.partials.collect-modal')
+    @endcan
 @endpush
 
 @push('page-js')
     <script>
         var PaymentsConfig = {
             listUrl: "{{ route('admin.payments.list') }}",
+
+            // The Take payment picker's search endpoint. Null when this user
+            // cannot take payments, which is what the script checks before
+            // wiring the modal up at all.
+            collectableUrl: @json(auth()->user()?->can('recordAny', \App\Models\Payment\Payment::class)
+                ? route('admin.payments.collectable')
+                : null),
+
             currency: "BDT"
         };
     </script>

@@ -8,9 +8,11 @@ use App\Http\Controllers\Admin\Reservation\Concerns\RendersReservations;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Payment\RecordPaymentRequest;
 use App\Http\Requests\Admin\Payment\StorePaymentRequest;
+use App\Http\Requests\Admin\Payment\TakePaymentRequest;
 use App\Models\Payment\Payment;
 use App\Models\Reservation\Reservation;
 use App\Services\Payment\PaymentService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -221,6 +223,112 @@ class PaymentController extends Controller
             'data' => [
                 'html' => $this->detailHtml($payment),
                 'list' => $this->listPayload($request),
+            ],
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Taking money at the counter
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Reservations with a balance, for the Take payment picker.
+     *
+     * Answers Select2's shape rather than the house envelope, because Select2
+     * reads `results` and nothing else. The empty case carries a `notice` the
+     * modal shows instead of an empty dropdown — "nothing is outstanding" is an
+     * answer, and a search box that just sits there looking broken is not.
+     *
+     * Each row carries a rendered summary card. The money on it is formatted by
+     * PHP and swapped in whole by the browser, same rule as everywhere else.
+     */
+    public function collectable(Request $request): JsonResponse
+    {
+        Gate::authorize('recordAny', Payment::class);
+
+        $search = trim((string) $request->query('q', ''));
+        $rows   = $this->payments->collectable($search);
+
+        return response()->json([
+            'results' => $rows->map(fn (Reservation $reservation) => [
+                'id' => $reservation->id,
+
+                // What Select2 shows in the closed control and searches on.
+                'text' => sprintf(
+                    '%s — %s · %s',
+                    $reservation->reference_code,
+                    $reservation->user?->name ?? 'Visitor',
+                    $reservation->reserved_date->format('j M Y'),
+                ),
+
+                'outstanding'       => number_format($reservation->outstandingTotal()),
+                'outstanding_input' => number_format($reservation->outstandingTotal(), 2, '.', ''),
+
+                'card' => view('admin.payments.partials.collect-summary', [
+                    'reservation' => $reservation,
+                ])->render(),
+            ])->values(),
+
+            'notice' => $rows->isEmpty()
+                ? ($search === ''
+                    ? 'Nothing is outstanding right now. Every approved and confirmed reservation is paid up.'
+                    : 'No reservation with a balance matches that.')
+                : null,
+        ]);
+    }
+
+    /**
+     * Take it.
+     *
+     * The service decides whether this records against an open request or
+     * raises one for the balance first — that depends on state which has to be
+     * read under a lock, so it is not a decision this can make.
+     */
+    public function collect(TakePaymentRequest $request): JsonResponse
+    {
+        Gate::authorize('recordAny', Payment::class);
+
+        $reservation = Reservation::findOrFail($request->validated()['reservation_id']);
+
+        try {
+            $payment = $this->payments->collect(
+                $reservation,
+                (float) $request->validated()['amount'],
+                PaymentMethod::from($request->validated()['method']),
+                $request->user(),
+                $request->validated()['reference'] ?? null,
+                $request->filled('paid_at')
+                    ? CarbonImmutable::parse($request->validated()['paid_at'])
+                    : null,
+                $request->validated()['note'] ?? null,
+            );
+        } catch (RuntimeException $e) {
+            // 409 rather than 422: the figures were fine, the state was not —
+            // somebody else settled it, or the reservation moved on.
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+        }
+
+        $reservation->refresh()->load('payments');
+
+        return response()->json([
+            'success' => true,
+            'message' => $reservation->outstandingTotal() <= 0.009
+                ? sprintf(
+                    'BDT %s taken. %s is paid in full.',
+                    number_format((float) $request->validated()['amount']),
+                    $reservation->reference_code,
+                )
+                : sprintf(
+                    'BDT %s taken. BDT %s still outstanding on %s.',
+                    number_format((float) $request->validated()['amount']),
+                    number_format($reservation->outstandingTotal()),
+                    $reservation->reference_code,
+                ),
+            'data' => [
+                'reference' => $payment->reference,
+                'list'      => $this->listPayload($request),
             ],
         ]);
     }

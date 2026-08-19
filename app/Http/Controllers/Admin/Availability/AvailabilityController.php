@@ -71,6 +71,16 @@ class AvailabilityController extends Controller
             'data'    => [
                 'html'    => view('admin.availability.partials.hours', ['hours' => $this->weekHours()])->render(),
                 'warning' => $broken,
+
+                /*
+                 | The weekly pattern the Block a date picker must now refuse.
+                 |
+                 | Returned rather than left to the next page load because both
+                 | live on this screen: somebody closing Mondays and then
+                 | blocking a date would otherwise be offered a Monday by a
+                 | calendar built before they pressed save.
+                 */
+                'closed_weekdays' => \App\Support\Availability\Closures::closedWeekdays(),
             ],
         ]);
     }
