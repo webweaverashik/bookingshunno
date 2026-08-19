@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — the two flash keys the visitor area uses.
+    The two flash keys the visitor area uses.
 
     Named visitor_notice / visitor_error rather than success / error because the
     public layout is shared with the landing page, and the reservation popup

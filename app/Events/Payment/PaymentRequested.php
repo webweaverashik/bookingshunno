@@ -7,7 +7,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 12C — the studio has asked a visitor for money.
+ * The studio has asked a visitor for money.
  *
  * A payment event rather than a reservation status event, even though a status
  * change happens at the same moment. ReservationStatusChanged carries only a

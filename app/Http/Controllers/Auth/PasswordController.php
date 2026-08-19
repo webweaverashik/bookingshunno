@@ -15,7 +15,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 class PasswordController extends Controller
 {
     /**
-     * PHASE 17 — said whether or not the address is on record.
+     * Said whether or not the address is on record.
      *
      * Phrased conditionally so it is not a lie in either case: it does not
      * claim a message was sent, only what happens if there was somewhere to
@@ -42,7 +42,7 @@ class PasswordController extends Controller
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 17 — the same answer either way
+        | The same answer either way
         |----------------------------------------------------------------------
         | This used to reply "We could not find an active account with that
         | email address." on a miss and "Password reset link sent" on a hit,
@@ -54,7 +54,7 @@ class PasswordController extends Controller
         | sent if there is somewhere to send it, and the reply is identical
         | regardless.
         |
-        | Note the deliberate asymmetry with the VISITOR flow in Phase 15: this
+        | Note the deliberate asymmetry with the VISITOR flow in this
         | one is for staff, who have passwords, and it stays a password reset.
         | Visitors have no password to reset and sign in with a code instead.
         */

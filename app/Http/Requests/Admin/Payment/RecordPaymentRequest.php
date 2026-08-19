@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * PHASE 12A — writing down money that arrived by hand.
+ * Writing down money that arrived by hand.
  *
  * This one DOES take an amount, unlike StorePaymentRequest, and the difference
  * is the point: there the server knows what should be charged, here only the

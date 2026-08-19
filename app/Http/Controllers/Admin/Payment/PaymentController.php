@@ -21,7 +21,7 @@ use Illuminate\View\View;
 use RuntimeException;
 
 /**
- * PHASE 12A — the payments register, plus the two actions that move money.
+ * The payments register, plus the two actions that move money.
  *
  * RendersReservations is pulled in for one reason: requesting a payment happens
  * from the reservation drawer, so store() has to hand back a refreshed
@@ -478,7 +478,7 @@ class PaymentController extends Controller
 
     private function detailHtml(Payment $payment): string
     {
-        // PHASE 12B: transactions.recordedBy, because the drawer now lists every
+        // Transactions.recordedBy, because the drawer now lists every
         // receipt. Eager-loaded rather than lazy — a part-paid request with
         // several receipts would otherwise fire a query per row.
         $payment->load([

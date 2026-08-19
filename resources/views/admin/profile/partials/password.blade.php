@@ -1,7 +1,7 @@
 {{--
     Changing your own password.
 
-    PHASE 19 — the current-password field is gone, at your instruction. What
+    The current-password field is gone, at your instruction. What
     that costs is recorded once, in the docblock on UpdatePasswordRequest,
     rather than repeated here.
 

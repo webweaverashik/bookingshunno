@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 /**
- * PHASE 17 — a staff member's own account.
+ * A staff member's own account.
  *
  * Scoped to $request->user() throughout, with no id anywhere in a route or a
  * payload. That is not a convenience: an endpoint that took a user id would be

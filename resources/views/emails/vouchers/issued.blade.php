@@ -1,5 +1,5 @@
 {{--
-    PHASE 14A — the coupon lands in the visitor's inbox.
+    The coupon lands in the visitor's inbox.
 
     Serves both types. The wording forks on what the voucher can be spent on,
     because telling somebody their café credit can go towards a workshop would

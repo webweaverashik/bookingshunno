@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — one booking, as a visitor sees it.
+    One booking, as a visitor sees it.
 
     @param App\Models\Reservation\Reservation $reservation
     @param array                  $next        from VisitorPortalService::nextStep()

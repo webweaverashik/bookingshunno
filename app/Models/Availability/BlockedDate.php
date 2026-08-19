@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  * A day, or part of a day, the studio cannot take bookings for: holidays,
  * private hires, installation days.
  *
- * PHASE 7B: swapped its hand-written creator() for HasCreatedBy, which also
+ * Swapped its hand-written creator() for HasCreatedBy, which also
  * fills created_by automatically — the admin should never have to send it, and
  * a client-supplied created_by would be worth nothing anyway.
  */

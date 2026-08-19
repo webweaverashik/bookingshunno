@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| PHASE 15 — the returning visitor
+| The returning visitor
 |--------------------------------------------------------------------------
 | Its own file, loaded from bootstrap/app.php beside routes/admin.php. Kept out
 | of web.php because web.php is the public front door and is already long, and

@@ -419,7 +419,7 @@ class AvailabilityService
      * How many people this session will take, independent of who has already
      * booked it.
      *
-     * DECISION (Phase 7C): this is enforced whether or not
+     * DECISION: this is enforced whether or not
      * availability.enforce_capacity is on. The two are different rules and were
      * previously conflated. A session's max_participants is a property of the
      * session — how many stools, wheels or screens exist — and it is editable
@@ -589,7 +589,7 @@ class AvailabilityService
     /**
      * Every block on this date, from the month already in memory.
      *
-     * PHASE 7C: these two lookups used to be a database query each, per slot.
+     * These two lookups used to be a database query each, per slot.
      * The calendar sweep would have run something like 750 of them for one
      * month of a two-hour session. One query per month instead.
      *

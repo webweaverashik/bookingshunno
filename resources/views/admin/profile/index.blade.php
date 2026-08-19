@@ -34,7 +34,7 @@
                 <div class="fs-4 fw-bold text-gray-900" id="profile-name">{{ $user->name }}</div>
                 <div class="text-muted fs-7" id="profile-email">{{ $user->email }}</div>
 
-                {{-- PHASE 19 — when this account was created. Both forms shown
+                {{-- When this account was created. Both forms shown
                      on purpose: the exact date is what goes in a support
                      conversation, and "2 years ago" is what makes it mean
                      something at a glance. --}}

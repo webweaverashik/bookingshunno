@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * PHASE 17 — a staff member editing their own details.
+ * A staff member editing their own details.
  *
  * The unusual rule here is current_password, which is required ONLY when the
  * email address is being changed.

@@ -6,7 +6,7 @@
     them in JavaScript would put slot logic in the browser, which Phase 7A
     deliberately took out of it.
 
-    PHASE 10A — Manager keeps the date, time and party size; only an Admin sees
+    Manager keeps the date, time and party size; only an Admin sees
     the price field. That split is the escalation flow working as intended: a
     Manager prepares the request and hands the decision up.
 --}}
@@ -110,7 +110,7 @@
 @endunless
 
 @if (!$locked && $canSetPrice)
-    {{-- PHASE 10A. Admin only, via reservations.discount-override. The
+    {{-- Admin only, via reservations.discount-override. The
          calculated figure stays on screen beside it so an agreed price is
          always readable as a deliberate departure from the price list rather
          than as the price list. --}}

@@ -39,7 +39,7 @@ class Workshop extends Model
             'gallery'             => 'array',
             'price'               => 'decimal:2',
 
-            // PHASE 14A. Zero means this experience earns no café credit, which
+            // Zero means this experience earns no café credit, which
             // is the default for everything except the space visit.
             'cafe_credit_per_person' => 'decimal:2',
             'materials_included'  => 'boolean',

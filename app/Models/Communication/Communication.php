@@ -13,7 +13,7 @@ use App\Models\Payment\PaymentTransaction;
 use App\Models\Reservation\Reservation;
 
 /**
- * PHASE 13B — one email we tried to send.
+ * One email we tried to send.
  *
  * Written by CommunicationLogger and updated by LogMailDelivery. Nothing else
  * should touch it: this is a record of something that happened, and a row that

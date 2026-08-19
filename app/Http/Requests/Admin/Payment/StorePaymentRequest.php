@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * PHASE 12A — the "ask the visitor for money" form.
+ * The "ask the visitor for money" form.
  *
  * Notably absent: an amount. The figure is derived from the reservation and the
  * type, by PricingService, on the server. A payload that could name its own

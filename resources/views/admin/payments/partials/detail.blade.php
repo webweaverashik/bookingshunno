@@ -46,7 +46,7 @@
 @endif
 
 {{--
-    PHASE 12A. An Admin who agrees a new price after the link went out creates
+    An Admin who agrees a new price after the link went out creates
     exactly this, and it is not an error — it is something a person has to
     decide about. Nothing auto-corrects: rewriting a figure the visitor has
     already been asked for is how a studio takes the wrong money.
@@ -198,7 +198,7 @@
     </div>
 @endif
 
-{{-- ================= Receipts (Phase 12B, corrected in 13) =================
+{{-- ================= Receipts =================
 
      Split into two lists, because they are two different things.
 
@@ -313,7 +313,7 @@
     </div>
 @endif
 
-{{-- ================= Messages (Phase 13B) ================= --}}
+{{-- ================= Messages ================= --}}
 <div class="border border-gray-300 border-dashed rounded p-4 mb-5">
     <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
         <span class="fw-bold text-gray-800">Emails about this payment</span>
@@ -359,7 +359,7 @@
 
     <div class="fw-bold text-gray-800 mb-1">Actions</div>
     <div class="text-muted fs-8 mb-4">
-        {{-- PHASE 12C. The visitor has a link and has been emailed it, so the
+        {{-- The visitor has a link and has been emailed it, so the
              thing an admin needs to know here is what recording a payment will
              SEND, not that nothing was sent. --}}
         The visitor was emailed a payment link when this request was created.

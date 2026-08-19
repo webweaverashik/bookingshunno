@@ -18,7 +18,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * PHASE 13B — writes the log row, then sends the email.
+ * Writes the log row, then sends the email.
  *
  * That order matters. The row is created first so its id can be stamped into
  * the message as a header, which is what lets LogMailDelivery match a delivery
@@ -99,7 +99,7 @@ class CommunicationLogger
     }
 
     /**
-     * PHASE 14A — the voucher email.
+     * The voucher email.
      *
      * Its own method rather than a branch in send(), because a voucher may have
      * no reservation behind it at all and send() builds its subject and its

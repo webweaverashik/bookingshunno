@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * PHASE 20 — creating a staff account.
+ * Creating a staff account.
  *
  * The password is REQUIRED here and optional on update, which is the one
  * asymmetry worth explaining: a new account has no password to keep, so blank

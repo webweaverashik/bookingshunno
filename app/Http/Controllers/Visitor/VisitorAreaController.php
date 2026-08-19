@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * PHASE 15 — the visitor's own pages.
+ * The visitor's own pages.
  *
  * Read-mostly by design. A visitor can look at their bookings, follow a
  * payment link they already had, read their voucher codes, and correct their

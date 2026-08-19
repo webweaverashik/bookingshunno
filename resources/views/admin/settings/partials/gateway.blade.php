@@ -1,7 +1,7 @@
 {{--
     SSLCommerz.
 
-    PHASE 19 — this was a read-only panel. It is a form now: credentials moved
+    This was a read-only panel. It is a form now: credentials moved
     out of .env and into the settings table, both stores, at your instruction.
 
     What is kept from the old arrangement:

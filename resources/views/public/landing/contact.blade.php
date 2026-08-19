@@ -19,7 +19,7 @@
                 The studio is on Block F in Lalmatia. Open the location in Google Maps for
                 turn-by-turn directions, or message us on WhatsApp and we'll help you find it.
             </p>
-            {{-- PHASE 7: an embedded Leaflet map can replace this; the plugin ships with Metronic --}}
+            {{-- An embedded Leaflet map can replace this; the plugin ships with Metronic --}}
             <x-public.btn :href="config('shunno.contact.maps')" variant="primary" :arrow="true">Get directions</x-public.btn>
         </div>
     </div>

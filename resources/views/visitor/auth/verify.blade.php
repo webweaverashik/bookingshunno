@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — step two.
+    Step two.
 
     A plain form POST, not AJAX. §14's AJAX rule covers admin CRUD; this is the
     public side, where the payment portal already posts and redirects. It also

@@ -30,7 +30,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | SSLCommerz (Phase 13)
+    | SSLCommerz
     |--------------------------------------------------------------------------
     | Credentials live in .env and ONLY in .env. Not in the settings table, not
     | in the admin panel. Database rows travel in ways .env does not — nightly
@@ -54,7 +54,7 @@ return [
         'sandbox'        => env('SSLCZ_SANDBOX', true),
 
         /*
-        | PHASE 22 — the addresses SSLCommerz sends IPN callbacks from, per the
+        | The addresses SSLCommerz sends IPN callbacks from, per the
         | "Common Issues" section of the v4 documentation.
         |
         | NOT enforced in the application, and that is deliberate. Behind

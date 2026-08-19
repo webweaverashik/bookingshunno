@@ -3,7 +3,7 @@
 namespace App\Enums\Voucher;
 
 /**
- * PHASE 14A — where a voucher stands.
+ * Where a voucher stands.
  *
  * Three cases. Expired is NOT one of them, for the same reason PaymentStatus
  * has no Expired: nothing would set it. Expiry is a date arithmetic against

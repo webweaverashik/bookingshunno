@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * PHASE 13B — flips a logged email from Queued to Sent.
+ * Flips a logged email from Queued to Sent.
  *
  * Hooked to the mailer rather than to our own code, because the interesting
  * moment happens in the QUEUE WORKER, minutes after and in a different process

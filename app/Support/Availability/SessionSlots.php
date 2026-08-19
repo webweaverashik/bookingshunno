@@ -13,11 +13,11 @@ use Carbon\CarbonImmutable;
  * would happily sell a 4-hour session at 8pm and then have to decline it.
  * Slots are therefore generated per workshop from its duration.
  *
- * PHASE 6: durations are now editable in the admin panel and are stored in
+ * Durations are now editable in the admin panel and are stored in
  * minutes, so this class works in minutes too. forDuration(int $hours) is gone;
  * a 90-minute session used to floor to 1 hour and offer a slot that did not fit.
  *
- * PHASE 7: this becomes AvailabilityService, which will additionally subtract
+ * This becomes AvailabilityService, which will additionally subtract
  * blocked dates and seats already taken. The generation rule stays the same.
  */
 class SessionSlots

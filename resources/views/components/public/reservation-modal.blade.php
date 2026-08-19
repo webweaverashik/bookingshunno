@@ -11,7 +11,7 @@
     $ceiling = (int) $settings->get('reservation.max_participants', 30);
 
     /*
-     | PHASE 7C: the copy under the date field used to read "Monday to Saturday.
+     | The copy under the date field used to read "Monday to Saturday.
      | We're closed on Sundays." — true when it was typed, and silently wrong
      | from the moment the client edited the hours in the Phase 7B screen. It is
      | derived from operating_hours now, so the two cannot disagree.
@@ -111,7 +111,7 @@
 
                         <div class="sh-grid2">
                             <div>
-                                {{-- PHASE 7C: <input type="date"> cannot grey out a day, so it
+                                {{-- <input type="date"> cannot grey out a day, so it
                                      offered Sundays, blocked holidays and days too short for the
                                      chosen session, and the visitor learned the truth only on
                                      submit. The value still posts as `date` in Y-m-d from the

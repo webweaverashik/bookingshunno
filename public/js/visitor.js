@@ -2,7 +2,7 @@
     'use strict';
 
     /**
-     * Shunno Art Cafe — visitor area (Phase 15).
+     * Shunno Art Cafe — visitor area.
      *
      * Two small enhancements on the code screen and nothing else. The page works
      * without this file: the boxes are ordinary inputs, the hidden field is what

@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PHASE 17 — money rules.
+ * Money rules.
  *
  * The tightest validation on this screen, because these are the only settings
  * that change what a visitor is charged. §25 of the brief puts anything

@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 14A — gift vouchers and café credit, in one table.
+ * Gift vouchers and café credit, in one table.
  *
  * They are the same object. Both are a code with a value, a window in which it
  * is good, and a single moment when somebody spends it. Two tables would mean

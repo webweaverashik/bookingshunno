@@ -16,7 +16,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 class AuthController extends Controller
 {
     /**
-     * PHASE 17 — the only thing a failed sign-in says.
+     * The only thing a failed sign-in says.
      *
      * Deliberately vague about which half was wrong, and deliberately identical
      * for an unknown address, a deleted account, a deactivated one and a bad
@@ -64,7 +64,7 @@ class AuthController extends Controller
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 17 — one answer for every kind of failure
+        | One answer for every kind of failure
         |----------------------------------------------------------------------
         | This block used to give four distinguishable replies: "No user found!"
         | (401), "This account is invalid or deleted." (403), "Account is

@@ -5,7 +5,7 @@ namespace App\Enums\Report;
 use App\Models\Auth\User;
 
 /**
- * PHASE 16 — the four reports, and the one thing that separates them.
+ * The four reports, and the one thing that separates them.
  *
  * Not just a list of names. Each report answers a question about a WINDOW OF
  * TIME, and the whole design of this phase turns on which date column defines
@@ -44,7 +44,7 @@ enum ReportType: string
     case Vouchers     = 'vouchers';
 
     /*
-    | PHASE 20 — the two LOGS.
+    | The two LOGS.
     |
     | Reports of what the system did rather than of what the studio earned, and
     | they sit here rather than in a module of their own because they answer the
@@ -58,7 +58,7 @@ enum ReportType: string
     case Gateway      = 'gateway';
 
     /*
-    | PHASE 21 — who changed a setting.
+    | Who changed a setting.
     |
     | Narrow on purpose. An earlier draft logged eight models through a package;
     | six of those are already covered by ReservationStatusHistory,

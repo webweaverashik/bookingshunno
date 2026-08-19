@@ -8,7 +8,7 @@ use App\Events\Payment\PaymentRequested;
 use App\Events\Voucher\VoucherIssued;
 
 /**
- * PHASE 11 — the notifications this system sends about a reservation.
+ * The notifications this system sends about a reservation.
  *
  * One enum rather than six near-identical Mailable classes. They differ only in
  * a subject line, a template and who receives them, and putting those three
@@ -93,7 +93,7 @@ enum ReservationMailKind: string
     /**
      * A short name for a log or a table cell.
      *
-     * PHASE 22 — added because the email log partial called this and it did not
+     * Added because the email log partial called this and it did not
      * exist, which is a 500 on /admin/reports/emails.
      *
      * Deliberately NOT subject(). That method builds the line a visitor reads in

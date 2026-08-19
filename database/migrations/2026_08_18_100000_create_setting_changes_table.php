@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 21 — who changed a setting.
+ * Who changed a setting.
  *
  * ONE TABLE, ONE PURPOSE. The first draft of this phase reached for
  * spatie/laravel-activitylog and applied it to eight models, which was more

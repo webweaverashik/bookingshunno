@@ -99,7 +99,7 @@
                     </div>
                 @endcan
 
-                {{-- PHASE 16. Moved out of the Admin-only block and onto its
+                {{-- Moved out of the Admin-only block and onto its
                      own permission: Manager holds reports.view and reports.export,
                      because whoever runs the floor is the person asked how last
                      month went. @role('Admin') here would have hidden a screen
@@ -125,7 +125,7 @@
                         <div class="menu-content"><span
                                 class="menu-heading fw-bold text-uppercase fs-7">Administration</span></div>
                     </div>
-                    {{-- PHASE 20 — staff accounts. Under Administration and
+                    {{-- Staff accounts. Under Administration and
                          gated on users.view, which is Admin-only: a Manager who
                          could create accounts could create an Admin, and the
                          role split would be decoration. --}}
@@ -142,7 +142,7 @@
                     @endcan
 
                     <div class="menu-item">
-                        {{-- PHASE 17. The placeholder read routeIs('settings.*'),
+                        {{-- The placeholder read routeIs('settings.*'),
                              which never matched: routes in this group carry the
                              'admin.' name prefix, so the pattern has to be
                              'admin.settings.*'. The href was '#'. --}}
@@ -156,7 +156,7 @@
                     </div>
                 @endcan
 
-                {{-- PHASE 19 — My profile is NOT in this sidebar. It lives in the
+                {{-- My profile is NOT in this sidebar. It lives in the
                      avatar menu in layouts/partials/header.blade.php, which is
                      where people look for their own account. The sidebar is for
                      the studio's work. --}}

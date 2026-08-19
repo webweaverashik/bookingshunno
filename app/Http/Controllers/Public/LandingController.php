@@ -10,7 +10,7 @@ class LandingController extends Controller
 {
     public function index(): View
     {
-        // PHASE 6: was ExperienceCatalogue::all(). Workshop::menu() is the
+        // Was ExperienceCatalogue::all(). Workshop::menu() is the
         // cached active list, ordered shortest session first, so the page still
         // costs no query on a warm cache.
         return view('public.landing', [

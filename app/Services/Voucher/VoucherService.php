@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * PHASE 14A — issuing and redeeming, in one place.
+ * Issuing and redeeming, in one place.
  *
  * Redemption is the reason this class exists. It is the one operation in the
  * system where getting concurrency wrong means the same money is spent twice —
@@ -139,7 +139,7 @@ class VoucherService
     /**
      * Create a gift voucher by hand.
      *
-     * PHASE 25 — the code now comes from the person creating it. Campaign codes
+     * The code now comes from the person creating it. Campaign codes
      * (EIDGIFT2026, WORKSHOP-50) are worth far more to the studio than a random
      * string, and a code somebody chose is a code they can print on a card
      * without copying it off a screen first.

@@ -81,7 +81,7 @@ class Payment extends Model
     }
 
     /**
-     * PHASE 12B — every receipt against this request, newest first.
+     * Every receipt against this request, newest first.
      *
      * This is the authoritative record of what arrived and how. The method and
      * gateway_reference columns on this table are a denormalised copy of the
@@ -146,7 +146,7 @@ class Payment extends Model
     */
 
     /**
-     * PHASE 13 — the settled transactions, which are the only real receipts.
+     * The settled transactions, which are the only real receipts.
      *
      * Added because three separate templates independently filtered the
      * transactions list and one of them forgot, which is how a null

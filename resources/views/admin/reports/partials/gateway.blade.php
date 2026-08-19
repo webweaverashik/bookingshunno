@@ -57,7 +57,7 @@
                             {{ $attempt->status->label() }}
                         </span>
 
-                        {{-- PHASE 22 — SSLCommerz's own fraud assessment, which
+                        {{-- SSLCommerz's own fraud assessment, which
                              was previously arriving and being ignored. Shown
                              here because a payment that settled and was flagged
                              is a booking somebody should look at BEFORE the

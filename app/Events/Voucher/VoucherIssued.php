@@ -7,7 +7,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 14A — a voucher exists and somebody should be told.
+ * A voucher exists and somebody should be told.
  *
  * Its own event rather than a branch inside payment settlement, because café
  * credit and gift vouchers are issued at completely different moments — one

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * PHASE 13 — the SSLCommerz round trip.
+ * The SSLCommerz round trip.
  *
  * Five endpoints. Four of them are entered by somebody who is not logged in,
  * carrying data we did not write, so the governing rule throughout is: the
@@ -156,7 +156,7 @@ class PaymentGatewayController extends Controller
     public function ipn(Request $request): Response
     {
         /*
-         | PHASE 22 — AUTHENTICITY FIRST, before anything is read or written.
+         | AUTHENTICITY FIRST, before anything is read or written.
          |
          | This endpoint is public, unauthenticated and CSRF-exempt, as it has
          | to be. Before this check, anybody who learned a tran_id could POST
@@ -201,7 +201,7 @@ class PaymentGatewayController extends Controller
         }
 
         /*
-         | PHASE 22 — the v4 docs define five IPN statuses, not three:
+         | The v4 docs define five IPN statuses, not three:
          | VALID, FAILED, CANCELLED, EXPIRED and UNATTEMPTED.
          |
          | UNATTEMPTED means the visitor reached the gateway and did not pick a
@@ -293,7 +293,7 @@ class PaymentGatewayController extends Controller
     }
 
     /**
-     * PHASE 22 — store SSLCommerz's fraud assessment, and shout if it is bad.
+     * Store SSLCommerz's fraud assessment, and shout if it is bad.
      *
      * The docs are explicit that this is the merchant's call: risk_level 1 means
      * SSLCommerz thinks the transaction is risky and leaves the decision to us.

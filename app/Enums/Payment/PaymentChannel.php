@@ -5,7 +5,7 @@ namespace App\Enums\Payment;
 use App\Models\Voucher\Voucher;
 
 /**
- * PHASE 12B — who asserted that this money arrived.
+ * Who asserted that this money arrived.
  *
  * Not the same question as PaymentMethod, which says HOW it arrived. The client
  * wants both routes open — online and manual — and at month end the difference
@@ -24,7 +24,7 @@ enum PaymentChannel: string
     case Manual  = 'manual';
     case Gateway = 'gateway';
 
-    // PHASE 14C. A third channel rather than folding vouchers into Manual,
+    // A third channel rather than folding vouchers into Manual,
     // because no money moved. A voucher settlement is the studio honouring a
     // promise it already made, and a payments report counting it as cash taken
     // would overstate the till by the value of every coupon redeemed.

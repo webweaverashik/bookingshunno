@@ -49,7 +49,7 @@ class PricingService
     }
 
     /**
-     * PHASE 12: the booking-fee split. Kept here so the percentage is read from
+     * The booking-fee split. Kept here so the percentage is read from
      * settings in exactly one place when the payment module needs it.
      */
     public function split(float $total, bool $bookingFeeOnly): array

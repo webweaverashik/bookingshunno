@@ -10,7 +10,7 @@ use App\Models\Voucher\Voucher;
 use Illuminate\Support\Collection;
 
 /**
- * PHASE 15 — everything a visitor is allowed to see about themselves.
+ * Everything a visitor is allowed to see about themselves.
  *
  * A service rather than queries in the controller for one specific reason: the
  * ownership filter. Every read in the visitor area is scoped to one user_id,

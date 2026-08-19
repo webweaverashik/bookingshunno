@@ -80,7 +80,7 @@ class Reservation extends Model
     }
 
     /**
-     * PHASE 12A. Newest first, because the register and the drawer both want
+     * Newest first, because the register and the drawer both want
      * "the current request" far more often than the first one ever sent.
      */
     public function payments(): HasMany
@@ -249,7 +249,7 @@ class Reservation extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Money — payments (Phase 12A)
+    | Money — payments
     |--------------------------------------------------------------------------
     | These read the payments RELATION, so callers must have loaded it. That is
     | deliberate rather than lazy-loading per call: the drawer and the register

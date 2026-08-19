@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * PHASE 15 — the gate on /visits.
+ * The gate on /visits.
  *
  * A separate middleware rather than Laravel's `auth`, for one reason: `auth`
  * sends a guest to route('login'), which is the STAFF sign-in screen. A visitor

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * PHASE 21 — one settings change.
+ * One settings change.
  *
  * Written by SettingsRepository and nothing else. There is no controller, no
  * form request and no update path: this is a record of something that happened,

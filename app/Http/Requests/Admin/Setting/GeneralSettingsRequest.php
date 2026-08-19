@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PHASE 17 — studio identity and contact details.
+ * Studio identity and contact details.
  *
  * These are not decoration. contact.email is where staff notifications go and
  * what visitors are told to reply to; contact.phone and contact.whatsapp are

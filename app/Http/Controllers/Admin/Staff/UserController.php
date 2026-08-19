@@ -15,7 +15,7 @@ use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 
 /**
- * PHASE 20 — staff accounts.
+ * Staff accounts.
  *
  * STAFF ONLY. Visitors have their own module from Phase 8, and the two must not
  * merge: a visitor record is somebody who booked a workshop, a staff record is

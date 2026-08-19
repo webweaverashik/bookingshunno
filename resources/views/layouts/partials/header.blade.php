@@ -233,7 +233,7 @@
 
                         <div class="separator my-2"></div>
 
-                        {{-- PHASE 19 — this was href="#". The profile screen lives
+                        {{-- This was href="#". The profile screen lives
                              here rather than in the sidebar: it is about the
                              person signed in, not about the studio, and the
                              avatar menu is where anyone looks for it. --}}

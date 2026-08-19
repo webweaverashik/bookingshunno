@@ -1,5 +1,5 @@
 {{--
-    PHASE 20 — the PDF body, rendered by mPDF.
+    The PDF body, rendered by mPDF.
 
     NOT the same markup as the on-screen table, and it should not be. mPDF
     understands a narrow, old subset of CSS: no flexbox, no grid, no CSS

@@ -9,7 +9,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
 /**
- * PHASE 25 — editing a gift voucher.
+ * Editing a gift voucher.
  *
  * Everything StoreVoucherRequest says, with two rules replaced:
  *

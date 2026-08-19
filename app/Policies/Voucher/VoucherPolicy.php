@@ -56,7 +56,7 @@ class VoucherPolicy
 
     /*
     |--------------------------------------------------------------------------
-    | PHASE 25 — editing and deleting
+    | Editing and deleting
     |--------------------------------------------------------------------------
     | These two DO hide their buttons on state, unlike redeem() above, and the
     | difference is who is standing there. Redemption is refused in front of a

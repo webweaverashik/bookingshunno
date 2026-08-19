@@ -17,7 +17,7 @@ class SettingSeeder extends Seeder
             ['key' => 'payment_deadline_hours',          'value' => '48', 'type' => 'integer', 'group' => 'payment', 'label' => 'Hours to pay after approval'],
 
             /*
-             | PHASE 13 — the operational switch for online payment.
+             | The operational switch for online payment.
              |
              | Separate from the SSLCommerz credentials, which live in .env and
              | only in .env. This one answers "should we be offering online
@@ -29,7 +29,7 @@ class SettingSeeder extends Seeder
             ['key' => 'payments.online_enabled',         'value' => '1',  'type' => 'boolean', 'group' => 'payment', 'label' => 'Accept payment online'],
 
             /*
-             | PHASE 14A — how long café credit lasts, counted from the VISIT
+             | How long café credit lasts, counted from the VISIT
              | date rather than from issue. Credit is issued when payment lands,
              | which can be weeks before the day; counting from then would hand
              | somebody a coupon that expired before they had been.
@@ -57,7 +57,7 @@ class SettingSeeder extends Seeder
             ['key' => 'reservation.max_participants',    'value' => '30', 'type' => 'integer', 'group' => 'general', 'label' => 'Largest group accepted online'],
 
             /*
-             | PHASE 7A — availability
+             | Availability
              |
              | enforce_capacity ships OFF. max_participants on every seeded
              | workshop is the placeholder 12 from Phase 4; enforcing against an
@@ -72,7 +72,7 @@ class SettingSeeder extends Seeder
             ['key' => 'availability.slot_step_minutes',  'value' => '30',  'type' => 'integer', 'group' => 'availability', 'label' => 'Start times every (minutes)'],
 
             /*
-             | PHASE 11 — notifications
+             | Notifications
              |
              | Ships ON, because a reservation system that silently tells nobody
              | anything is worse than one that occasionally sends a clumsy email.
@@ -86,7 +86,7 @@ class SettingSeeder extends Seeder
             ['key' => 'notifications.enabled',           'value' => '1',   'type' => 'boolean', 'group' => 'notifications', 'label' => 'Send reservation emails'],
 
             /*
-             | PHASE 17 — studio identity and contact, moved out of
+             | Studio identity and contact, moved out of
              | config/shunno.php so the client can correct a phone number
              | without a deploy.
              |
@@ -103,7 +103,7 @@ class SettingSeeder extends Seeder
             ['key' => 'contact.address',  'value' => '5/6 Block F, Lalmatia, Dhaka 1207, Bangladesh', 'type' => 'string', 'group' => 'general', 'label' => 'Address'],
 
             /*
-             | PHASE 17 — SMTP.
+             | SMTP.
              |
              | SEEDED EMPTY, DELIBERATELY. An empty value means "not configured
              | here", and RuntimeConfigServiceProvider skips empty keys — so a
@@ -125,7 +125,7 @@ class SettingSeeder extends Seeder
             ['key' => 'mail.from_name',    'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Sender name'],
 
             /*
-             | PHASE 19 — SSLCommerz, moved out of .env into this table.
+             | SSLCommerz, moved out of .env into this table.
              |
              | Store IDs are seeded empty for the same reason the mail keys are:
              | empty means "not configured here", and
@@ -151,7 +151,7 @@ class SettingSeeder extends Seeder
 
         foreach ($settings as $setting) {
             /*
-             | PHASE 17 — VALUES ARE SEEDED ONCE, THEN LEFT ALONE.
+             | VALUES ARE SEEDED ONCE, THEN LEFT ALONE.
              |
              | This used to be a plain updateOrCreate, which rewrote `value` on
              | every run. That was survivable while the table held defaults

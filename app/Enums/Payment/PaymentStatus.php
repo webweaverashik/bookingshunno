@@ -3,7 +3,7 @@
 namespace App\Enums\Payment;
 
 /**
- * PHASE 12A — where a payment request stands.
+ * Where a payment request stands.
  *
  * Three cases. An "Expired" case was drafted and removed: nothing in the system
  * would ever set it. Auto-expiry needs a business rule the client has not given

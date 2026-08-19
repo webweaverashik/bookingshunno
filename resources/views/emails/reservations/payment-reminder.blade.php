@@ -1,5 +1,5 @@
 {{--
-    PHASE 17 — the nudge before a payment deadline.
+    The nudge before a payment deadline.
 
     Shorter than payment-requested on purpose. The visitor has already had the
     full breakdown once; repeating every figure would make this read as a second

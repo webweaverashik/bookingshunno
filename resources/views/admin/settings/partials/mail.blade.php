@@ -148,7 +148,7 @@
             unnest it, which would leave this input submitting with the settings
             payload and Save firing the test send.
 
-            PHASE 19 — the recipient is typed rather than fixed to the signed-in
+            The recipient is typed rather than fixed to the signed-in
             Admin, at your request. The inbox you need to test against is usually
             a Gmail account or the client's, not the one you happen to be signed
             in as.

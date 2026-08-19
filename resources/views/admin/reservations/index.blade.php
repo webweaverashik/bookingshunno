@@ -23,7 +23,7 @@
 @section('content')
 
     {{-- Four numbers, no more. Anything richer is Phase 16's reports.
-         "Escalated" earns a slot of its own from Phase 10A: it is the queue an
+         "Escalated" earns a slot of its own from it is the queue an
          Admin is personally responsible for, and it must not hide inside a
          general pending count. --}}
     <div class="row g-5 mb-5">
@@ -163,7 +163,7 @@
          never gets a trigger for an action they cannot take. --}}
     @include('admin.reservations.partials.decision-modal')
 
-    {{-- PHASE 12A. Rendered for anyone holding the permission; whether the
+    {{-- Rendered for anyone holding the permission; whether the
          trigger appears inside a given reservation's drawer is decided per
          reservation by ReservationPolicy::requestPayment(), which also checks
          the reservation is actually sitting at Approved. --}}
@@ -216,7 +216,7 @@
          Shunno.filterBar(). --}}
     <script src="{{ asset('js/admin/filters.js') }}"></script>
     <script src="{{ asset('js/admin/reservations.js') }}"></script>
-    {{-- PHASE 13B — message history, resend, and copying the payment link.
+    {{-- Message history, resend, and copying the payment link.
          Delegated from the document, so it works inside drawers that the other
          scripts replace wholesale. --}}
     <script src="{{ asset('js/admin/communications.js') }}"></script>

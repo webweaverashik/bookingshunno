@@ -17,7 +17,7 @@ use Illuminate\View\View;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
- * PHASE 17 — the settings screen.
+ * The settings screen.
  *
  * FIVE TABS, FIVE FORMS, FIVE ENDPOINTS. Not one giant form with one Save.
  * The tabs hold unrelated things — a studio phone number and an SMTP port have
@@ -197,7 +197,7 @@ class SettingController extends Controller
     /**
      * Prove the SMTP settings actually work, by sending somewhere real.
      *
-     * PHASE 19 — the recipient is now supplied by the form rather than fixed to
+     * The recipient is now supplied by the form rather than fixed to
      * the signed-in Admin, at your request. Sensible: the address you need to
      * test against is often a Gmail account or the client's own inbox, not the
      * one you happen to be signed in as.

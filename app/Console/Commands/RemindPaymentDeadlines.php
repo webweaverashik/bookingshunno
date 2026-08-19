@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * PHASE 17 — the payment deadline, half resolved.
+ * The payment deadline, half resolved.
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS DOES, AND WHAT IT REFUSES TO DO

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 use RuntimeException;
 
 /**
- * PHASE 13B — the message history, and resending.
+ * The message history, and resending.
  *
  * Two list endpoints rather than one generic one, because the two callers ask
  * different questions. A reservation drawer wants everything ever sent about

@@ -8,7 +8,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 12C — money has arrived.
+ * Money has arrived.
  *
  * Raised for EVERY receipt, online or recorded by hand, because the client
  * wants both routes open and a visitor who paid cash at the studio deserves the

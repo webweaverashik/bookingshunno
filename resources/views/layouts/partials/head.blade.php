@@ -30,7 +30,7 @@
     <!--end::Global Stylesheets Bundle-->
 
     {{--
-        PHASE 17 — the frame-busting script that was here has been removed.
+        The frame-busting script that was here has been removed.
 
         It ran `if (window.top != window.self) window.top.location.replace(...)`,
         which is defeated by one attribute: an attacker frames the panel with

@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 (corrected) — contact details.
+    Contact details.
 
     Three editable fields. The email address is shown but locked: it is the
     account, the only credential this side of the app has, and every

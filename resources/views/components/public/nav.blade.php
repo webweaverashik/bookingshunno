@@ -17,7 +17,7 @@
             <li><a href="{{ route('home') }}#contact">Visit</a></li>
 
             {{--
-                PHASE 15 — the way back in.
+                The way back in.
 
                 One item that says the same thing in all three states, because
                 "Your visits" is what somebody is looking for whether or not

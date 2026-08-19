@@ -3,7 +3,7 @@
 namespace App\Enums\Payment;
 
 /**
- * PHASE 12A — what the studio is asking for.
+ * What the studio is asking for.
  *
  * Two cases only, per §10 of the brief. There is deliberately no
  * "second instalment" case: the client has not asked for a workflow that chases

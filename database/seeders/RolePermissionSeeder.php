@@ -27,10 +27,10 @@ class RolePermissionSeeder extends Seeder
             'reservations.approve',
             'reservations.decline',
             'reservations.request-info',
-            'reservations.escalate',        // PHASE 10A — Manager hands a decision up
+            'reservations.escalate',        // Manager hands a decision up
             'reservations.update',
             'reservations.payment-request',
-            'reservations.cancel',          // PHASE 10A — cancel before any payment
+            'reservations.cancel',          // cancel before any payment
             'reservations.cancel-paid',
             'reservations.discount-override',
 
@@ -64,7 +64,7 @@ class RolePermissionSeeder extends Seeder
             'payments.verify',
             'payments.update-status',
 
-            // PHASE 13B — repeating an email the visitor was already sent.
+            // Repeating an email the visitor was already sent.
             'communications.resend',
 
             // ---------------------------------------------------------------
@@ -77,7 +77,7 @@ class RolePermissionSeeder extends Seeder
             'vouchers.redeem',
 
             /*
-             | PHASE 25. Deleting is not cancelling and does not inherit from
+             | Deleting is not cancelling and does not inherit from
              | it. Cancelling withdraws a voucher and leaves a row saying why;
              | deleting removes the row. Only ever right for one created in
              | error, and never available for a voucher that was actually spent
@@ -100,7 +100,7 @@ class RolePermissionSeeder extends Seeder
             'reports.logs',
 
             /*
-             | PHASE 20 — clearing a log is not the same act as reading one, so
+             | Clearing a log is not the same act as reading one, so
              | it is not the same permission. Admin only; Manager keeps view and
              | export below.
              */
@@ -170,7 +170,7 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         | Manager handles day-to-day reservation operations.
         |
-        | PHASE 10A — the client's escalation rule. Manager prepares a request
+        | The client's escalation rule. Manager prepares a request
         | and hands the decision up; Admin commits the studio to it. So:
         |
         |   REMOVED  reservations.approve   — approval is the commitment
@@ -179,7 +179,7 @@ class RolePermissionSeeder extends Seeder
         |                                     equally a decision about a
         |                                     commitment already made
         |
-        | PHASE 10B — the client has now closed the question 10A left open:
+        | The client has now closed the question 10A left open:
         |
         |   REMOVED  reservations.decline   — a refusal is a decision about the
         |                                     studio's business, and the visitor
@@ -247,7 +247,7 @@ class RolePermissionSeeder extends Seeder
             'payments.update-status',
 
             /*
-             | PHASE 13B. Resending is a Manager job too. Repeating a message
+             | Resending is a Manager job too. Repeating a message
              | the visitor was already sent is not a decision about the
              | studio's business — the content, the recipient and the
              | reservation are all unchanged. Whoever is on the phone to

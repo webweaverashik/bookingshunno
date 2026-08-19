@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 /**
- * PHASE 19 — SSLCommerz credentials, now held in the database.
+ * SSLCommerz credentials, now held in the database.
  *
  * This reverses the Phase 13 decision that credentials live in .env and only in
  * .env. That call was yours, and the reason for it has not gone away: database

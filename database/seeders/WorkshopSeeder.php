@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
 /**
  * The printed Shunno workshop menu, as seed data.
  *
- * PHASE 6: App\Support\ExperienceCatalogue is deleted, so the menu lives here
+ * App\Support\ExperienceCatalogue is deleted, so the menu lives here
  * and nowhere else. From this point the admin panel is the source of truth —
  * this seeder only bootstraps an empty database.
  *

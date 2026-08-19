@@ -27,7 +27,7 @@ use App\Services\Setting\SettingsRepository;
 use App\Services\Voucher\VoucherService;
 
 /**
- * PHASE 12A — the single place a payment request is created or settled.
+ * The single place a payment request is created or settled.
  *
  * The controller does not do arithmetic and neither does the browser. Both ask
  * this class, so the figure in the modal, the figure in the database and the
@@ -210,7 +210,7 @@ class PaymentService
             );
 
             /*
-             | PHASE 12C — dispatched INSIDE the transaction, unlike a textbook
+             | Dispatched INSIDE the transaction, unlike a textbook
              | afterCommit, and for the same reason transition() is called from
              | in here: SendReservationNotifications catches every Throwable
              | itself and only logs, so a mail failure cannot roll this back.
@@ -447,7 +447,7 @@ class PaymentService
             $this->guardCollectable($payment, $amount);
 
             /*
-             | PHASE 12B — the receipt. PHASE 13 moved the money arithmetic out
+             | The receipt. PHASE 13 moved the money arithmetic out
              | into applySettlement(), which the gateway path also uses, so that
              | a card payment and a cash payment cannot drift apart in how they
              | credit a request.
@@ -472,7 +472,7 @@ class PaymentService
     }
 
     /**
-     * PHASE 13 — credit a settled attempt to its request.
+     * Credit a settled attempt to its request.
      *
      * The single place money moves, whichever way it arrived. Assumes the
      * transaction row already exists and is genuinely settled: record() writes
@@ -597,7 +597,7 @@ class PaymentService
         }
 
         /*
-         | PHASE 14A — the café coupon, issued only once the request is settled.
+         | The café coupon, issued only once the request is settled.
          |
          | On settlement, not on approval: the client's rule is that credit is
          | earned by a paid visit, and issuing it earlier would let somebody
@@ -622,7 +622,7 @@ class PaymentService
     }
 
     /**
-     * PHASE 13 — the shared guard for anything about to take money.
+     * The shared guard for anything about to take money.
      *
      * Run under the row lock in every caller. Throws rather than returning
      * false because each message is something a person needs to READ: an admin
@@ -651,7 +651,7 @@ class PaymentService
 
     /*
     |--------------------------------------------------------------------------
-    | Gateway (Phase 13)
+    | Gateway
     |--------------------------------------------------------------------------
     */
 
@@ -792,7 +792,7 @@ class PaymentService
     }
 
     /**
-     * PHASE 14C — settle a request, in whole or in part, with a voucher.
+     * Settle a request, in whole or in part, with a voucher.
      *
      * ORDER MATTERS. The voucher is redeemed FIRST, inside this transaction,
      * because that is the operation with a lock on it and the one that must not

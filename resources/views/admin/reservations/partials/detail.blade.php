@@ -39,7 +39,7 @@ visitor's history is exactly the mistake a one-click row button invites.
     </div>
 </div>
 
-{{-- PHASE 10A. An escalated request is waiting on a specific person's
+{{-- An escalated request is waiting on a specific person's
 judgement, and the reason it was escalated is the most important thing on
 the screen for whoever opens it next. --}}
 @if ($reservation->status === ReservationStatus::Escalated)
@@ -188,7 +188,7 @@ flag its own seats as a conflict with itself. --}}
     <div class="separator separator-dashed my-3"></div>
 
     @if ($reservation->hasManualPrice())
-        {{-- PHASE 10A. Both figures, always, and the gap between them. A single
+        {{-- Both figures, always, and the gap between them. A single
     number here would make an agreed price indistinguishable from the
     price list — and would hide an override left stale by a later
     change to the party size, which amend() deliberately does not
@@ -226,7 +226,7 @@ flag its own seats as a conflict with itself. --}}
         </div>
     @endif
 
-    {{-- ================= Messages (Phase 13B) ================= --}}
+    {{-- ================= Messages ================= --}}
     <div class="d-flex align-items-center justify-content-between gap-2 mt-4">
         <span class="text-muted fs-8">Emails sent about this reservation</span>
         <button type="button" class="btn btn-sm btn-light" data-action="load-messages"
@@ -237,7 +237,7 @@ flag its own seats as a conflict with itself. --}}
     </div>
     <div id="reservation-messages-{{ $reservation->id }}" data-messages-list class="mt-3" hidden></div>
 
-    {{-- ================= Payments (Phase 12A) ================= --}}
+    {{-- ================= Payments ================= --}}
     @php
         $latestPayment = $reservation->latestPayment();
         $paid = $reservation->amountPaid();
@@ -453,7 +453,7 @@ flag its own seats as a conflict with itself. --}}
     ])->filter(fn($action) => auth()->user()->can($action['ability'], $reservation));
 
     /*
-| PHASE 10B — who each VISIBLE decision writes to, derived rather than
+| Who each VISIBLE decision writes to, derived rather than
 | stated.
 |
 | The paragraph below used to name approving, declining and cancelling

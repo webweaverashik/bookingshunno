@@ -6,7 +6,7 @@ use Closure;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * PHASE 16 — writing a CSV without holding it in memory.
+ * Writing a CSV without holding it in memory.
  *
  * Two things this class exists for, and both are the difference between an
  * export that works on the client's hosting and one that does not.

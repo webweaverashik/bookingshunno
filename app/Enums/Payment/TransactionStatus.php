@@ -3,7 +3,7 @@
 namespace App\Enums\Payment;
 
 /**
- * PHASE 13 — the life of one payment attempt.
+ * The life of one payment attempt.
  *
  * Phase 12B wrote a hard-coded 'success' into this column and said the other
  * cases would arrive with the gateway. They have. An online payment is not an

@@ -8,8 +8,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
 /**
- * PHASE 14B — creating a gift voucher by hand.
- * PHASE 25  — the code is now typed rather than generated.
+ * Creating a gift voucher by hand.
+ * The code is now typed rather than generated.
  *
  * Only gift vouchers reach this. Café credit is issued by the system on
  * settlement and has no form: letting staff mint it by hand would decouple it

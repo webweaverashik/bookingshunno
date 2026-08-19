@@ -25,13 +25,13 @@ return [
         'percentage'       => 10,
     ],
 
-    // PHASE 12: the booking-fee split. Never hard-code 50 anywhere else.
+    // The booking-fee split. Never hard-code 50 anywhere else.
     'booking_fee_percentage' => env('BOOKING_FEE_PERCENTAGE', 50),
     'payment_deadline_hours' => env('PAYMENT_DEADLINE_HOURS', 48),
 
     'payments' => [
         /*
-         | PHASE 17 — how long before a deadline the reminder goes out.
+         | How long before a deadline the reminder goes out.
          |
          | 24 hours against a 48-hour deadline, so it lands roughly halfway:
          | late enough that somebody who was always going to pay today has
@@ -45,7 +45,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | PHASE 17 — response headers
+    | Response headers
     |--------------------------------------------------------------------------
     | Read by App\Http\Middleware\SecurityHeaders. Only HSTS is configurable;
     | the rest are unconditional because there is no situation in which this
@@ -70,7 +70,7 @@ return [
         'hsts_max_age' => env('HSTS_MAX_AGE', 300),
     ],
 
-    // PHASE 14: cafe credit issued with the entry fee. The printed menu says
+    // Cafe credit issued with the entry fee. The printed menu says
     // it is redeemable against food and drinks only.
     'cafe_credit' => [
         'entry_fee_coupon' => 50,

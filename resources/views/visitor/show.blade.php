@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — one booking in full.
+    One booking in full.
 
     The payment panel reproduces the brief's §10 summary exactly — total, type,
     required, paid, remaining — and takes every figure from the PAYMENT

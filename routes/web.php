@@ -37,7 +37,7 @@ use Illuminate\Support\Facades\Route;
 | string. That is what the QR code on the printed reservation card and the
 | "request a visit" links in emails should point at.
 |
-| PHASE 7C: every throttle here is now a NAMED limiter defined in
+| Every throttle here is now a NAMED limiter defined in
 | App\Providers\RateLimitServiceProvider. The inline form (`throttle:8,1`) keys
 | on domain and IP only — not on the route — so all three of these shared a
 | single counter and the availability polling from the popup was exhausting the
@@ -75,7 +75,7 @@ Route::middleware('throttle:availability')
 
 /*
 |--------------------------------------------------------------------------
-| PHASE 12B — the visitor's payslip
+| The visitor's payslip
 |--------------------------------------------------------------------------
 | No login. The 48-character token on the payment IS the credential, which is
 | how payment links work everywhere — the alternative is asking somebody to
@@ -132,7 +132,7 @@ Route::prefix('payment/gateway')->name('payment.gateway.')->group(function () {
 });
 
 /*
-| PHASE 14C — spending a voucher against a payment request.
+| Spending a voucher against a payment request.
 |
 | Two steps: check() validates and previews, apply() commits. The split exists
 | because a voucher is single use and all or nothing, so a visitor about to
@@ -157,7 +157,7 @@ Route::get('receipt/{token}/{transaction:reference}', [PayslipController::class,
 
 /*
 |--------------------------------------------------------------------------
-| PHASE 17 — /send-test-email has been removed
+| /send-test-email has been removed
 |--------------------------------------------------------------------------
 | It was an unauthenticated GET that sent mail to a hard-coded address. Three
 | things were wrong with leaving it on a public host:

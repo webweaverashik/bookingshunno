@@ -47,7 +47,7 @@ class ReservationDecisionController extends Controller
     }
 
     /**
-     * PHASE 10A — hand the decision to an Admin.
+     * Hand the decision to an Admin.
      *
      * A Manager may prepare a request — fix the party size, move the date — but
      * not commit the studio to it. This is how they ask.
@@ -166,7 +166,7 @@ class ReservationDecisionController extends Controller
             ], 409);
         }
 
-        // PHASE 11: the notification for this transition goes out here, from an
+        // The notification for this transition goes out here, from an
         // event the service raises rather than from this controller. Escalated
         // is the one that needs to reach staff rather than the visitor.
 

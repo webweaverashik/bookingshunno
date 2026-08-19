@@ -18,7 +18,7 @@ use Illuminate\View\View;
 use RuntimeException;
 
 /**
- * PHASE 14B — the voucher register, plus the counter workflow.
+ * The voucher register, plus the counter workflow.
  *
  * The counter workflow is lookup() and it is the reason this module exists in
  * the shape it does. A visitor holding a coupon is standing in front of
@@ -119,7 +119,7 @@ class VoucherController extends Controller
         if (! $voucher) {
             return response()->json([
                 'success' => false,
-                // PHASE 25: this used to promise our codes contain no letter O
+                // This used to promise our codes contain no letter O
                 // and no zero. Admins now type their own codes, so that promise
                 // is no longer ours to make.
                 'message' => 'No voucher with that code. Check the spelling — letters and numbers only, and case does not matter.',

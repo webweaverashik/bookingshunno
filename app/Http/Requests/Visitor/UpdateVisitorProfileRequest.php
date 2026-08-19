@@ -5,7 +5,7 @@ namespace App\Http\Requests\Visitor;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PHASE 15 — the only thing a visitor may write.
+ * The only thing a visitor may write.
  *
  * Three fields, and email is not among them: see the note on
  * VisitorAreaController::updateAccount() for why the address is not editable

@@ -164,7 +164,7 @@ class Voucher extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Editing and deleting  (PHASE 25)
+    | Editing and deleting
     |--------------------------------------------------------------------------
     | Both answer with a REASON rather than a bare boolean, for the same reason
     | unusableReason() does: the policy needs a yes or no to draw a button, and

@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * PHASE 16 — reports and CSV export.
+ * Reports and CSV export.
  *
  * Four reports, one controller, one filter resolver. The last of those is the
  * important one: index(), list() and export() all call filters() and hand the
@@ -456,7 +456,7 @@ class ReportController extends Controller
                     ->all(),
 
             /*
-             | PHASE 21 — filtered by key PREFIX, matching the tabs on the
+             | Filtered by key PREFIX, matching the tabs on the
              | settings screen. The values here are what changesQuery() runs a
              | LIKE against, so 'sslcommerz.' catches every gateway key without
              | listing them.

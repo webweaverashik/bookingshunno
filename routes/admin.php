@@ -32,8 +32,8 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 9 — Reservations
-        | PHASE 10 — Approval workflow
+        | Reservations
+        | Approval workflow
         |----------------------------------------------------------------------
         | Bound on the reference code, which is Reservation's route key: an
         | admin pasting SHN-2608-A7K3 from an email lands on the right record,
@@ -73,7 +73,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 6 — Workshops
+        | Workshops
         |----------------------------------------------------------------------
         */
         Route::prefix('workshops')
@@ -91,7 +91,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 7 — Availability
+        | Availability
         |----------------------------------------------------------------------
         | Gated on availability.view; BlockedDatePolicy handles the write
         | abilities per action. Manager holds view only and so reaches the page
@@ -120,7 +120,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 8 — Visitors
+        | Visitors
         |----------------------------------------------------------------------
         | Bound on {visitor:id}. No policy class: a policy on
         | App\Models\Auth\User would also govern staff-user management in a
@@ -148,7 +148,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 12A — Payments
+        | Payments
         |----------------------------------------------------------------------
         | Gated on payments.view for the whole group; PaymentPolicy handles the
         | write abilities per action, because record and cancel both depend on
@@ -208,7 +208,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 13B — communications
+        | Communications
         |----------------------------------------------------------------------
         | Two list endpoints rather than one filtered one: a reservation drawer
         | wants everything ever sent about the booking, a payment drawer wants
@@ -235,7 +235,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 14B — vouchers
+        | Vouchers
         |----------------------------------------------------------------------
         | Gated on vouchers.view for the group; VoucherPolicy handles the write
         | abilities per action, because redeem and cancel both depend on the
@@ -262,7 +262,7 @@ Route::prefix('admin')
                 Route::get('lookup', [VoucherController::class, 'lookup'])->name('lookup');
 
                 /*
-                 | PHASE 25 — is this code free?
+                 | Is this code free?
                  |
                  | Another literal segment, and it has to stay above
                  | {voucher:code} or 'check-code' would be bound as a voucher
@@ -279,7 +279,7 @@ Route::prefix('admin')
                 Route::get('{voucher:code}', [VoucherController::class, 'show'])->name('show');
 
                 /*
-                 | PHASE 25 — full CRUD on gift vouchers.
+                 | Full CRUD on gift vouchers.
                  |
                  | POST to update and DELETE to destroy, matching workshops and
                  | users. The middleware here is the coarse gate — "may this
@@ -309,7 +309,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 16 — reports and CSV export
+        | Reports and CSV export
         |----------------------------------------------------------------------
         | Gated on reports.view for the whole group, with reports.export as a
         | second gate on the download alone. Both are held by Admin and Manager,
@@ -346,7 +346,7 @@ Route::prefix('admin')
                     ->name('export');
 
                 /*
-                 | PHASE 20 — clearing a log.
+                 | Clearing a log.
                  |
                  | Its own permission, Admin-only, and separate from
                  | reports.export on purpose: reading a log and destroying one
@@ -365,7 +365,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 17 — settings
+        | Settings
         |----------------------------------------------------------------------
         | settings.view and settings.update are Admin-only in the seeder, and
         | left that way. A Manager runs the floor; they record payments and
@@ -395,7 +395,7 @@ Route::prefix('admin')
                     Route::post('mail', [SettingController::class, 'updateMail'])->name('mail');
 
                     /*
-                     | PHASE 19 — the gateway tab is a form now, not a read-only
+                     | The gateway tab is a form now, not a read-only
                      | panel. Credentials moved from .env into the settings
                      | table; both store passwords are encrypted at rest and
                      | never sent back to the browser.
@@ -416,7 +416,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 17 — your own account
+        | Your own account
         |----------------------------------------------------------------------
         | No permission gate. Every signed-in member of staff may edit
         | themselves, and the controller reads $request->user() rather than an
@@ -434,7 +434,7 @@ Route::prefix('admin')
                 Route::post('/', [ProfileController::class, 'update'])->name('update');
 
                 /*
-                 | PHASE 19 — there is no longer an 'activity' endpoint. The
+                 | There is no longer an 'activity' endpoint. The
                  | sign-in history is capped at the last 30 entries and rendered
                  | with the page, then paged and searched by DataTables in the
                  | browser. A server round trip to page thirty rows would be a
@@ -448,7 +448,7 @@ Route::prefix('admin')
 
         /*
         |----------------------------------------------------------------------
-        | PHASE 20 — staff accounts
+        | Staff accounts
         |----------------------------------------------------------------------
         | users.* is Admin-only in the seeder, and stays that way. A Manager who
         | could create accounts could create an Admin, which makes the

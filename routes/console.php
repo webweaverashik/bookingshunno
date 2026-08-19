@@ -32,21 +32,42 @@ Artisan::command('inspire', function () {
 | find again in a year, and one thing to fix when the PHP path changes after a
 | panel upgrade.
 |
-|   --stop-when-empty  exits the moment the queue drains, so an idle minute
-|                      costs a process start and nothing else. It also means
-|                      each run boots the current code, which is how a deploy
-|                      takes effect without queue:restart — unavailable here.
+| --stop-when-empty IS GONE, and that is the whole point of this block.
 |
-|   --max-time=50      exits before the next tick, so runs never stack up.
-|                      Shared hosts kill long processes anyway.
+| It exited the moment the queue drained, which is almost immediately — so the
+| worker was alive for a fraction of a second per minute and a job pushed just
+| after it quit waited for the next tick. That is why one approval email took
+| up to a minute to arrive with nothing whatsoever queued behind it: the delay
+| was never a backlog, it was a worker that had already gone home. Average wait
+| about thirty seconds, worst case sixty.
 |
-|   --tries=3          a Gmail SMTP hiccup retries rather than landing in
-|                      failed_jobs on the first stumble.
+| Without it the worker LISTENS for its fifty-five seconds and picks a job up
+| within about one. Cron starts a fresh one each minute, so there is a gap of
+| roughly five seconds a minute where a job waits — the price of not having a
+| supervisor on shared hosting, and two orders of magnitude better than before.
+|
+|   --max-time=55   exits before the next tick, so runs never stack up. Shared
+|                   hosts kill long processes anyway, and this leaves before
+|                   being killed rather than after.
+|
+|   --sleep=1       how long to wait after finding nothing. The default is 3,
+|                   which would put three seconds back onto every email for no
+|                   reason: one idle query a second against a database this
+|                   size costs nothing measurable.
+|
+|   --tries=3       a Gmail SMTP hiccup retries rather than landing in
+|                   failed_jobs on the first stumble.
+|
+| ONE THING WE GIVE UP: --stop-when-empty also meant every run booted the
+| current code, which is how a deploy took effect here without queue:restart —
+| unavailable on this host. A worker started before an upload now runs the old
+| code until its fifty-five seconds are up. Under a minute, once per deploy,
+| and worth it.
 |
 | withoutOverlapping() is belt and braces on top of --max-time. It takes a
 | cache lock; the cache driver is `database`, so this works without Redis.
 */
-Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=3')
+Schedule::command('queue:work --max-time=55 --sleep=1 --tries=3')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
@@ -63,7 +84,7 @@ Schedule::command('queue:prune-failed --hours=336')->weekly();
 
 /*
 |--------------------------------------------------------------------------
-| PHASE 17 — the payment deadline reminder
+| The payment deadline reminder
 |--------------------------------------------------------------------------
 | Half of what the Phase 12 note above anticipated. The reminder is here; the
 | expiry is NOT, and deliberately so — see the header of RemindPaymentDeadlines

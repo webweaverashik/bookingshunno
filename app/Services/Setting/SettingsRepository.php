@@ -25,7 +25,7 @@ class SettingsRepository
         return Cache::rememberForever(self::CACHE_KEY, function () {
             return Setting::query()
                 /*
-                 | PHASE 17 — secrets are excluded from this cache on purpose.
+                 | Secrets are excluded from this cache on purpose.
                  |
                  | Their stored value is ciphertext, so get('mail.password')
                  | would hand back an encrypted blob that looks like a password
@@ -62,7 +62,7 @@ class SettingsRepository
     }
 
     /**
-     * PHASE 17 — write several keys and flush the cache once.
+     * Write several keys and flush the cache once.
      *
      * A settings form saves a dozen rows at a time. Calling set() in a loop
      * would flush the cache a dozen times, and every flush is followed by the
@@ -110,7 +110,7 @@ class SettingsRepository
     |--------------------------------------------------------------------------
     | Secrets
     |--------------------------------------------------------------------------
-    | PHASE 17 — the SMTP password, and anything else like it.
+    | The SMTP password, and anything else like it.
     |
     | Encrypted with APP_KEY before it touches the table, which makes the stored
     | value useless on its own. That matters because of where database rows go
@@ -196,7 +196,7 @@ class SettingsRepository
     |--------------------------------------------------------------------------
     | The change log
     |--------------------------------------------------------------------------
-    | PHASE 21. Here rather than in the controller because this class is the
+    | Here rather than in the controller because this class is the
     | single choke point every settings write already passes through — set(),
     | setMany() and setSecret() are the only three ways a row in that table
     | changes. Logging in the controller would mean five call sites today and a

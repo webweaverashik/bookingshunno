@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — step one of getting in.
+    Step one of getting in.
 
     One field. There is no password field because there is no password: a
     visitor account is created by ReservationService::resolveVisitor() with a

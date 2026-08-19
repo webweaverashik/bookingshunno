@@ -1,5 +1,5 @@
 {{--
-    PHASE 13B — what was sent, and whether it left.
+    What was sent, and whether it left.
 
     Loaded on demand rather than rendered with the drawer. Most of the time
     nobody asks this question, and a query per drawer open to answer it would be

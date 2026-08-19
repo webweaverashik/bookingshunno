@@ -5,7 +5,7 @@ namespace App\Enums\Payment;
 use App\Models\Voucher\Voucher;
 
 /**
- * PHASE 12A — how money actually arrived.
+ * How money actually arrived.
  *
  * An enum rather than a free-text field because this is what the payment report
  * groups by in Phase 16, and "bKash", "Bkash", "bkash " and "BKASH" are four

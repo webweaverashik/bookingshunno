@@ -11,7 +11,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
- * PHASE 20 — one report, three files.
+ * One report, three files.
  *
  * All three are built from the SAME rows: ReportService::stream() feeds this
  * class exactly what it feeds the CSV, so a spreadsheet and a PDF of the same

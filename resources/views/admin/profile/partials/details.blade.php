@@ -8,7 +8,7 @@
     submitted address against the database and demands the password itself, so
     stripping the field out of the DOM achieves nothing.
 
-    PHASE 19 — this is now the ONLY place the current password is asked for; the
+    This is now the ONLY place the current password is asked for; the
     password-change form no longer wants it. Not an inconsistency. A password
     taken from you is recoverable, because the reset link goes to your address.
     An ADDRESS taken from you is not: the reset goes to the attacker and the

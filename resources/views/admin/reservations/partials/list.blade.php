@@ -3,7 +3,7 @@
     paginator. Swapped wholesale by reservations.js after any search, filter,
     sort, page change, edit or decision — nothing in the browser builds a row.
 
-    PHASE 10A: sorting is server-side, like the paging and the search already
+    Sorting is server-side, like the paging and the search already
     were. See the note in RendersReservations for why this is not DataTables.
 --}}
 

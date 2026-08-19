@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PHASE 17 — the rules that decide what the public booking form will accept.
+ * The rules that decide what the public booking form will accept.
  *
  * Every bound here is a real one rather than a formality, because each of these
  * numbers can make the reservation form unusable if it is set carelessly and

@@ -6,7 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * PHASE 19 — the current-password requirement has been REMOVED, at your
+ * The current-password requirement has been REMOVED, at your
  * instruction. Worth recording what that costs, once, so it is a decision on
  * the record rather than a gap somebody finds later.
  *

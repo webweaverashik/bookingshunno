@@ -14,7 +14,7 @@ use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 14A — a voucher's own Mailable.
+ * A voucher's own Mailable.
  *
  * Separate from ReservationNotificationMail, and this is the one place where a
  * second Mailable earns itself. That class requires a Reservation for its

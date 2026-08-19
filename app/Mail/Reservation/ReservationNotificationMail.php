@@ -16,7 +16,7 @@ use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 11 — every reservation notification.
+ * Every reservation notification.
  *
  * ShouldQueue, unlike LoginOtpMail. The OTP mail is deliberately synchronous
  * because the login controller has to know whether it failed; these are the
@@ -40,7 +40,7 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
     use SerializesModels;
 
     /**
-     * PHASE 12C — the Shunno mail theme.
+     * The Shunno mail theme.
      *
      * Set here rather than in config/mail.php so it applies to reservation mail
      * only. LoginOtpMail is a functional message that should stay plain, and
@@ -76,7 +76,7 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
         public ?string $note = null,
 
         /*
-         | PHASE 12C. Null for every kind except the two payment ones, which
+         | Null for every kind except the two payment ones, which
          | cannot be rendered without it — an amount, a deadline and a link do
          | not exist on a reservation.
          |
@@ -94,7 +94,7 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
         public ?PaymentTransaction $transaction = null,
 
         /*
-         | PHASE 13B. The communications row this message belongs to, stamped
+         | The communications row this message belongs to, stamped
          | into the outgoing headers so LogMailDelivery can flip it to Sent when
          | the transport accepts it — which happens in the queue worker, in a
          | different process, minutes later.
@@ -107,7 +107,7 @@ class ReservationNotificationMail extends Mailable implements ShouldQueue
     }
 
     /**
-     * PHASE 13B — the correlation header.
+     * The correlation header.
      *
      * Matching a delivery back to a log row on recipient and subject would
      * break the first time two identical emails went to one address, which is

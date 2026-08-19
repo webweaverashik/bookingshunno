@@ -85,7 +85,7 @@ class ReservationService
         });
 
         /*
-        | PHASE 11 — raised AFTER the transaction, deliberately.
+        | Raised AFTER the transaction, deliberately.
         |
         | A listener that throws inside the transaction rolls the whole thing
         | back, which would mean an unreachable mail server silently discarding
@@ -280,7 +280,7 @@ class ReservationService
     }
 
     /**
-     * PHASE 12A — write a line into the history without changing anything.
+     * Write a line into the history without changing anything.
      *
      * amend() was the obvious candidate and is the wrong one: it prefixes every
      * entry with "Edited", which is true when someone corrected a date and a
@@ -347,7 +347,7 @@ class ReservationService
         });
 
         /*
-        | PHASE 11 — outside the transaction, for the same reason as above.
+        | Outside the transaction, for the same reason as above.
         |
         | A decline is recorded the moment it is made. Whether the email
         | announcing it went out is a separate question, and a mail failure must

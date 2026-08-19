@@ -10,7 +10,7 @@ use Illuminate\View\View;
 use App\Http\Controllers\Controller;
 
 /**
- * PHASE 12B — the payslip.
+ * The payslip.
  *
  * One controller and one view for two audiences, reached by two different
  * routes with two different credentials:
@@ -45,7 +45,7 @@ class PayslipController extends Controller
         // and not a silently different document.
         abort_unless($transaction->payment_id === $payment->id, 404);
 
-        // PHASE 13. Only a settled attempt is a receipt. A failed or in-flight
+        // Only a settled attempt is a receipt. A failed or in-flight
         // one has no amount received, no balance and no moment — rendering a
         // payslip for it would produce a document asserting a payment that
         // never happened.

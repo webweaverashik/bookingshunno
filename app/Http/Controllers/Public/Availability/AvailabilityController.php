@@ -20,7 +20,7 @@ use Illuminate\Http\Request;
  * service on submit. These endpoints exist so the visitor is not told "no"
  * only after filling in the whole form.
  *
- * PHASE 7C:
+ * 
  *   - split into slots() and calendar(); the route names are unchanged for the
  *     first and `availability.calendar` for the second;
  *   - both send no-store, because a cached month is a month that keeps showing

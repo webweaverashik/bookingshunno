@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 14A — which experiences earn café credit, and how much.
+ * Which experiences earn café credit, and how much.
  *
  * The client's rule is that only the non-session visit types earn it. That
  * could have been hard-coded against WorkshopCategory::Other, and this is

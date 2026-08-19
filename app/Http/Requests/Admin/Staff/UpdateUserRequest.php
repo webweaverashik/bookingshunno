@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 /**
- * PHASE 20 — editing a staff account.
+ * Editing a staff account.
  *
  * Identical to StoreUserRequest except that the password is nullable and the
  * uniqueness rule ignores this row.

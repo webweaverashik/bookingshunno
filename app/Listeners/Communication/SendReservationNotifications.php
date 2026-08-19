@@ -17,7 +17,7 @@ use App\Services\Setting\SettingsRepository;
 use Illuminate\Support\Facades\Log;
 
 /**
- * PHASE 11 — turns reservation events into email.
+ * Turns reservation events into email.
  *
  * Deliberately NOT ShouldQueue itself. Everything it does is decide who gets
  * what and hand a queued Mailable to the queue, which is cheap; queueing the
@@ -71,7 +71,7 @@ class SendReservationNotifications
     }
 
     /**
-     * PHASE 12C — the payment link.
+     * The payment link.
      *
      * Raised by PaymentService rather than derived from the status change,
      * because the email needs the amount and the deadline. The corresponding
@@ -89,7 +89,7 @@ class SendReservationNotifications
     }
 
     /**
-     * PHASE 12C — the receipt.
+     * The receipt.
      *
      * Sent for every settlement, whether the gateway confirmed it or a member
      * of staff wrote it down. A visitor who paid cash at the counter should
@@ -107,7 +107,7 @@ class SendReservationNotifications
     }
 
     /**
-     * PHASE 14A — a voucher has been issued.
+     * A voucher has been issued.
      *
      * Handled here rather than in a listener of its own because everything that
      * makes this awkward — the notifications kill switch, the failure handling,
@@ -210,7 +210,7 @@ class SendReservationNotifications
         ?PaymentTransaction $transaction = null,
     ): void {
         /*
-         | PHASE 13B — handed to CommunicationLogger rather than to Mail
+         | Handed to CommunicationLogger rather than to Mail
          | directly. It writes the log row first so the id can be stamped into
          | the message, and it owns the try/catch that used to live here. One
          | class sends every reservation email, first time and resend alike, so

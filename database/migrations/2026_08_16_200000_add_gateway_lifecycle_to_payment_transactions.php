@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 13 — room for attempts that never became receipts.
+ * Room for attempts that never became receipts.
  *
  * 12B built this table around a settlement that had already happened, so
  * balance_after and received_at were both NOT NULL: money had arrived, and we

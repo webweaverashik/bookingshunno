@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
- * PHASE 16 — the four reports.
+ * The four reports.
  *
  * One class rather than four, because the reports share the thing that is worth
  * sharing — a date range, a status filter, and the rule that the export must
@@ -72,7 +72,7 @@ class ReportService
     }
 
     /**
-     * PHASE 21 — who changed a setting.
+     * Who changed a setting.
      *
      * changedBy eager-loaded because the whole value of this log is the name
      * beside the change, and a page of fifty rows without it is fifty extra
@@ -102,7 +102,7 @@ class ReportService
 
     /*
     |--------------------------------------------------------------------------
-    | Logs (Phase 20)
+    | Logs
     |--------------------------------------------------------------------------
     */
 

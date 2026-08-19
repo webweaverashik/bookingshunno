@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 12A — one row per payment REQUEST.
+ * One row per payment REQUEST.
  *
  * Not one row per transaction. A request is the studio saying "this much, by
  * then"; a transaction is an attempt to satisfy it. SSLCommerz will produce

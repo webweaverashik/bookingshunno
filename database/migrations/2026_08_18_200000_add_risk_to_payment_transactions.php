@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 22 — SSLCommerz's own fraud assessment, stored where it can be seen.
+ * SSLCommerz's own fraud assessment, stored where it can be seen.
  *
  * THE GAP THIS FILLS. The v4 documentation says, in the overview and again in
  * its sample code: "Sometime you will get Risk payments (In response you will

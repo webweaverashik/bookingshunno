@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * PHASE 17 — SMTP.
+ * SMTP.
  *
  * THE PASSWORD IS NULLABLE, AND THAT IS THE POINT. The stored value is never
  * sent to the browser, so the field renders empty on every load. If empty meant

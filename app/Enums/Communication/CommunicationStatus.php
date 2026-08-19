@@ -3,7 +3,7 @@
 namespace App\Enums\Communication;
 
 /**
- * PHASE 13B — how far an email got.
+ * How far an email got.
  *
  * Three states, and the gap between the first two is the useful part. Queued
  * means we handed it to the queue; Sent means the mail transport accepted it

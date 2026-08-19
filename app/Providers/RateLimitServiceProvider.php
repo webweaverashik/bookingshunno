@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * PHASE 7C — why this file exists.
+ * Why this file exists.
  *
  * The inline form of the throttle middleware — `throttle:8,1` — does NOT key on
  * the route. Illuminate\Routing\Middleware\ThrottleRequests::resolveRequestSignature()
@@ -69,7 +69,7 @@ class RateLimitServiceProvider extends ServiceProvider
             ->by('otp-resend:' . $request->ip()));
 
         /*
-        | PHASE 12B — the visitor's payslip.
+        | The visitor's payslip.
         |
         | Keyed on the TOKEN as well as the IP. The token is the credential, so
         | the thing worth rate limiting is attempts against one, not traffic
@@ -82,7 +82,7 @@ class RateLimitServiceProvider extends ServiceProvider
         | needs a hundred views of one document in an afternoon.
         */
         /*
-        | PHASE 14C — guessing at voucher codes.
+        | Guessing at voucher codes.
         |
         | Tighter than anything else public, because this is the only endpoint
         | that takes a code and answers whether it is real. A code is twelve
@@ -101,7 +101,7 @@ class RateLimitServiceProvider extends ServiceProvider
         ]);
 
         /*
-        | PHASE 15 — the visitor's passwordless sign-in.
+        | The visitor's passwordless sign-in.
         |
         | Three buckets, all separate from the staff ones above. Sharing 'otp'
         | between the two audiences would mean a visitor on a café's wifi could
@@ -117,7 +117,7 @@ class RateLimitServiceProvider extends ServiceProvider
         | full of codes nobody asked for is its own kind of harm.
         */
         /*
-        | PHASE 17 — the two admin endpoints that need a ceiling.
+        | The two admin endpoints that need a ceiling.
         |
         | 'test-email' sends real mail every time it is called. Without a limit,
         | an Admin holding the button down would burn through the mail

@@ -14,7 +14,7 @@ use Illuminate\Validation\Validator;
  * One request class for create and update. The only rule that differs is the
  * slug's unique-ignore, which route model binding gives us for free.
  *
- * PHASE 7A: the duration ceiling and the step size now come from
+ * The duration ceiling and the step size now come from
  * AvailabilityService rather than the deleted SessionSlots, so editing the
  * operating hours immediately changes what durations are accepted here.
  */
@@ -58,7 +58,7 @@ class WorkshopRequest extends FormRequest
             'price'       => ['required', 'numeric', 'min:0', 'max:9999999.99'],
 
             /*
-             | PHASE 14A — café credit per person, in taka.
+             | Café credit per person, in taka.
              |
              | Nullable and defaulting to zero: almost every workshop earns
              | nothing, and requiring a figure would make staff type 0 into

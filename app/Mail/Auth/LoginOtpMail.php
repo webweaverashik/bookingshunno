@@ -12,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Deliberately NOT ShouldQueue. The login controller needs to know whether the
  * send failed so it can say so, rather than leaving someone staring at an OTP
  * screen for a code that was never dispatched. Every other mailable in the
- * system (Phase 11) should be queued.
+ * system should be queued.
  */
 class LoginOtpMail extends Mailable
 {

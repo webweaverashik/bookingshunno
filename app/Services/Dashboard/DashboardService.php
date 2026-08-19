@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 use App\Services\Setting\SettingsRepository;
 
 /**
- * PHASE 23 — everything the dashboard shows.
+ * Everything the dashboard shows.
  *
  * A service rather than a fat controller, for the usual reason and one specific
  * one: several of these figures also appear elsewhere — outstanding money on

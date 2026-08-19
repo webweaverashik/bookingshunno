@@ -60,7 +60,7 @@ class StoreReservationRequest extends FormRequest
     }
 
     /**
-     * PHASE 7A: every date, slot and capacity rule now comes from
+     * Every date, slot and capacity rule now comes from
      * AvailabilityService. This class previously owned a Sunday check and a
      * slot-fits check of its own, which meant the same business rule existed in
      * two places and only one of them read the operating_hours table.

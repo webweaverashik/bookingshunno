@@ -19,7 +19,7 @@ use App\Models\Payment\Payment;
  * "trust a gateway callback" — a genuinely different act from "a human says
  * this money arrived", and one worth being able to grant separately.
  *
- * PHASE 12C: Manager now holds payments.update-status as well, on the client's
+ * Manager now holds payments.update-status as well, on the client's
  * instruction that they may take payment offline. No method here changed — the
  * seeder answered it, as in 10A and 10B. Manager still cannot approve, decline
  * or cancel a reservation; recording money that arrived is a fact, not a

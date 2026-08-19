@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * PHASE 12B — one settlement, and the payslip that documents it.
+ * One settlement, and the payslip that documents it.
  *
  * Immutable by intent. Nothing in the application updates a transaction after
  * it is written: a receipt the visitor is holding must say the same thing next
@@ -56,7 +56,7 @@ class PaymentTransaction extends Model
     }
 
     /**
-     * PHASE 13 — a settled attempt, as opposed to one still in flight or one
+     * A settled attempt, as opposed to one still in flight or one
      * that failed. Only these render a payslip and only these moved money.
      */
     public function scopeReceipts(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder

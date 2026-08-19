@@ -7,7 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use Throwable;
 
 /**
- * PHASE 17 — makes the SMTP settings form actually do something.
+ * Makes the SMTP settings form actually do something.
  *
  * THE TRAP THIS EXISTS TO AVOID. Writing mail.host into the settings table
  * changes nothing on its own. Laravel reads config/mail.php once at boot, from
@@ -108,7 +108,7 @@ class RuntimeConfigServiceProvider extends ServiceProvider
     |--------------------------------------------------------------------------
     | SSLCommerz
     |--------------------------------------------------------------------------
-    | PHASE 19 — credentials moved out of .env and into the settings table, at
+    | Credentials moved out of .env and into the settings table, at
     | your instruction. Both stores are held: sandbox and live, with a mode
     | setting choosing between them.
     |

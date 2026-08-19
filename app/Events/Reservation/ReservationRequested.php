@@ -7,7 +7,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 11 — a visitor has submitted a request from the website.
+ * A visitor has submitted a request from the website.
  *
  * Separate from ReservationStatusChanged even though a new reservation does
  * land on Pending. The two are different facts: this one says "something new

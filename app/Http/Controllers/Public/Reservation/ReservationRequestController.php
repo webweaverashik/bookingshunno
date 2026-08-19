@@ -18,7 +18,7 @@ class ReservationRequestController extends Controller
     /**
      * Receive a reservation request from the popup and persist it.
      *
-     * PHASE 4 CLOSEOUT: this used to generate a reference, return it, and throw
+     * This used to generate a reference, return it, and throw
      * everything away. ReservationService does the whole job in one
      * transaction — visitor, reservation, line item, purposes, first status
      * history row — and it is the only place a reservation is ever created, so

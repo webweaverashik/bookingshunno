@@ -9,7 +9,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * PHASE 11 — a reservation moved from one status to another.
+ * A reservation moved from one status to another.
  *
  * Carries the note alongside the statuses. The note is the reason for a
  * decline, the question being asked of a visitor, or what an Admin is being

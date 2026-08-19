@@ -1,5 +1,5 @@
 {{--
-    PHASE 15 — the returning visitor's home.
+    The returning visitor's home.
 
     Ordered by what somebody actually came here for: what is next, then what is
     owed, then what they hold, then what has already happened. The archive is

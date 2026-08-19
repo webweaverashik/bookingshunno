@@ -14,7 +14,7 @@ use Illuminate\View\View;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
- * PHASE 15 — how a returning visitor gets in.
+ * How a returning visitor gets in.
  *
  * NO PASSWORD. Not a shortcut — a visitor account has never had a password its
  * owner could know. ReservationService::resolveVisitor() creates one with a

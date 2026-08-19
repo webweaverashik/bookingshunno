@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 12B — one row per settlement event.
+ * One row per settlement event.
  *
  * Brought forward from Phase 13 because the client requires a payslip for every
  * receipt, online or manual, and a payslip needs its own amount, method,

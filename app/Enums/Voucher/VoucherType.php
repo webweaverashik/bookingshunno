@@ -3,7 +3,7 @@
 namespace App\Enums\Voucher;
 
 /**
- * PHASE 14A — where a voucher came from and what it buys.
+ * Where a voucher came from and what it buys.
  *
  * The distinction that matters is not "who paid for it" but WHERE IT IS SPENT,
  * because that decides whether it can ever touch a reservation total. Café

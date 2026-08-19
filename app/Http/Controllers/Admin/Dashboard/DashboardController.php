@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * PHASE 23 — the dashboard.
+ * The dashboard.
  *
  * ---------------------------------------------------------------------------
  * GATED BY PERMISSION, NOT BY ROLE

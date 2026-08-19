@@ -7,11 +7,11 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * PHASE 17 — the headers every response should have been carrying.
+ * The headers every response should have been carrying.
  *
  * These replace the frame-busting script that has been sitting in the admin
  * <head> since Phase 5, and they close a token leak that has been live since
- * Phase 12. Taken one at a time.
+ * Taken one at a time.
  *
  * ---------------------------------------------------------------------------
  * 1. FRAMING — why the script it replaces did not work

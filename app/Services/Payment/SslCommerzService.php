@@ -11,7 +11,7 @@ use RuntimeException;
 use App\Services\Setting\SettingsRepository;
 
 /**
- * PHASE 13 — everything that talks to SSLCommerz.
+ * Everything that talks to SSLCommerz.
  *
  * Two jobs, and the second is the important one:
  *
@@ -126,7 +126,7 @@ class SslCommerzService
             'cus_city'    => 'Dhaka',
 
             /*
-             | PHASE 22 — the v4 docs list cus_postcode as Mandatory and it was
+             | The v4 docs list cus_postcode as Mandatory and it was
              | missing. In practice sandbox accepts a session without it; live
              | stores have been known not to, and the refusal comes back as a
              | generic failedreason that points at nothing.
@@ -228,7 +228,7 @@ class SslCommerzService
         $body = $response->json() ?? [];
 
         /*
-         | PHASE 22 — APIConnect first, before anything else is read.
+         | APIConnect first, before anything else is read.
          |
          | The docs define it as the AUTHENTICATION result, separately from the
          | transaction result: INVALID_REQUEST, FAILED (bad credentials),
@@ -331,7 +331,7 @@ class SslCommerzService
     */
 
     /**
-     * PHASE 22 — is this IPN actually from SSLCommerz?
+     * Is this IPN actually from SSLCommerz?
      *
      * THE HOLE THIS CLOSES. The IPN endpoint is public, unauthenticated and
      * CSRF-exempt, as it has to be. Before this, anybody who learned a tran_id

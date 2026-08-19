@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 13B — a record of every email the system sends.
+ * A record of every email the system sends.
  *
  * §18 asks for communication history and no earlier phase built it. Until now
  * the only trace of an email was a line in laravel.log, and only while

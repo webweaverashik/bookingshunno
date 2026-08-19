@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * PHASE 10A — Admin may set a reservation's total to any figure.
+ * Admin may set a reservation's total to any figure.
  *
  * Stored separately from total_amount rather than by simply writing over it.
  * total_amount is what the studio will charge; subtotal, discount_amount and
