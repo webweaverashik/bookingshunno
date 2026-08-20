@@ -1,0 +1,410 @@
+/* =============================================================================
+   SHUNNO ART CAFE — error pages
+   -----------------------------------------------------------------------------
+   Cyanotype. Deep Prussian blue, cream type, paper grain — the process the
+   studio runs, and where the accent colour on the public site comes from. A
+   dead end should still feel like the place you were trying to reach.
+
+   STANDALONE. An error page is shown when something has already gone wrong, so
+   it depends on nothing that could BE the thing that went wrong: not
+   public.css, not the Metronic bundles, not a build step. Everything is here.
+
+   The palette is copied from public.css rather than imported. Eight repeated
+   hex codes against a 404 that renders unstyled because a stylesheet moved is
+   an easy trade.
+   ============================================================================= */
+
+:root {
+    --err-deep: #0f1e2b;
+    --err-cyan: #2a4a63;
+    --err-cyan-lift: #35597a;
+    --err-cream: #f7f1e8;
+    --err-sand: #ebe2d8;
+    --err-line: rgba(247, 241, 232, 0.16);
+    --err-mute: rgba(247, 241, 232, 0.62);
+
+    --err-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --err-body: system-ui, -apple-system, "Segoe UI", "Karla", "Noto Sans Bengali", sans-serif;
+
+    --err-gutter: clamp(1.5rem, 5vw, 5rem);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+
+    /* Hidden because the numeral behind everything is deliberately wider than
+       the viewport. Without this a phone gets a horizontal scrollbar and the
+       layout slides sideways under the thumb. */
+    overflow: hidden;
+
+    font-family: var(--err-body);
+    color: var(--err-cream);
+    background: var(--err-deep);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The wash. Light falling from the top left, the way it does on a print
+   pegged up to dry. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(120% 110% at 12% -10%, var(--err-cyan-lift) 0%, #1d374f 40%, transparent 70%),
+        radial-gradient(90% 90% at 100% 100%, #16334a 0%, transparent 60%);
+    background-color: var(--err-deep);
+    z-index: -2;
+}
+
+/* Paper grain. An inline SVG turbulence rather than an image file: no request,
+   nothing to 404 on a page whose whole job is 404s. Very low opacity — it
+   should read as texture, not as noise. */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.32;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------------------
+   The number
+   ---------------------------------------------------------------------------
+   Set enormous, outlined, bleeding off the left and bottom edges. Hollow
+   because solid at this size it would fight the text sitting on top of it;
+   bleeding because a number that fits neatly on screen is a graphic, and one
+   that runs off the edge is a background.
+*/
+.err-ghost {
+    position: fixed;
+    left: -0.08em;
+    bottom: -0.28em;
+    margin: 0;
+    z-index: -1;
+    pointer-events: none;
+    user-select: none;
+
+    font-family: var(--err-display);
+    font-weight: 300;
+    font-size: clamp(20rem, 52vw, 52rem);
+    line-height: 0.78;
+    letter-spacing: -0.04em;
+
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(247, 241, 232, 0.11);
+}
+
+/* ---------------------------------------------------------------------------
+   Layout
+   --------------------------------------------------------------------------- */
+
+.err-shell {
+    position: relative;
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: clamp(1.5rem, 4vh, 2.75rem) var(--err-gutter);
+    max-width: 1240px;
+    margin: 0 auto;
+}
+
+.err-top {
+    display: flex;
+    align-items: center;
+}
+
+.err-mark {
+    height: 100px;
+    width: auto;
+    opacity: 0.85;
+}
+
+/* Shown when the logo file is missing — see the onerror in the layout. */
+.err-wordmark {
+    font-family: var(--err-display);
+    font-size: 18px;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+}
+
+.err-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 42rem;
+
+    /* Left aligned, not centred. Centred type at this scale reads as a poster;
+       ranged left it reads as something addressed to the person reading it. */
+    text-align: left;
+}
+
+/* ---------------------------------------------------------------------------
+   Type
+   --------------------------------------------------------------------------- */
+
+.err-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 22px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--err-mute);
+}
+
+.err-rule {
+    display: block;
+    width: clamp(28px, 6vw, 56px);
+    height: 1px;
+    background: currentColor;
+    opacity: 0.55;
+}
+
+.err-heading {
+    margin: 0 0 18px;
+    font-family: var(--err-display);
+    font-weight: 300;
+    font-size: clamp(2.3rem, 6.5vw, 4.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+}
+
+.err-text {
+    margin: 0 0 26px;
+    max-width: 34rem;
+    font-size: clamp(15px, 1.6vw, 17px);
+    line-height: 1.7;
+    color: var(--err-mute);
+}
+
+/* The address that failed. Monospaced so a typo is visible; wrapped anywhere so
+   a long path cannot push the layout sideways. */
+.err-path {
+    display: inline-block;
+    align-self: flex-start;
+    max-width: 100%;
+    margin: 0 0 30px;
+    padding: 7px 14px;
+    border: 1px solid var(--err-line);
+    border-radius: 999px;
+    background: rgba(247, 241, 232, 0.05);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--err-mute);
+    overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   Actions
+   --------------------------------------------------------------------------- */
+
+.err-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.err-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 26px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.err-btn--go {
+    background: var(--err-cream);
+    color: var(--err-deep);
+}
+
+.err-btn--go:hover {
+    background: #fff;
+    transform: translateY(-1px);
+}
+
+.err-arrow {
+    transition: transform .18s ease;
+}
+
+.err-btn--go:hover .err-arrow {
+    transform: translateX(3px);
+}
+
+.err-btn--back {
+    background: transparent;
+    border-color: var(--err-line);
+    color: var(--err-cream);
+}
+
+.err-btn--back:hover {
+    border-color: rgba(247, 241, 232, 0.4);
+}
+
+/* The countdown. Quiet enough not to read as a threat — nobody should feel
+   hurried off a page they are still reading. min-height reserves the line so
+   nothing jumps when it clears itself. */
+.err-timer {
+    margin: 0;
+    min-height: 22px;
+    font-size: 13px;
+    color: rgba(247, 241, 232, 0.45);
+}
+
+.err-timer button {
+    font: inherit;
+    color: var(--err-cream);
+    background: none;
+    border: 0;
+    padding: 0 0 1px;
+    border-bottom: 1px solid rgba(247, 241, 232, 0.4);
+    cursor: pointer;
+}
+
+/* No JavaScript: the countdown will never count, so the line is hidden rather
+   than left promising a redirect that is not coming. */
+.no-js .err-timer {
+    display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Foot
+   --------------------------------------------------------------------------- */
+
+.err-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-top: 18px;
+    border-top: 1px solid var(--err-line);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: rgba(247, 241, 232, 0.45);
+}
+
+.err-foot a {
+    color: var(--err-mute);
+    text-decoration-color: var(--err-line);
+    text-underline-offset: 3px;
+}
+
+.err-foot a:hover {
+    color: var(--err-cream);
+}
+
+.err-foot__mark {
+    letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion
+   ---------------------------------------------------------------------------
+   One rise, once, on the block of text. Enough that the page feels composed
+   rather than dumped; short enough that somebody who came here by accident is
+   not made to wait for it.
+*/
+@keyframes err-rise {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.err-main>* {
+    animation: err-rise .5s cubic-bezier(.22, .61, .36, 1) both;
+}
+
+.err-main>*:nth-child(2) {
+    animation-delay: .05s;
+}
+
+.err-main>*:nth-child(3) {
+    animation-delay: .1s;
+}
+
+.err-main>*:nth-child(4) {
+    animation-delay: .15s;
+}
+
+.err-main>*:nth-child(5) {
+    animation-delay: .2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .err-main>*,
+    .err-btn,
+    .err-arrow {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Small screens
+   ---------------------------------------------------------------------------
+   The numeral gets pushed further off the edge and lightened. On a narrow
+   viewport it otherwise sits directly behind the paragraph, and outlined type
+   over body copy at that size is unreadable.
+*/
+@media (max-width: 600px) {
+    .err-ghost {
+        bottom: -0.2em;
+        left: -0.14em;
+        -webkit-text-stroke-width: 1px;
+        -webkit-text-stroke-color: rgba(247, 241, 232, 0.07);
+    }
+
+    .err-foot {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}
+
+/* Landscape phones: the shell is taller than the viewport, so the height lock
+   and the hidden overflow together would clip the buttons. */
+@media (max-height: 520px) {
+    body {
+        overflow: auto;
+    }
+
+    html,
+    body {
+        height: auto;
+        min-height: 100%;
+    }
+
+    .err-shell {
+        min-height: 100vh;
+        height: auto;
+    }
+}
