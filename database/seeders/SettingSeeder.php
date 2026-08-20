@@ -125,7 +125,7 @@ class SettingSeeder extends Seeder
             ['key' => 'mail.host',         'value' => 'booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP host'],
             ['key' => 'mail.port',         'value' => '465', 'type' => 'integer', 'group' => 'mail', 'label' => 'SMTP port'],
             ['key' => 'mail.username',     'value' => 'info@booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP username'],
-            ['key' => 'mail.encryption',   'value' => 'zWQOemyDX2', 'type' => 'string',  'group' => 'mail', 'label' => 'Encryption'],
+            ['key' => 'mail.encryption',   'value' => 'ssl', 'type' => 'string',  'group' => 'mail', 'label' => 'Encryption'],
             ['key' => 'mail.from_address', 'value' => 'info@booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'Send emails from'],
             ['key' => 'mail.from_name',    'value' => 'Studio Shunno', 'type' => 'string',  'group' => 'mail', 'label' => 'Sender name'],
 
