@@ -37,6 +37,11 @@ use Throwable;
  *
  * Rate limited on top of all four: five runs a minute is generous for a person
  * and slow for anything else.
+ *
+ * ONE TASK HAS A FIFTH LOCK. migrate:fresh --seed drops every table, so it is
+ * fenced to APP_ENV=local. The card is still shown in production, greyed out
+ * with the reason on it; run() refuses the request regardless of what the page
+ * rendered. See requiresLocal().
  */
 class MaintenanceController extends Controller
 {
@@ -78,6 +83,11 @@ class MaintenanceController extends Controller
         $this->assertEnabled($request);
 
         return view('admin.system.maintenance', [
+            // EVERY task, including the ones this environment will refuse. The
+            // page greys those out with the reason on them — see
+            // MaintenanceTask::isAvailable(). Hiding a tool between machines
+            // just sends somebody hunting for a feature that seems to have
+            // vanished.
             'tasks' => MaintenanceTask::all(),
         ]);
     }
@@ -97,6 +107,30 @@ class MaintenanceController extends Controller
 
         $task = MaintenanceTask::from($validated['task']);
         $user = $request->user();
+
+        /*
+         | The environment fence, checked here and not only when rendering.
+         |
+         | Hiding a button is presentation; this is the gate. A forged POST
+         | naming fresh-seed against the live site gets a refusal, and the
+         | refusal says why rather than pretending the task does not exist —
+         | the person reading it is an authenticated Admin who has every right
+         | to know the difference.
+         */
+        if ($task->requiresLocal() && ! app()->environment('local')) {
+            Log::warning('Blocked a local-only maintenance command outside local.', [
+                'user' => $user->email,
+                'task' => $task->value,
+                'env'  => app()->environment(),
+                'ip'   => $request->ip(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $task->label() . ' can only run on a development machine. '
+                    . 'This server is running as ' . app()->environment() . '.',
+            ], 403);
+        }
 
         /*
          | Per user, not per IP. The studio is behind one connection, so an IP

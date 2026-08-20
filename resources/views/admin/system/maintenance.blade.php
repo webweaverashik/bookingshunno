@@ -57,9 +57,19 @@
         <div class="row g-5">
             @foreach ($tasks as $task)
                 <div class="col-md-6 col-xl-4">
-                    <div class="card h-100">
-                        <div class="card-body d-flex flex-column">
-                            <div class="d-flex align-items-center mb-2">
+                    {{-- Unavailable cards are rendered, not hidden. A tool that
+                         vanishes between machines sends somebody hunting for a
+                         feature that seems to have disappeared; a greyed one
+                         says it exists, where it works, and why it does not
+                         work here. The button being disabled is presentation —
+                         the controller refuses the request either way. --}}
+                    <div @class([
+                        'card h-100',
+                        'border border-danger border-dashed' => $task->isDestructive() && $task->isAvailable(),
+                        'bg-light-secondary' => !$task->isAvailable(),
+                    ])>
+                        <div class="card-body d-flex flex-column {{ $task->isAvailable() ? '' : 'opacity-75' }}">
+                            <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                                 <span class="fw-bold text-gray-900 fs-5">{{ $task->label() }}</span>
 
                                 @if ($task->isReadOnly())
@@ -67,18 +77,46 @@
                                          buttons they can press freely. Making a status check look
                                          identical to a migration discourages exactly the diagnosis
                                          that avoids running a migration blind. --}}
-                                    <span class="badge badge-light-success fs-8 ms-2">Read only</span>
+                                    <span class="badge badge-light-success fs-8">Read only</span>
+                                @endif
+
+                                @if ($task->requiresLocal())
+                                    <span class="badge badge-light-warning fs-8">Local only</span>
+                                @endif
+
+                                @if ($task->isDestructive())
+                                    <span class="badge badge-danger fs-8">Destroys data</span>
                                 @endif
                             </div>
 
                             <p class="fs-7 text-gray-700 flex-grow-1">{{ $task->description() }}</p>
 
+                            @if ($reason = $task->unavailableReason())
+                                <div class="d-flex align-items-start bg-light-warning rounded p-3 mb-4">
+                                    <i class="ki-outline ki-lock-2 fs-4 text-warning me-2 mt-1"></i>
+                                    <span class="fs-8 text-gray-700">{{ $reason }}</span>
+                                </div>
+                            @endif
+
                             <button type="button"
-                                class="btn btn-sm {{ $task->isReadOnly() ? 'btn-light-primary' : 'btn-light-danger' }} align-self-start"
+                                @class([
+                                    'btn btn-sm align-self-start',
+                                    'btn-light-primary' => $task->isReadOnly() && $task->isAvailable(),
+                                    'btn-light-danger' => !$task->isReadOnly() && !$task->isDestructive() && $task->isAvailable(),
+                                    // Solid, not tinted. The one button here that
+                                    // cannot be undone should not look like the six
+                                    // that can.
+                                    'btn-danger' => $task->isDestructive() && $task->isAvailable(),
+                                    'btn-light' => !$task->isAvailable(),
+                                ])
+                                @disabled(!$task->isAvailable())
                                 data-maintenance-run="{{ $task->value }}" data-label="{{ $task->label() }}"
                                 data-readonly="{{ $task->isReadOnly() ? '1' : '0' }}"
+                                data-destructive="{{ $task->isDestructive() ? '1' : '0' }}"
                                 data-timeout="{{ $task->timeout() }}">
-                                <span class="indicator-label">Run</span>
+                                <span class="indicator-label">
+                                    {{ $task->isAvailable() ? 'Run' : 'Unavailable here' }}
+                                </span>
                                 <span class="indicator-progress">
                                     Running…
                                     <span class="spinner-border spinner-border-sm align-middle ms-2"></span>

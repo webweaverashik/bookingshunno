@@ -79,6 +79,7 @@
             var task = this.getAttribute('data-maintenance-run');
             var label = this.getAttribute('data-label');
             var readOnly = this.getAttribute('data-readonly') === '1';
+            var destructive = this.getAttribute('data-destructive') === '1';
             var trigger = this;
 
             if (readOnly) {
@@ -92,7 +93,23 @@
              | reading the name of the command; the dialog behind it asks "are
              | you who you say you are?", which a stolen session cannot answer.
              */
-            Shunno.confirm({
+            /*
+             | The destructive task gets its own wording, and it names the
+             | consequence rather than the action. "Run this?" is a question
+             | somebody answers yes to on autopilot; "every reservation will be
+             | destroyed" is one they read.
+             |
+             | Its own environment fence is server-side — the button only exists
+             | on a development machine at all. This is about the wrong click on
+             | the right machine.
+             */
+            Shunno.confirm(destructive ? {
+                title: 'Destroy this database?',
+                text: 'Every reservation, payment, voucher and staff account will be dropped and '
+                    + 'rebuilt from the seeders. This cannot be undone.',
+                confirmText: 'Yes, wipe it',
+                danger: true
+            } : {
                 title: 'Run this on the live server?',
                 text: label + ' will run against the live database.',
                 confirmText: 'Continue',
