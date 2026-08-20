@@ -67,8 +67,8 @@ class SettingSeeder extends Seeder
              | pathway activates with no code change.
              */
             ['key' => 'availability.enforce_capacity',   'value' => '0',   'type' => 'boolean', 'group' => 'availability', 'label' => 'Enforce per-session capacity'],
-            ['key' => 'availability.min_lead_hours',     'value' => '24',  'type' => 'integer', 'group' => 'availability', 'label' => 'Minimum notice (hours)'],
-            ['key' => 'availability.max_advance_days',   'value' => '120', 'type' => 'integer', 'group' => 'availability', 'label' => 'How far ahead visitors may book (days)'],
+            ['key' => 'availability.min_lead_hours',     'value' => '12',  'type' => 'integer', 'group' => 'availability', 'label' => 'Minimum notice (hours)'],
+            ['key' => 'availability.max_advance_days',   'value' => '14', 'type' => 'integer', 'group' => 'availability', 'label' => 'How far ahead visitors may book (days)'],
             ['key' => 'availability.slot_step_minutes',  'value' => '30',  'type' => 'integer', 'group' => 'availability', 'label' => 'Start times every (minutes)'],
 
             /*
@@ -122,12 +122,12 @@ class SettingSeeder extends Seeder
              | A seeder row would create it as plain text with type 'string' and
              | quietly bypass that.
              */
-            ['key' => 'mail.host',         'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP host'],
-            ['key' => 'mail.port',         'value' => '', 'type' => 'integer', 'group' => 'mail', 'label' => 'SMTP port'],
-            ['key' => 'mail.username',     'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP username'],
-            ['key' => 'mail.encryption',   'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Encryption'],
-            ['key' => 'mail.from_address', 'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Send emails from'],
-            ['key' => 'mail.from_name',    'value' => '', 'type' => 'string',  'group' => 'mail', 'label' => 'Sender name'],
+            ['key' => 'mail.host',         'value' => 'booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP host'],
+            ['key' => 'mail.port',         'value' => '465', 'type' => 'integer', 'group' => 'mail', 'label' => 'SMTP port'],
+            ['key' => 'mail.username',     'value' => 'info@booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'SMTP username'],
+            ['key' => 'mail.encryption',   'value' => 'zWQOemyDX2', 'type' => 'string',  'group' => 'mail', 'label' => 'Encryption'],
+            ['key' => 'mail.from_address', 'value' => 'info@booking.studioshunno.net', 'type' => 'string',  'group' => 'mail', 'label' => 'Send emails from'],
+            ['key' => 'mail.from_name',    'value' => 'Studio Shunno', 'type' => 'string',  'group' => 'mail', 'label' => 'Sender name'],
 
             /*
              | PHASE 19 — SSLCommerz, moved out of .env into this table.
