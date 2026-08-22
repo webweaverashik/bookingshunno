@@ -47,12 +47,20 @@ class VoucherService
      * not six 50s — the client's decision, and the reason value is computed
      * here rather than stored per head.
      */
-    public function issueCafeCredit(Reservation $reservation, ?Payment $payment = null): ?Voucher
+    /**
+     * @param  CarbonImmutable|null  $validFrom  Overrides the visit date as the
+     *                                           start of the window. Null everywhere except the Phase 36B backfill,
+     *                                           where a visit already in the past would otherwise mint a coupon that
+     *                                           expired before it was sent.
+     * @param  string|null  $note  Overrides the stored note, so a coupon issued
+     *                             months late does not claim it was issued automatically on payment.
+     */
+    public function issueCafeCredit(Reservation $reservation, ?Payment $payment = null, ?CarbonImmutable $validFrom = null, ?string $note = null): ?Voucher
     {
         $perPerson = $this->cafeCreditPerPerson($reservation);
 
         if ($perPerson <= 0) {
-            return null;        // Not a credit-earning experience.
+            return null; // Not a credit-earning experience.
         }
 
         $value = round($perPerson * max(1, (int) $reservation->participants), 2);
@@ -68,25 +76,27 @@ class VoucherService
          | the date. Counting thirty days from issue would hand somebody a
          | coupon that expired before they had even been to the studio.
          */
-        $visitDate = CarbonImmutable::parse($reservation->reserved_date);
+        $visitDate = $validFrom ?? CarbonImmutable::parse($reservation->reserved_date);
         $days = (int) $this->settings->get('cafe_credit.validity_days', 30) ?: 30;
 
         try {
-            return DB::transaction(function () use ($reservation, $value, $visitDate, $days) {
+            return DB::transaction(function () use ($reservation, $value, $visitDate, $days, $note) {
                 $voucher = new Voucher;
 
-                $voucher->forceFill([
-                    'code' => $this->generateCode(VoucherType::CafeCredit),
-                    'type' => VoucherType::CafeCredit,
-                    'status' => VoucherStatus::Active,
-                    'value' => $value,
-                    'reservation_id' => $reservation->id,
-                    'valid_from' => $visitDate->toDateString(),
-                    'expires_at' => $visitDate->addDays($days)->toDateString(),
-                    'issued_to_name' => $reservation->user?->name,
-                    'issued_to_email' => $reservation->user?->email,
-                    'note' => 'Issued automatically on payment.',
-                ])->save();
+                $voucher
+                    ->forceFill([
+                        'code' => $this->generateCode(VoucherType::CafeCredit),
+                        'type' => VoucherType::CafeCredit,
+                        'status' => VoucherStatus::Active,
+                        'value' => $value,
+                        'reservation_id' => $reservation->id,
+                        'valid_from' => $visitDate->toDateString(),
+                        'expires_at' => $visitDate->addDays($days)->toDateString(),
+                        'issued_to_name' => $reservation->user?->name,
+                        'issued_to_email' => $reservation->user?->email,
+                        'note' => $note ?? 'Issued automatically on payment.',
+                    ])
+                    ->save();
 
                 VoucherIssued::dispatch($voucher);
 
@@ -108,9 +118,7 @@ class VoucherService
                 'payment' => $payment?->reference,
             ]);
 
-            return Voucher::where('reservation_id', $reservation->id)
-                ->where('type', VoucherType::CafeCredit)
-                ->first();
+            return Voucher::where('reservation_id', $reservation->id)->where('type', VoucherType::CafeCredit)->first();
         }
     }
 
@@ -125,9 +133,7 @@ class VoucherService
      */
     private function cafeCreditPerPerson(Reservation $reservation): float
     {
-        return (float) $reservation->items
-            ->map(fn ($item) => (float) ($item->workshop?->cafe_credit_per_person ?? 0))
-            ->max();
+        return (float) $reservation->items->map(fn ($item) => (float) ($item->workshop?->cafe_credit_per_person ?? 0))->max();
     }
 
     /*
@@ -331,9 +337,7 @@ class VoucherService
             return false;
         }
 
-        return ! Voucher::where('code', $code)
-            ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->getKey()))
-            ->exists();
+        return ! Voucher::where('code', $code)->when($ignore, fn ($query) => $query->whereKeyNot($ignore->getKey()))->exists();
     }
 
     /**
@@ -378,18 +382,14 @@ class VoucherService
         // The guard that keeps café credit out of the checkout. Asked of the
         // enum rather than compared here, so the rule has one home.
         if (! $voucher->type->paysForReservations()) {
-            throw new RuntimeException(
-                'Café credit is for food and drink at the studio. It cannot be used against a reservation.'
-            );
+            throw new RuntimeException('Café credit is for food and drink at the studio. It cannot be used against a reservation.');
         }
 
         if ($voucher->workshop_id !== null) {
             $booked = $against->items->pluck('workshop_id')->filter()->all();
 
             if (! in_array($voucher->workshop_id, $booked, true)) {
-                throw new RuntimeException(
-                    'This voucher is only valid for '.($voucher->workshop?->title ?? 'another experience').'.'
-                );
+                throw new RuntimeException('This voucher is only valid for '.($voucher->workshop?->title ?? 'another experience').'.');
             }
         }
     }
@@ -415,26 +415,22 @@ class VoucherService
      *
      * @throws RuntimeException when it cannot be spent.
      */
-    public function redeem(
-        Voucher $voucher,
-        ?User $actor = null,
-        ?Reservation $against = null,
-        ?string $note = null,
-    ): Voucher {
+    public function redeem(Voucher $voucher, ?User $actor = null, ?Reservation $against = null, ?string $note = null): Voucher
+    {
         return DB::transaction(function () use ($voucher, $actor, $against, $note) {
-            $voucher = Voucher::whereKey($voucher->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
+            $voucher = Voucher::whereKey($voucher->getKey())->lockForUpdate()->firstOrFail();
 
             $this->assertUsable($voucher, $against);
 
-            $voucher->forceFill([
-                'status' => VoucherStatus::Redeemed,
-                'redeemed_at' => CarbonImmutable::now(),
-                'redeemed_by' => $actor?->id,
-                'redeemed_for_reservation_id' => $against?->id,
-                'redemption_note' => $note,
-            ])->save();
+            $voucher
+                ->forceFill([
+                    'status' => VoucherStatus::Redeemed,
+                    'redeemed_at' => CarbonImmutable::now(),
+                    'redeemed_by' => $actor?->id,
+                    'redeemed_for_reservation_id' => $against?->id,
+                    'redemption_note' => $note,
+                ])
+                ->save();
 
             return $voucher;
         });
@@ -446,15 +442,15 @@ class VoucherService
             $voucher = Voucher::whereKey($voucher->getKey())->lockForUpdate()->firstOrFail();
 
             if ($voucher->status === VoucherStatus::Redeemed) {
-                throw new RuntimeException(
-                    'This voucher has already been used and cannot be cancelled.'
-                );
+                throw new RuntimeException('This voucher has already been used and cannot be cancelled.');
             }
 
-            $voucher->forceFill([
-                'status' => VoucherStatus::Cancelled,
-                'cancellation_reason' => $reason,
-            ])->save();
+            $voucher
+                ->forceFill([
+                    'status' => VoucherStatus::Cancelled,
+                    'cancellation_reason' => $reason,
+                ])
+                ->save();
 
             return $voucher;
         });
@@ -479,9 +475,7 @@ class VoucherService
             $voucher->save();
         } catch (QueryException $e) {
             if (($e->errorInfo[1] ?? null) === 1062 || $e->getCode() === '23000') {
-                throw new RuntimeException(
-                    "The code {$code} was taken while you were typing. Choose another one."
-                );
+                throw new RuntimeException("The code {$code} was taken while you were typing. Choose another one.");
             }
 
             throw $e;

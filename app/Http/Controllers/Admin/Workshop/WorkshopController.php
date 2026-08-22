@@ -20,16 +20,14 @@ use RuntimeException;
  */
 class WorkshopController extends Controller
 {
-    public function __construct(private readonly WorkshopService $workshops)
-    {
-    }
+    public function __construct(private readonly WorkshopService $workshops) {}
 
     public function index(): View
     {
         Gate::authorize('viewAny', Workshop::class);
 
         return view('admin.workshops.index', [
-            'workshops'  => $this->collection(),
+            'workshops' => $this->collection(),
             'categories' => WorkshopCategory::options(),
         ]);
     }
@@ -46,10 +44,7 @@ class WorkshopController extends Controller
     {
         Gate::authorize('create', Workshop::class);
 
-        $workshop = $this->workshops->create(
-            $request->validated(),
-            $request->file('image'),
-        );
+        $workshop = $this->workshops->create($request->validated(), $request->file('image'));
 
         return $this->rowsResponse("“{$workshop->title}” has been added.");
     }
@@ -61,26 +56,27 @@ class WorkshopController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'id'                  => $workshop->id,
-                'title'               => $workshop->title,
-                'slug'                => $workshop->slug,
-                'category'            => $workshop->category?->value,
-                'medium'              => $workshop->medium,
-                'short_description'   => $workshop->short_description,
-                'description'         => $workshop->description,
-                'price'               => (float) $workshop->price,
-                'price_basis'         => $workshop->price_basis,
-                'duration_minutes'    => $workshop->duration_minutes,
-                'min_participants'    => $workshop->min_participants,
-                'max_participants'    => $workshop->max_participants,
-                'materials_included'  => $workshop->materials_included,
+            'data' => [
+                'id' => $workshop->id,
+                'title' => $workshop->title,
+                'slug' => $workshop->slug,
+                'category' => $workshop->category?->value,
+                'medium' => $workshop->medium,
+                'short_description' => $workshop->short_description,
+                'description' => $workshop->description,
+                'price' => (float) $workshop->price,
+                'price_basis' => $workshop->price_basis,
+                'cafe_credit_per_person' => (float) $workshop->cafe_credit_per_person,
+                'duration_minutes' => $workshop->duration_minutes,
+                'min_participants' => $workshop->min_participants,
+                'max_participants' => $workshop->max_participants,
+                'materials_included' => $workshop->materials_included,
                 'requires_experience' => $workshop->requires_experience,
-                'is_active'           => $workshop->is_active,
-                'is_featured'         => $workshop->is_featured,
-                'sort_order'          => $workshop->sort_order,
-                'image_url'           => $workshop->imageUrl(),
-                'update_url'          => route('admin.workshops.update', $workshop->id),
+                'is_active' => $workshop->is_active,
+                'is_featured' => $workshop->is_featured,
+                'sort_order' => $workshop->sort_order,
+                'image_url' => $workshop->imageUrl(),
+                'update_url' => route('admin.workshops.update', $workshop->id),
             ],
         ]);
     }
@@ -94,11 +90,7 @@ class WorkshopController extends Controller
     {
         Gate::authorize('update', $workshop);
 
-        $workshop = $this->workshops->update(
-            $workshop,
-            $request->validated(),
-            $request->file('image'),
-        );
+        $workshop = $this->workshops->update($workshop, $request->validated(), $request->file('image'));
 
         return $this->rowsResponse("“{$workshop->title}” has been updated.");
     }
@@ -109,11 +101,7 @@ class WorkshopController extends Controller
 
         $workshop = $this->workshops->toggleActive($workshop);
 
-        return $this->rowsResponse(
-            $workshop->is_active
-                ? "“{$workshop->title}” is now visible on the website."
-                : "“{$workshop->title}” has been hidden from the website."
-        );
+        return $this->rowsResponse($workshop->is_active ? "“{$workshop->title}” is now visible on the website." : "“{$workshop->title}” has been hidden from the website.");
     }
 
     public function destroy(Workshop $workshop): JsonResponse
@@ -127,10 +115,13 @@ class WorkshopController extends Controller
         } catch (RuntimeException $e) {
             // Business rule, not a system failure: 409 so the front end can
             // tell it apart from a validation error.
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 409);
+            return response()->json(
+                [
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ],
+                409,
+            );
         }
 
         return $this->rowsResponse("“{$title}” has been deleted.");
@@ -144,10 +135,7 @@ class WorkshopController extends Controller
 
     private function collection()
     {
-        return Workshop::query()
-            ->withCount('reservationItems')
-            ->adminOrdered()
-            ->get();
+        return Workshop::query()->withCount('reservationItems')->adminOrdered()->get();
     }
 
     private function rowsResponse(string $message): JsonResponse
@@ -157,9 +145,9 @@ class WorkshopController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message,
-            'data'    => [
-                'html'   => view('admin.workshops.partials.rows', compact('workshops'))->render(),
-                'count'  => $workshops->count(),
+            'data' => [
+                'html' => view('admin.workshops.partials.rows', compact('workshops'))->render(),
+                'count' => $workshops->count(),
                 'active' => $workshops->where('is_active', true)->count(),
             ],
         ]);

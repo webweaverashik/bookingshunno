@@ -45,17 +45,22 @@ class WorkshopRequest extends FormRequest
             'title' => ['required', 'string', 'min:2', 'max:150'],
 
             'slug' => [
-                'nullable', 'string', 'max:150', 'alpha_dash',
-                Rule::unique('workshops', 'slug')->ignore($this->workshop()?->id)->withoutTrashed(),
+                'nullable',
+                'string',
+                'max:150',
+                'alpha_dash',
+                Rule::unique('workshops', 'slug')
+                    ->ignore($this->workshop()?->id)
+                    ->withoutTrashed(),
             ],
 
             'category' => ['required', Rule::in(WorkshopCategory::values())],
-            'medium'   => ['nullable', 'string', 'max:150'],
+            'medium' => ['nullable', 'string', 'max:150'],
 
             'short_description' => ['nullable', 'string', 'max:400'],
-            'description'       => ['nullable', 'string', 'max:5000'],
+            'description' => ['nullable', 'string', 'max:5000'],
 
-            'price'       => ['required', 'numeric', 'min:0', 'max:9999999.99'],
+            'price' => ['required', 'numeric', 'min:0', 'max:9999999.99'],
 
             /*
              | Café credit per person, in taka.
@@ -77,14 +82,14 @@ class WorkshopRequest extends FormRequest
             'min_participants' => ['required', 'integer', 'min:1', 'max:100'],
             'max_participants' => ['required', 'integer', 'min:1', 'max:100', 'gte:min_participants'],
 
-            'materials_included'  => ['boolean'],
+            'materials_included' => ['boolean'],
             'requires_experience' => ['boolean'],
-            'is_active'           => ['boolean'],
-            'is_featured'         => ['boolean'],
+            'is_active' => ['boolean'],
+            'is_featured' => ['boolean'],
 
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
 
-            'image'        => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
             'remove_image' => ['boolean'],
         ];
     }
@@ -92,14 +97,14 @@ class WorkshopRequest extends FormRequest
     public function messages(): array
     {
         $window = $this->availability()->longestWindowMinutes();
-        $hours  = round($window / 60, 1);
+        $hours = round($window / 60, 1);
 
         return [
             'duration_minutes.multiple_of' => 'Duration must be a multiple of 30 minutes so start times line up.',
-            'duration_minutes.max'         => "The longest studio window is {$hours} hours ({$window} minutes). A longer session could never be scheduled.",
-            'max_participants.gte'         => 'Maximum participants cannot be below the minimum.',
-            'image.max'                    => 'The image must be 2 MB or smaller.',
-            'slug.alpha_dash'              => 'The slug may only contain letters, numbers, dashes and underscores.',
+            'duration_minutes.max' => "The longest studio window is {$hours} hours ({$window} minutes). A longer session could never be scheduled.",
+            'max_participants.gte' => 'Maximum participants cannot be below the minimum.',
+            'image.max' => 'The image must be 2 MB or smaller.',
+            'slug.alpha_dash' => 'The slug may only contain letters, numbers, dashes and underscores.',
         ];
     }
 
@@ -110,14 +115,22 @@ class WorkshopRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'title'               => trim((string) $this->input('title')),
-            'slug'                => $this->filled('slug') ? Str::slug($this->input('slug')) : null,
-            'materials_included'  => $this->boolean('materials_included'),
+            'title' => trim((string) $this->input('title')),
+            'slug' => $this->filled('slug') ? Str::slug($this->input('slug')) : null,
+            'materials_included' => $this->boolean('materials_included'),
             'requires_experience' => $this->boolean('requires_experience'),
-            'is_active'           => $this->boolean('is_active'),
-            'is_featured'         => $this->boolean('is_featured'),
-            'remove_image'        => $this->boolean('remove_image'),
-            'sort_order'          => $this->filled('sort_order') ? (int) $this->input('sort_order') : 0,
+            'is_active' => $this->boolean('is_active'),
+            'is_featured' => $this->boolean('is_featured'),
+            'remove_image' => $this->boolean('remove_image'),
+            'sort_order' => $this->filled('sort_order') ? (int) $this->input('sort_order') : 0,
+            /*
+            | The column is NOT NULL with a default of zero, but the rule is
+            | nullable so staff are not forced to type 0 into every form. An
+            | empty box therefore has to become 0 HERE — validation would
+            | otherwise pass null straight into a column that refuses it.
+            | "0" survives filled(), so an explicit zero is not mistaken for blank.
+            */
+            'cafe_credit_per_person' => $this->filled('cafe_credit_per_person') ? $this->input('cafe_credit_per_person') : 0,
         ]);
     }
 
@@ -131,11 +144,8 @@ class WorkshopRequest extends FormRequest
                 // UploadedFile and passes the mime rules; only the temp file is
                 // missing. Catch it before the filesystem adapter throws on an
                 // empty path.
-                if ($image && ! $image->isValid()) {
-                    $validator->errors()->add(
-                        'image',
-                        'The image could not be uploaded. It may be too large, or the server temp folder is not writable.'
-                    );
+                if ($image && !$image->isValid()) {
+                    $validator->errors()->add('image', 'The image could not be uploaded. It may be too large, or the server temp folder is not writable.');
                 }
             },
         ];

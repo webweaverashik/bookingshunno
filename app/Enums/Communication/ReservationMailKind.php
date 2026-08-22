@@ -20,6 +20,17 @@ use App\Events\Voucher\VoucherIssued;
  * see ReservationNotificationMail — because an amount, a deadline and a link
  * cannot be read off a reservation.
  *
+ * PHASE 36 adds three, all requested by the client after go-live:
+ *
+ *   NewRequest      staff hear that a request has arrived, at the same moment
+ *                   the visitor is told it was received
+ *   PaymentSettled  staff hear that the money is in and the booking is real
+ *   Completed       the visitor hears from us once, after the visit
+ *
+ * The first two are internal. That distinction is load-bearing: see
+ * isInternal(), and Communication::isResendable(), which uses it to keep a
+ * resend button off studio-to-studio mail.
+ *
  * There is no separate "final confirmation". The brief lists Payment
  * Confirmation and Final Reservation Confirmation as two emails, but they would
  * fire in the same second and say the same thing, and two messages about one
@@ -45,22 +56,39 @@ enum ReservationMailKind: string
     // PHASE 14A.
     case VoucherIssued    = 'voucher_issued';
 
+    // PHASE 36.
+    case NewRequest     = 'new_request';
+    case PaymentSettled = 'payment_settled';
+    case Completed      = 'completed';
+
     /**
      * Whether this goes to the visitor or to the studio.
      *
-     * Escalated is the only internal one so far, and getting this wrong would
-     * send a Manager's private note about a booking to the person it is about.
-     * Hence a method rather than a convention about naming.
+     * Getting this wrong sends a Manager's private note about a booking to the
+     * person it is about, or puts a visitor's contact details and the admin
+     * panel URL in front of whoever the To field happens to hold. Hence a
+     * method rather than a convention about naming, and hence the fact that
+     * three separate things read it: who receives the mail, whether a Reply-To
+     * is set, and whether the log offers a resend button.
      */
     public function isInternal(): bool
     {
-        return $this === self::Escalated;
+        return match ($this) {
+            self::Escalated,
+            self::NewRequest,
+            self::PaymentSettled => true,
+
+            default => false,
+        };
     }
 
     /**
      * The reference is in every visitor-facing subject on purpose: it makes the
      * thread searchable for them and quotable to us, and it is what the admin
      * panel searches on.
+     *
+     * Internal subjects lead with the studio name in brackets, so staff can
+     * filter the lot into one folder without reading any of them.
      */
     public function subject(string $reference, string $studio): string
     {
@@ -82,6 +110,17 @@ enum ReservationMailKind: string
             // behind it, and quoting a booking code at somebody who was given a
             // present by a friend would be meaningless.
             self::VoucherIssued    => "Your voucher from {$studio}",
+
+            // PHASE 36. "New request" rather than "Action required": every one
+            // of these needs looking at, so a phrase that shouts adds nothing
+            // and stops meaning anything by the twentieth.
+            self::NewRequest     => "[{$studio}] New request — {$reference}",
+            self::PaymentSettled => "[{$studio}] Payment complete — {$reference}",
+
+            // Warm, and not a status update. The visitor has been and gone;
+            // "your reservation has been marked completed" is how the database
+            // would put it, not how a studio would.
+            self::Completed      => "Thank you for visiting — {$reference}",
         };
     }
 
@@ -111,23 +150,29 @@ enum ReservationMailKind: string
             self::Cancelled        => 'Cancelled',
 
             // Says who it went to, because that is the distinguishing fact
-            // about this one in a list — it is the only internal email here.
+            // about these in a list — they are the internal ones.
             self::Escalated        => 'Escalation (staff)',
+            self::NewRequest       => 'New request (staff)',
+            self::PaymentSettled   => 'Payment complete (staff)',
 
             self::PaymentRequested => 'Payment requested',
             self::PaymentReceived  => 'Payment received',
             self::VoucherIssued    => 'Voucher issued',
+            self::Completed        => 'Visit completed',
         };
     }
 
     /**
      * The status a transition lands on, mapped to what should go out.
      *
-     * Returns null for statuses that send nothing, which is most of them:
+     * Returns null for statuses that send nothing, which is still most of them.
      * Pending arrived at by a return-to-review is an internal tidy-up, and
-     * Completed and NoShow are recorded after the visitor has already been and
-     * gone. Silence is the right default — a system that emails on every state
-     * change trains people to ignore it.
+     * NoShow is a note the studio makes to itself — emailing somebody to say
+     * they did not turn up is a message with no good outcome.
+     *
+     * Completed WAS in that group and no longer is. The client asked for it:
+     * one warm message after the visit, which is also the natural place to
+     * mention that the café coupon is now live.
      */
     public static function forStatus(ReservationStatus $status): ?self
     {
@@ -138,6 +183,9 @@ enum ReservationMailKind: string
             ReservationStatus::Cancelled     => self::Cancelled,
             ReservationStatus::Escalated     => self::Escalated,
 
+            // PHASE 36.
+            ReservationStatus::Completed     => self::Completed,
+
             /*
              | STILL NULL, and deliberately so.
              |
@@ -146,6 +194,9 @@ enum ReservationMailKind: string
              | the Payment. If this match ever returns a kind for either, the
              | status listener fires as well and the visitor is emailed twice
              | about the same thing.
+             |
+             | The staff-facing PaymentSettled added in Phase 36 is raised from
+             | the same event, for the same reason, and is likewise absent here.
              */
             ReservationStatus::PaymentRequested,
             ReservationStatus::Confirmed     => null,

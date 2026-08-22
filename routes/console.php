@@ -67,10 +67,7 @@ Artisan::command('inspire', function () {
 | withoutOverlapping() is belt and braces on top of --max-time. It takes a
 | cache lock; the cache driver is `database`, so this works without Redis.
 */
-Schedule::command('queue:work --max-time=55 --sleep=1 --tries=3')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+Schedule::command('queue:work --max-time=55 --sleep=1 --tries=3')->everyMinute()->withoutOverlapping()->runInBackground();
 
 /*
 | Housekeeping. failed_jobs grows forever otherwise, and on shared hosting
@@ -112,4 +109,27 @@ Schedule::command('shunno:remind-payments')
     ->runInBackground()
     ->onFailure(function () {
         Log::error('shunno:remind-payments failed. Payment reminders may not have gone out.');
+    });
+
+/*
+|--------------------------------------------------------------------------
+| The payment deadline expiry
+|--------------------------------------------------------------------------
+| The half the reminder block above said was still the client's decision. It
+| has been made: a deadline that passes unpaid cancels the reservation.
+|
+| HOURLY, matching the reminder, and for the same reason — a deadline can fall
+| at any hour. The command applies its own grace period on top, so running it
+| twelve times inside one grace window cancels nothing early.
+|
+| --max defaults to 25 and the run REFUSES above it rather than truncating.
+| That is what stops a scheduler waking after an outage from cancelling a
+| month of bookings in one tick.
+*/
+Schedule::command('shunno:expire-payments')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onFailure(function () {
+        Log::error('shunno:expire-payments failed. Overdue reservations may not have been cancelled.');
     });

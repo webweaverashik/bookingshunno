@@ -35,6 +35,10 @@ namespace App\Enums\System;
  *
  *   shunno:strip-phase-comments — rewrites source files. Source edits belong in
  *   git on a machine somebody can review the diff on.
+ *
+ *   shunno:backfill-cafe-credit --from-today — the two safe halves of the
+ *   backfill are here; the flag that re-dates a lapsed coupon is not. See
+ *   CafeCreditIssue below.
  */
 enum MaintenanceTask: string
 {
@@ -47,6 +51,22 @@ enum MaintenanceTask: string
     case QueueFailed   = 'queue-failed';
     case QueueRetry    = 'queue-retry';
     case RemindPayments = 'remind-payments';
+
+    /*
+     | PHASE 36B — the café credit backfill, split in two.
+     |
+     | Two cards rather than one with a checkbox, because the arguments are
+     | fixed here on purpose (see command()) and a checkbox would be the first
+     | argument this console ever accepted from a browser. Two enum cases cost
+     | nothing and keep that rule intact.
+     |
+     | The check is read-only and emails nobody. The issue writes vouchers and
+     | queues real mail to real customers, which is why they are separate
+     | buttons with separate confirmations rather than one button somebody
+     | presses twice.
+     */
+    case CafeCreditCheck = 'cafe-credit-check';
+    case CafeCreditIssue = 'cafe-credit-issue';
 
     /*
      | LOCAL ONLY — see requiresLocal(). The card is still SHOWN in production,
@@ -66,16 +86,18 @@ enum MaintenanceTask: string
     public function label(): string
     {
         return match ($this) {
-            self::ClearCaches    => 'Clear all caches',
-            self::Migrate        => 'Run pending migrations',
-            self::MigrateStatus  => 'Check migration status',
-            self::SeedRoles      => 'Re-sync roles and permissions',
-            self::StorageLink    => 'Re-create the storage link',
-            self::QueueRestart   => 'Restart the queue worker',
-            self::QueueFailed    => 'List failed jobs',
-            self::QueueRetry     => 'Retry all failed jobs',
-            self::RemindPayments => 'Send payment reminders now',
-            self::FreshSeed      => 'Rebuild the database from scratch',
+            self::ClearCaches     => 'Clear all caches',
+            self::Migrate         => 'Run pending migrations',
+            self::MigrateStatus   => 'Check migration status',
+            self::SeedRoles       => 'Re-sync roles and permissions',
+            self::StorageLink     => 'Re-create the storage link',
+            self::QueueRestart    => 'Restart the queue worker',
+            self::QueueFailed     => 'List failed jobs',
+            self::QueueRetry      => 'Retry all failed jobs',
+            self::RemindPayments  => 'Send payment reminders now',
+            self::CafeCreditCheck => 'Check for missing café credit',
+            self::CafeCreditIssue => 'Issue missing café credit',
+            self::FreshSeed       => 'Rebuild the database from scratch',
         };
     }
 
@@ -108,6 +130,14 @@ enum MaintenanceTask: string
             self::RemindPayments => 'Runs the reminder sweep immediately instead of waiting for the hour. '
                 . 'It deduplicates against the communications log, so nobody is emailed twice.',
 
+            self::CafeCreditCheck => 'Lists paid visits that should have received a café coupon and did not, '
+                . 'with what each would be worth. Issues nothing and emails nobody. Set the per-person '
+                . 'figure on the workshop first, then run this to see the effect.',
+
+            self::CafeCreditIssue => 'Issues the coupons the check just listed and emails them out. Coupons '
+                . 'whose 30-day window has already passed are skipped and named, not quietly extended — '
+                . 'create those by hand in Voucher Management if the studio wants to honour them.',
+
             self::FreshSeed => 'Drops every table, runs all migrations again and re-seeds. Every '
                 . 'reservation, payment, voucher and staff account is destroyed. Development only — '
                 . 'this cannot run on the live site.',
@@ -118,28 +148,34 @@ enum MaintenanceTask: string
      * The artisan command and its arguments.
      *
      * Arguments are fixed here rather than accepted from the request, which is
-     * what keeps this a list of nine buttons rather than a shell with nine
-     * shortcuts.
+     * what keeps this a list of buttons rather than a shell with shortcuts.
      *
-     * --force on the two writing commands because Artisan refuses to run them
+     * --force on the writing commands because Artisan refuses to run them
      * unattended in production otherwise, and there is no terminal here to
      * answer the confirmation prompt.
+     *
+     * NOTE what CafeCreditIssue does NOT pass: --from-today. Re-dating a lapsed
+     * coupon is a decision about money the studio may or may not want to
+     * honour, and §25 of the brief keeps that kind of decision off a button.
+     * The command lists what it skipped; a person decides what to do about it.
      *
      * @return array{0:string,1:array<string,mixed>}
      */
     public function command(): array
     {
         return match ($this) {
-            self::ClearCaches    => ['optimize:clear', []],
-            self::Migrate        => ['migrate', ['--force' => true]],
-            self::MigrateStatus  => ['migrate:status', []],
-            self::SeedRoles      => ['db:seed', ['--class' => 'RolePermissionSeeder', '--force' => true]],
-            self::StorageLink    => ['storage:link', []],
-            self::QueueRestart   => ['queue:restart', []],
-            self::QueueFailed    => ['queue:failed', []],
-            self::QueueRetry     => ['queue:retry', ['id' => ['all']]],
-            self::RemindPayments => ['shunno:remind-payments', []],
-            self::FreshSeed      => ['migrate:fresh', ['--seed' => true, '--force' => true]],
+            self::ClearCaches     => ['optimize:clear', []],
+            self::Migrate         => ['migrate', ['--force' => true]],
+            self::MigrateStatus   => ['migrate:status', []],
+            self::SeedRoles       => ['db:seed', ['--class' => 'RolePermissionSeeder', '--force' => true]],
+            self::StorageLink     => ['storage:link', []],
+            self::QueueRestart    => ['queue:restart', []],
+            self::QueueFailed     => ['queue:failed', []],
+            self::QueueRetry      => ['queue:retry', ['id' => ['all']]],
+            self::RemindPayments  => ['shunno:remind-payments', []],
+            self::CafeCreditCheck => ['shunno:backfill-cafe-credit', ['--dry-run' => true]],
+            self::CafeCreditIssue => ['shunno:backfill-cafe-credit', []],
+            self::FreshSeed       => ['migrate:fresh', ['--seed' => true, '--force' => true]],
         };
     }
 
@@ -153,7 +189,11 @@ enum MaintenanceTask: string
      */
     public function isReadOnly(): bool
     {
-        return in_array($this, [self::MigrateStatus, self::QueueFailed], true);
+        return in_array($this, [
+            self::MigrateStatus,
+            self::QueueFailed,
+            self::CafeCreditCheck,
+        ], true);
     }
 
     /**
@@ -162,6 +202,10 @@ enum MaintenanceTask: string
      * Drives the wording of the confirmation and the colour of the button.
      * Separate from isReadOnly() because most tasks are neither: migrating
      * writes, but it writes forwards.
+     *
+     * Issuing café credit is NOT destructive by this definition — it creates
+     * rows rather than removing them — even though it does send mail that
+     * cannot be recalled. That is what the confirmation dialog is for.
      */
     public function isDestructive(): bool
     {
@@ -189,9 +233,10 @@ enum MaintenanceTask: string
     public function timeout(): int
     {
         return match (true) {
-            $this === self::FreshSeed => 300,
-            $this === self::Migrate   => 120,
-            default                   => 60,
+            $this === self::FreshSeed       => 300,
+            $this === self::Migrate         => 120,
+            $this === self::CafeCreditIssue => 120,
+            default                         => 60,
         };
     }
 

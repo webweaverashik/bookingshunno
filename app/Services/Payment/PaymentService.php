@@ -41,12 +41,7 @@ use RuntimeException;
  */
 class PaymentService
 {
-    public function __construct(
-        private readonly PricingService $pricing,
-        private readonly SettingsRepository $settings,
-        private readonly ReservationService $reservations,
-        private readonly VoucherService $vouchers,
-    ) {}
+    public function __construct(private readonly PricingService $pricing, private readonly SettingsRepository $settings, private readonly ReservationService $reservations, private readonly VoucherService $vouchers) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -113,13 +108,8 @@ class PaymentService
      * @throws RuntimeException when the reservation is not in a state to be
      *                          charged, or already has a live request.
      */
-    public function request(
-        Reservation $reservation,
-        PaymentType $type,
-        User $actor,
-        ?int $deadlineHours = null,
-        ?string $note = null,
-    ): Payment {
+    public function request(Reservation $reservation, PaymentType $type, User $actor, ?int $deadlineHours = null, ?string $note = null): Payment
+    {
         return DB::transaction(function () use ($reservation, $type, $actor, $deadlineHours, $note) {
             /*
              | Re-read under a lock before deciding anything.
@@ -129,20 +119,14 @@ class PaymentService
              | busy. Without this, both pass the "no open request" check and the
              | visitor gets two payment links for the same visit.
              */
-            $reservation = Reservation::whereKey($reservation->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
+            $reservation = Reservation::whereKey($reservation->getKey())->lockForUpdate()->firstOrFail();
 
             if (! $reservation->status->canTransitionTo(ReservationStatus::PaymentRequested)) {
-                throw new RuntimeException(
-                    "A payment cannot be requested for a reservation that is {$reservation->status->label()}."
-                );
+                throw new RuntimeException("A payment cannot be requested for a reservation that is {$reservation->status->label()}.");
             }
 
             if ($reservation->payments()->open()->exists()) {
-                throw new RuntimeException(
-                    'This reservation already has a payment request awaiting payment. Cancel it before sending another.'
-                );
+                throw new RuntimeException('This reservation already has a payment request awaiting payment. Cancel it before sending another.');
             }
 
             $total = $reservation->payableTotal();
@@ -153,29 +137,29 @@ class PaymentService
             // and the right answer is to approve and confirm it by hand, not to
             // invoice for nothing.
             if ($split['payable'] <= 0) {
-                throw new RuntimeException(
-                    'This reservation has nothing to pay. Confirm it directly instead of requesting a payment.'
-                );
+                throw new RuntimeException('This reservation has nothing to pay. Confirm it directly instead of requesting a payment.');
             }
 
             $hours = $deadlineHours ?: $this->defaultDeadlineHours();
 
             $payment = new Payment;
 
-            $payment->forceFill([
-                'reference' => $this->generateReference(),
-                'token' => $this->generateToken(),
-                'reservation_id' => $reservation->id,
-                'type' => $type,
-                'percentage' => $split['percentage'],
-                'reservation_total' => $total,
-                'amount_due' => $split['payable'],
-                'amount_paid' => 0,
-                'status' => PaymentStatus::Pending,
-                'due_at' => $this->deadlineFrom($hours),
-                'note' => $note,
-                'requested_by' => $actor->id,
-            ])->save();
+            $payment
+                ->forceFill([
+                    'reference' => $this->generateReference(),
+                    'token' => $this->generateToken(),
+                    'reservation_id' => $reservation->id,
+                    'type' => $type,
+                    'percentage' => $split['percentage'],
+                    'reservation_total' => $total,
+                    'amount_due' => $split['payable'],
+                    'amount_paid' => 0,
+                    'status' => PaymentStatus::Pending,
+                    'due_at' => $this->deadlineFrom($hours),
+                    'note' => $note,
+                    'requested_by' => $actor->id,
+                ])
+                ->save();
 
             /*
              | Inside the transaction, deliberately, and safe.
@@ -193,20 +177,7 @@ class PaymentService
              | Nothing is emailed for PaymentRequested yet in any case:
              | ReservationMailKind::forStatus() returns null for it until 12B.
              */
-            $this->reservations->transition(
-                $reservation,
-                ReservationStatus::PaymentRequested,
-                $actor,
-                sprintf(
-                    '%s requested: BDT %s of BDT %s, due %s. Reference %s.%s',
-                    $type->describe($split['percentage']),
-                    number_format($split['payable']),
-                    number_format($total),
-                    $payment->due_at->format('j M Y, g:i A'),
-                    $payment->reference,
-                    $note ? ' '.$note : '',
-                ),
-            );
+            $this->reservations->transition($reservation, ReservationStatus::PaymentRequested, $actor, sprintf('%s requested: BDT %s of BDT %s, due %s. Reference %s.%s', $type->describe($split['percentage']), number_format($split['payable']), number_format($total), $payment->due_at->format('j M Y, g:i A'), $payment->reference, $note ? ' '.$note : ''));
 
             /*
              | PHASE 12C — dispatched INSIDE the transaction, unlike a textbook
@@ -256,11 +227,7 @@ class PaymentService
 
         return Reservation::query()
             ->with(['user', 'items.workshop', 'payments'])
-            ->whereIn('status', [
-                ReservationStatus::Approved,
-                ReservationStatus::PaymentRequested,
-                ReservationStatus::Confirmed,
-            ])
+            ->whereIn('status', [ReservationStatus::Approved, ReservationStatus::PaymentRequested, ReservationStatus::Confirmed])
             ->when($search !== '', fn ($q) => $q->search($search))
 
             /*
@@ -333,29 +300,18 @@ class PaymentService
      * @throws RuntimeException when there is nothing to collect, or the amount
      *                          is more than is owed.
      */
-    public function collect(
-        Reservation $reservation,
-        float $amount,
-        PaymentMethod $method,
-        User $actor,
-        ?string $reference = null,
-        ?CarbonImmutable $paidAt = null,
-        ?string $note = null,
-    ): Payment {
+    public function collect(Reservation $reservation, float $amount, PaymentMethod $method, User $actor, ?string $reference = null, ?CarbonImmutable $paidAt = null, ?string $note = null): Payment
+    {
         return DB::transaction(function () use ($reservation, $amount, $method, $actor, $reference, $paidAt, $note) {
             // Locked before anything is decided. Two staff at two tills on the
             // same reservation is unlikely and not impossible, and the loser of
             // that race must fail cleanly rather than raise a second request.
-            $reservation = Reservation::whereKey($reservation->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
+            $reservation = Reservation::whereKey($reservation->getKey())->lockForUpdate()->firstOrFail();
 
             $reservation->load('payments');
 
             if ($reservation->status->isClosed()) {
-                throw new RuntimeException(
-                    "This reservation is {$reservation->status->label()} and is not owed anything."
-                );
+                throw new RuntimeException("This reservation is {$reservation->status->label()} and is not owed anything.");
             }
 
             $open = $reservation->payments()->open()->first();
@@ -373,43 +329,42 @@ class PaymentService
             }
 
             if ((int) round($amount * 100) > (int) round($balance * 100)) {
-                throw new RuntimeException(sprintf(
-                    'That is more than the BDT %s still outstanding on this reservation.',
-                    number_format($balance),
-                ));
+                throw new RuntimeException(sprintf('That is more than the BDT %s still outstanding on this reservation.', number_format($balance)));
             }
 
             $payment = new Payment;
 
-            $payment->forceFill([
-                'reference' => $this->generateReference(),
-                'token' => $this->generateToken(),
+            $payment
+                ->forceFill([
+                    'reference' => $this->generateReference(),
+                    'token' => $this->generateToken(),
 
-                'reservation_id' => $reservation->id,
+                    'reservation_id' => $reservation->id,
 
-                /*
+                    /*
                  | Full, at 100% of what is left. Not BookingFee: the type
                  | describes what this request asks for, and this one asks for
                  | the whole remaining balance. leavesBalance() is therefore
                  | false and the payslip correctly shows no "payable at the
                  | studio" line — there is nothing after this.
                  */
-                'type' => PaymentType::Full,
-                'percentage' => 100,
+                    'type' => PaymentType::Full,
+                    'percentage' => 100,
 
-                'reservation_total' => $reservation->payableTotal(),
-                'amount_due' => $balance,
-                'amount_paid' => 0,
-                'status' => PaymentStatus::Pending,
+                    'reservation_total' => $reservation->payableTotal(),
+                    'amount_due' => $balance,
+                    'amount_paid' => 0,
+                    'status' => PaymentStatus::Pending,
 
-                // Already due. The money is on the counter; a deadline in three
-                // days would be a fiction, and an overdue badge on a request
-                // settled thirty seconds later would be noise.
-                'due_at' => CarbonImmutable::now(),
+                    // Already due. The money is on the counter; a deadline in three
+                    // days would be a fiction, and an overdue badge on a request
+                    // settled thirty seconds later would be noise.
+                    'due_at' => CarbonImmutable::now(),
 
-                'note' => $note,
-                'requested_by' => $actor->id,
-            ])->save();
+                    'note' => $note,
+                    'requested_by' => $actor->id,
+                ])
+                ->save();
 
             /*
              | A reservation still at Approved has to reach Payment requested
@@ -419,17 +374,7 @@ class PaymentService
              | email chasing money that has already been handed over.
              */
             if ($reservation->status === ReservationStatus::Approved) {
-                $this->reservations->transition(
-                    $reservation,
-                    ReservationStatus::PaymentRequested,
-                    $actor,
-                    sprintf(
-                        'Payment taken at the studio: BDT %s of BDT %s. Reference %s. No payment link was sent.',
-                        number_format($amount),
-                        number_format($balance),
-                        $payment->reference,
-                    ),
-                );
+                $this->reservations->transition($reservation, ReservationStatus::PaymentRequested, $actor, sprintf('Payment taken at the studio: BDT %s of BDT %s. Reference %s. No payment link was sent.', number_format($amount), number_format($balance), $payment->reference));
             }
 
             return $this->record($payment, $amount, $method, $actor, $reference, $paidAt, $note);
@@ -454,19 +399,10 @@ class PaymentService
      * @throws RuntimeException when the request is closed or the amount is not
      *                          collectable.
      */
-    public function record(
-        Payment $payment,
-        float $amount,
-        PaymentMethod $method,
-        User $actor,
-        ?string $reference = null,
-        ?CarbonImmutable $paidAt = null,
-        ?string $note = null,
-    ): Payment {
+    public function record(Payment $payment, float $amount, PaymentMethod $method, User $actor, ?string $reference = null, ?CarbonImmutable $paidAt = null, ?string $note = null): Payment
+    {
         return DB::transaction(function () use ($payment, $amount, $method, $actor, $reference, $paidAt, $note) {
-            $payment = Payment::whereKey($payment->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
+            $payment = Payment::whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
 
             $this->guardCollectable($payment, $amount);
 
@@ -478,18 +414,20 @@ class PaymentService
              */
             $transaction = new PaymentTransaction;
 
-            $transaction->forceFill([
-                'reference' => $this->generateTransactionReference(),
-                'payment_id' => $payment->id,
-                'channel' => PaymentChannel::forMethod($method),
-                'method' => $method,
-                'status' => TransactionStatus::Success,
-                'amount' => round($amount, 2),
-                'external_reference' => $reference,
-                'note' => $note,
-                'received_at' => $paidAt ?? CarbonImmutable::now(),
-                'recorded_by' => $actor->id,
-            ])->save();
+            $transaction
+                ->forceFill([
+                    'reference' => $this->generateTransactionReference(),
+                    'payment_id' => $payment->id,
+                    'channel' => PaymentChannel::forMethod($method),
+                    'method' => $method,
+                    'status' => TransactionStatus::Success,
+                    'amount' => round($amount, 2),
+                    'external_reference' => $reference,
+                    'note' => $note,
+                    'received_at' => $paidAt ?? CarbonImmutable::now(),
+                    'recorded_by' => $actor->id,
+                ])
+                ->save();
 
             return $this->applySettlement($payment, $transaction, $actor);
         });
@@ -521,45 +459,37 @@ class PaymentService
         $paidPoisha = (int) round((float) $payment->amount_paid * 100) + $amountPoisha;
         $settled = $paidPoisha >= (int) round((float) $payment->amount_due * 100);
 
-        $payment->forceFill([
-            'amount_paid' => $paidPoisha / 100,
-            'method' => $transaction->method,
-            'gateway_reference' => $transaction->external_reference,
-            'recorded_by' => $actor?->id,
-            'status' => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
-            'paid_at' => $settled ? ($transaction->received_at ?? CarbonImmutable::now()) : null,
-        ])->save();
+        $payment
+            ->forceFill([
+                'amount_paid' => $paidPoisha / 100,
+                'method' => $transaction->method,
+                'gateway_reference' => $transaction->external_reference,
+                'recorded_by' => $actor?->id,
+                'status' => $settled ? PaymentStatus::Paid : PaymentStatus::Pending,
+                'paid_at' => $settled ? $transaction->received_at ?? CarbonImmutable::now() : null,
+            ])
+            ->save();
 
         // balance_after is snapshotted rather than derived. A receipt the
         // visitor is holding must say the same thing next month, and
         // recomputing "still to come" at render time would rewrite it the
         // moment anything else moved.
-        $transaction->forceFill([
-            'balance_after' => max(0, $outstandingPoisha - $amountPoisha) / 100,
-        ])->save();
+        $transaction
+            ->forceFill([
+                'balance_after' => max(0, $outstandingPoisha - $amountPoisha) / 100,
+            ])
+            ->save();
 
         $reservation = $payment->reservation()->lockForUpdate()->firstOrFail();
 
-        $line = sprintf(
-            'BDT %s received by %s against %s. Receipt %s.%s%s',
-            number_format($amount),
-            $transaction->method->label(),
-            $payment->reference,
-            $transaction->reference,
-            $transaction->external_reference ? " Ref {$transaction->external_reference}." : '',
-            $transaction->note ? ' '.$transaction->note : '',
-        );
+        $line = sprintf('BDT %s received by %s against %s. Receipt %s.%s%s', number_format($amount), $transaction->method->label(), $payment->reference, $transaction->reference, $transaction->external_reference ? " Ref {$transaction->external_reference}." : '', $transaction->note ? ' '.$transaction->note : '');
 
         if (! $settled) {
             // Part paid. The reservation stays where it is — it is not
             // confirmed until the amount asked for has actually arrived — and
             // the history says how much is left so nobody has to work it out
             // from two other rows.
-            $this->reservations->note(
-                $reservation,
-                $actor,
-                $line.sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())),
-            );
+            $this->reservations->note($reservation, $actor, $line.sprintf(' BDT %s still outstanding on this request.', number_format($payment->outstanding())));
 
             /*
              | ONE RECEIPT PER REQUEST, not one per transaction.
@@ -598,12 +528,7 @@ class PaymentService
              */
             $this->reservations->note($reservation, $actor, $line);
         } elseif ($reservation->status->canTransitionTo(ReservationStatus::Confirmed)) {
-            $this->reservations->transition(
-                $reservation,
-                ReservationStatus::Confirmed,
-                $actor,
-                $line,
-            );
+            $this->reservations->transition($reservation, ReservationStatus::Confirmed, $actor, $line);
         } else {
             /*
              | Money arrived against a reservation that is no longer waiting for
@@ -613,11 +538,7 @@ class PaymentService
              | alone and the history says so plainly. Somebody has a refund to
              | process and this is how they find out.
              */
-            $this->reservations->note(
-                $reservation,
-                $actor,
-                $line." The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.",
-            );
+            $this->reservations->note($reservation, $actor, $line." The reservation is {$reservation->status->label()}, so it has not been confirmed. This may need refunding.");
         }
 
         /*
@@ -638,7 +559,20 @@ class PaymentService
          | redirect and the IPN — so a repeated call cannot mint a second coupon
          | or roll back a real payment.
          */
-        $this->vouchers->issueCafeCredit($reservation->load('items.workshop'), $payment);
+        $credit = $this->vouchers->issueCafeCredit($reservation->load('items.workshop'), $payment);
+
+        /*
+         | PHASE 36 — say which of the two things happened.
+         |
+         | Both outcomes used to be silent, which is how a workshop left at zero
+         | and a genuine failure to issue came to look identical: no voucher, no
+         | history line, nothing to notice. A customer asking where their coupon
+         | went is not an acceptable way to find out.
+         |
+         | Still no exception either way. Nothing here may roll back money that
+         | has already been taken.
+         */
+        $this->reservations->note($reservation, $actor, $credit ? sprintf('Café credit %s issued, worth BDT %s, redeemable to %s.', $credit->code, number_format((float) $credit->value), $credit->expires_at?->format('j M Y') ?? 'no expiry') : 'No café credit issued — this experience carries none.');
 
         PaymentReceived::dispatch($payment, $transaction);
 
@@ -656,9 +590,7 @@ class PaymentService
     private function guardCollectable(Payment $payment, float $amount): void
     {
         if (! $payment->isOpen()) {
-            throw new RuntimeException(
-                "This payment request is {$payment->status->label()} — nothing further can be recorded against it."
-            );
+            throw new RuntimeException("This payment request is {$payment->status->label()} — nothing further can be recorded against it.");
         }
 
         if ($amount <= 0) {
@@ -666,10 +598,7 @@ class PaymentService
         }
 
         if ((int) round($amount * 100) > (int) round($payment->outstanding() * 100)) {
-            throw new RuntimeException(sprintf(
-                'That is more than the BDT %s still outstanding on this request.',
-                number_format($payment->outstanding()),
-            ));
+            throw new RuntimeException(sprintf('That is more than the BDT %s still outstanding on this request.', number_format($payment->outstanding())));
         }
     }
 
@@ -704,19 +633,21 @@ class PaymentService
 
             $attempt = new PaymentTransaction;
 
-            $attempt->forceFill([
-                'reference' => $this->generateTransactionReference(),
-                'payment_id' => $payment->id,
-                'channel' => PaymentChannel::Gateway,
-                'method' => PaymentMethod::Sslcommerz,
-                'status' => TransactionStatus::Initiated,
-                'amount' => round($amount, 2),
+            $attempt
+                ->forceFill([
+                    'reference' => $this->generateTransactionReference(),
+                    'payment_id' => $payment->id,
+                    'channel' => PaymentChannel::Gateway,
+                    'method' => PaymentMethod::Sslcommerz,
+                    'status' => TransactionStatus::Initiated,
+                    'amount' => round($amount, 2),
 
-                // Both null until it succeeds. A row with no received_at is not
-                // a receipt, and the payslip route will not render one.
-                'received_at' => null,
-                'balance_after' => null,
-            ])->save();
+                    // Both null until it succeeds. A row with no received_at is not
+                    // a receipt, and the payslip route will not render one.
+                    'received_at' => null,
+                    'balance_after' => null,
+                ])
+                ->save();
 
             return $attempt;
         });
@@ -739,9 +670,7 @@ class PaymentService
     public function settleGatewayAttempt(PaymentTransaction $attempt, array $validation): Payment
     {
         return DB::transaction(function () use ($attempt, $validation) {
-            $attempt = PaymentTransaction::whereKey($attempt->getKey())
-                ->lockForUpdate()
-                ->firstOrFail();
+            $attempt = PaymentTransaction::whereKey($attempt->getKey())->lockForUpdate()->firstOrFail();
 
             $payment = Payment::whereKey($attempt->payment_id)->lockForUpdate()->firstOrFail();
 
@@ -751,16 +680,18 @@ class PaymentService
                 return $payment;
             }
 
-            $attempt->forceFill([
-                'status' => TransactionStatus::Success,
-                'external_reference' => $validation['bank_tran_id'] ?? ($validation['val_id'] ?? null),
-                'gateway_val_id' => $validation['val_id'] ?? null,
-                'gateway_bank_tran_id' => $validation['bank_tran_id'] ?? null,
-                'gateway_card_type' => $validation['card_type'] ?? null,
-                'gateway_payload' => $validation,
-                'validated_at' => CarbonImmutable::now(),
-                'received_at' => CarbonImmutable::now(),
-            ])->save();
+            $attempt
+                ->forceFill([
+                    'status' => TransactionStatus::Success,
+                    'external_reference' => $validation['bank_tran_id'] ?? ($validation['val_id'] ?? null),
+                    'gateway_val_id' => $validation['val_id'] ?? null,
+                    'gateway_bank_tran_id' => $validation['bank_tran_id'] ?? null,
+                    'gateway_card_type' => $validation['card_type'] ?? null,
+                    'gateway_payload' => $validation,
+                    'validated_at' => CarbonImmutable::now(),
+                    'received_at' => CarbonImmutable::now(),
+                ])
+                ->save();
 
             /*
              | Guarded AFTER the attempt is marked settled, deliberately.
@@ -794,23 +725,21 @@ class PaymentService
      * answer to a support call that silence cannot give, and a visitor
      * insisting their card went through is unanswerable without it.
      */
-    public function failGatewayAttempt(
-        PaymentTransaction $attempt,
-        TransactionStatus $status,
-        ?string $reason = null,
-        ?array $payload = null,
-    ): PaymentTransaction {
+    public function failGatewayAttempt(PaymentTransaction $attempt, TransactionStatus $status, ?string $reason = null, ?array $payload = null): PaymentTransaction
+    {
         if ($attempt->status !== TransactionStatus::Initiated) {
             // A late fail callback after a successful IPN. Ignore it — the
             // money is real and this would otherwise undo it.
             return $attempt;
         }
 
-        $attempt->forceFill([
-            'status' => $status,
-            'failure_reason' => $reason,
-            'gateway_payload' => $payload,
-        ])->save();
+        $attempt
+            ->forceFill([
+                'status' => $status,
+                'failure_reason' => $reason,
+                'gateway_payload' => $payload,
+            ])
+            ->save();
 
         return $attempt;
     }
@@ -847,9 +776,7 @@ class PaymentService
             // been withdrawn does not burn somebody's coupon on the way to
             // being refused.
             if (! $payment->isOpen()) {
-                throw new RuntimeException(
-                    "This payment request is {$payment->status->label()} and cannot take a voucher."
-                );
+                throw new RuntimeException("This payment request is {$payment->status->label()} and cannot take a voucher.");
             }
 
             $amount = min((float) $voucher->value, $payment->outstanding());
@@ -858,33 +785,24 @@ class PaymentService
 
             // Redeems under its own lock and re-checks type, expiry and any
             // workshop restriction. Throws with a message meant for the visitor.
-            $this->vouchers->redeem($voucher, $actor, $reservation, sprintf(
-                'Applied to %s (%s).',
-                $payment->reference,
-                $reservation?->reference_code ?? 'reservation',
-            ));
+            $this->vouchers->redeem($voucher, $actor, $reservation, sprintf('Applied to %s (%s).', $payment->reference, $reservation?->reference_code ?? 'reservation'));
 
             $transaction = new PaymentTransaction;
 
-            $transaction->forceFill([
-                'reference' => $this->generateTransactionReference(),
-                'payment_id' => $payment->id,
-                'channel' => PaymentChannel::Voucher,
-                'method' => PaymentMethod::Voucher,
-                'status' => TransactionStatus::Success,
-                'amount' => round($amount, 2),
-                'external_reference' => $voucher->code,
-                'note' => sprintf(
-                    'Voucher %s worth BDT %s.%s',
-                    $voucher->code,
-                    number_format((float) $voucher->value),
-                    (float) $voucher->value > $amount
-                        ? ' BDT '.number_format((float) $voucher->value - $amount).' of it was not needed and is now spent.'
-                        : '',
-                ),
-                'received_at' => CarbonImmutable::now(),
-                'recorded_by' => $actor?->id,
-            ])->save();
+            $transaction
+                ->forceFill([
+                    'reference' => $this->generateTransactionReference(),
+                    'payment_id' => $payment->id,
+                    'channel' => PaymentChannel::Voucher,
+                    'method' => PaymentMethod::Voucher,
+                    'status' => TransactionStatus::Success,
+                    'amount' => round($amount, 2),
+                    'external_reference' => $voucher->code,
+                    'note' => sprintf('Voucher %s worth BDT %s.%s', $voucher->code, number_format((float) $voucher->value), (float) $voucher->value > $amount ? ' BDT '.number_format((float) $voucher->value - $amount).' of it was not needed and is now spent.' : ''),
+                    'received_at' => CarbonImmutable::now(),
+                    'recorded_by' => $actor?->id,
+                ])
+                ->save();
 
             return $this->applySettlement($payment, $transaction, $actor);
         });
@@ -905,6 +823,60 @@ class PaymentService
     public function cancel(Payment $payment, User $actor, string $reason): Payment
     {
         return DB::transaction(function () use ($payment, $actor, $reason) {
+            $payment = Payment::whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
+
+            if (! $payment->isOpen()) {
+                throw new RuntimeException("This payment request is already {$payment->status->label()}.");
+            }
+
+            if ((float) $payment->amount_paid > 0) {
+                throw new RuntimeException(sprintf('BDT %s has already been received against this request. Refund it before cancelling.', number_format((float) $payment->amount_paid)));
+            }
+
+            $payment
+                ->forceFill([
+                    'status' => PaymentStatus::Cancelled,
+                    'cancellation_reason' => $reason,
+                ])
+                ->save();
+
+            $reservation = $payment->reservation()->lockForUpdate()->firstOrFail();
+
+            $line = "Payment request {$payment->reference} cancelled. {$reason}";
+
+            if ($reservation->status->canTransitionTo(ReservationStatus::Approved)) {
+                $this->reservations->transition($reservation, ReservationStatus::Approved, $actor, $line);
+            } else {
+                $this->reservations->note($reservation, $actor, $line);
+            }
+
+            return $payment->fresh(['reservation.user']);
+        });
+    }
+
+    /**
+     * the deadline passed and nobody paid.
+     *
+     * Deliberately NOT a flag on cancel(). That method puts the reservation
+     * back to Approved so staff can send a fresh request, which is right when a
+     * person withdraws a link and wrong here: the client's rule is that an
+     * expired deadline ends the booking, not that it reopens it. Two outcomes,
+     * two methods, neither reachable by getting an argument wrong.
+     *
+     * Every condition the sweep's query filtered on is re-checked here under
+     * the row lock. Between the query and this call somebody may have recorded
+     * a counter payment, and the lock is the only thing that makes "unpaid"
+     * still true at the moment of the write.
+     *
+     * No actor. Nobody decided this — a deadline did — and the history says so
+     * by leaving changed_by null, which is the same thing a gateway settlement
+     * does.
+     *
+     * @throws RuntimeException when this request must not be expired.
+     */
+    public function expire(Payment $payment, int $graceHours = 0): Payment
+    {
+        return DB::transaction(function () use ($payment, $graceHours) {
             $payment = Payment::whereKey($payment->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -915,31 +887,55 @@ class PaymentService
                 );
             }
 
+            $cutoff = CarbonImmutable::now()->subHours(max(0, $graceHours));
+
+            if ($payment->due_at === null || $payment->due_at->gt($cutoff)) {
+                throw new RuntimeException('The deadline on this request has not passed yet.');
+            }
+
+            // The whole reason part payments are the sweep's problem rather
+            // than this method's: it simply refuses, so no caller can expire
+            // one by forgetting to filter.
             if ((float) $payment->amount_paid > 0) {
                 throw new RuntimeException(sprintf(
-                    'BDT %s has already been received against this request. Refund it before cancelling.',
+                    'BDT %s has already been received against this request. That needs a refund decision, not an expiry.',
                     number_format((float) $payment->amount_paid),
                 ));
             }
 
+            $deadline = $payment->due_at->format('j M Y, g:ia');
+
             $payment->forceFill([
                 'status' => PaymentStatus::Cancelled,
-                'cancellation_reason' => $reason,
+                'cancellation_reason' => "Payment deadline passed on {$deadline} with nothing received.",
             ])->save();
 
             $reservation = $payment->reservation()->lockForUpdate()->firstOrFail();
 
-            $line = "Payment request {$payment->reference} cancelled. {$reason}";
+            $line = "Payment request {$payment->reference} expired unpaid. The deadline was {$deadline}.";
 
-            if ($reservation->status->canTransitionTo(ReservationStatus::Approved)) {
+            if ($reservation->status->canTransitionTo(ReservationStatus::Cancelled)) {
+                /*
+                 | Raises ReservationStatusChanged, so the visitor gets the
+                 | existing Cancelled email carrying this note as its reason.
+                 | No new template: what happened is a cancellation, and giving
+                 | it its own wording would mean two emails to keep in step.
+                 */
                 $this->reservations->transition(
                     $reservation,
-                    ReservationStatus::Approved,
-                    $actor,
-                    $line,
+                    ReservationStatus::Cancelled,
+                    null,
+                    $line.' The reservation has been cancelled and the slot released.',
                 );
             } else {
-                $this->reservations->note($reservation, $actor, $line);
+                // Settled or cancelled by another route while this request sat
+                // open. The request is closed either way; the reservation is
+                // left exactly as it is.
+                $this->reservations->note(
+                    $reservation,
+                    null,
+                    $line." The reservation is {$reservation->status->label()}, so it has been left alone.",
+                );
             }
 
             return $payment->fresh(['reservation.user']);
@@ -954,10 +950,7 @@ class PaymentService
 
     private function defaultDeadlineHours(): int
     {
-        return (int) $this->settings->get(
-            'payment_deadline_hours',
-            config('shunno.payment_deadline_hours'),
-        ) ?: 48;
+        return (int) $this->settings->get('payment_deadline_hours', config('shunno.payment_deadline_hours')) ?: 48;
     }
 
     /**

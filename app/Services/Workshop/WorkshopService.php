@@ -111,7 +111,7 @@ class WorkshopService
     {
         return array_intersect_key($data, array_flip([
             'slug', 'title', 'medium', 'category', 'short_description', 'description',
-            'image_path', 'price', 'price_basis', 'duration_minutes',
+            'image_path', 'price', 'price_basis', 'cafe_credit_per_person', 'duration_minutes',
             'min_participants', 'max_participants', 'materials_included',
             'requires_experience', 'is_active', 'is_featured', 'sort_order',
         ]));

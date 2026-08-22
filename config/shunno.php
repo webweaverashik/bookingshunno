@@ -10,19 +10,18 @@
 */
 
 return [
-
     'currency' => 'BDT',
 
     'operating' => [
-        'session_start' => '16:00',   // reservation card: sessions from 4:00 PM
-        'session_end'   => '21:30',   // reservation card: to 9:30 PM
-        'cafe_end'      => '23:00',   // cafe site: cafe open until 11 PM
-        'closed_days'   => [0],       // Sunday
+        'session_start' => '16:00', // reservation card: sessions from 4:00 PM
+        'session_end' => '21:30', // reservation card: to 9:30 PM
+        'cafe_end' => '23:00', // cafe site: cafe open until 11 PM
+        'closed_days' => [0], // Sunday
     ],
 
     'group_discount' => [
         'min_participants' => 4,
-        'percentage'       => 10,
+        'percentage' => 10,
     ],
 
     // The booking-fee split. Never hard-code 50 anywhere else.
@@ -41,6 +40,20 @@ return [
          | --hours option exists for testing rather than a second default.
          */
         'reminder_hours' => env('PAYMENT_REMINDER_HOURS', 24),
+
+        /*
+         | How long after a deadline before the reservation is cancelled.
+         |
+         | Not zero. SSLCommerz confirms by redirect AND by IPN and the IPN can
+         | lag; a counter payment lags by however long somebody takes to type it
+         | in. Cancelling at the stroke of the deadline would eventually cancel
+         | a booking that had just been paid for.
+         |
+         | Not a database setting yet — promoting it to the payments settings
+         | screen is a form field, a validation rule and a SettingController
+         | line, and is worth doing if the studio ever wants to tune it.
+         */
+        'expiry_grace_hours' => env('PAYMENT_EXPIRY_GRACE_HOURS', 2),
     ],
 
     /*
@@ -74,15 +87,14 @@ return [
     // it is redeemable against food and drinks only.
     'cafe_credit' => [
         'entry_fee_coupon' => 50,
-        'per_participant'  => true,   // AWAITING YOUR CONFIRMATION
+        'per_participant' => true, // AWAITING YOUR CONFIRMATION
     ],
 
     'contact' => [
-        'email'    => 'artcafe.shunno@gmail.com',
-        'phone'    => '+8801799020731',
+        'email' => 'artcafe.shunno@gmail.com',
+        'phone' => '+8801799020731',
         'whatsapp' => '8801711532891',
-        'address'  => '5/6 Block F, Lalmatia, Dhaka 1207, Bangladesh',
-        'maps'     => 'https://maps.app.goo.gl/ZCaYdveECmxbiScz8',
+        'address' => '5/6 Block F, Lalmatia, Dhaka 1207, Bangladesh',
+        'maps' => 'https://maps.app.goo.gl/ZCaYdveECmxbiScz8',
     ],
-
 ];
