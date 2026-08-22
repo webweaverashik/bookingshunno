@@ -56,6 +56,44 @@
 
     /*
     |--------------------------------------------------------------------------
+    | Café credit — shown for "Other purposes" only
+    |--------------------------------------------------------------------------
+    | The client's rule is that only non-session bookings earn a coupon. The
+    | categories that qualify are rendered into a data attribute by Blade rather
+    | than listed here, so WorkshopCategory stays the single source of the rule
+    | and adding a second credit-earning category never means editing this file.
+    |
+    | Bound through Shunno.onChange rather than addEventListener. The category
+    | field is a Select2, and Select2 announces a selection with jQuery's
+    | .trigger('change'), which never reaches a native listener — a plain
+    | addEventListener here would be silently dead and the field would never
+    | appear. onChange picks the right binding for the field it is given.
+    |
+    | Clearing the input on hide is not cosmetic: it stops a figure typed under
+    | one category riding along in FormData after the admin switches to another.
+    | The server zeroes it in that case anyway, so this exists so the number the
+    | admin last saw is the number that gets saved.
+    */
+
+    var creditWrap = document.getElementById('workshop-cafe-credit');
+    var creditInput = creditWrap ? creditWrap.querySelector('[name="cafe_credit_per_person"]') : null;
+    var categorySelect = form.querySelector('[name="category"]');
+
+    function syncCafeCredit() {
+        if (!creditWrap || !categorySelect) return;
+
+        var allowed = (creditWrap.getAttribute('data-credit-categories') || '').split(',');
+        var show = allowed.indexOf(categorySelect.value) !== -1;
+
+        creditWrap.hidden = !show;
+
+        if (!show && creditInput) creditInput.value = '';
+    }
+
+    Shunno.onChange(categorySelect, syncCafeCredit);
+
+    /*
+    |--------------------------------------------------------------------------
     | Modal open / reset
     |--------------------------------------------------------------------------
     */
@@ -69,6 +107,16 @@
         preview.hidden = true;
         preview.querySelector('img').src = '';
         removeWrap.hidden = true;
+
+        /*
+         | syncSelects() above already dispatches a native change that reaches
+         | the jQuery binding, so this is belt and braces. It is here because
+         | that chain is three indirections long and one day somebody will
+         | change one of them; an explicit call costs nothing and the failure it
+         | prevents — a credit field left open on a clay session — is not
+         | obvious from looking at either file.
+         */
+        syncCafeCredit();
     }
 
     function openCreate() {
@@ -95,6 +143,12 @@
             var data = payload.data;
             form.action = data.update_url;
             Shunno.fill(form, data);
+
+            // fill() sets the category and then syncs the Select2s, which
+            // reaches the binding above. Called again for the same reason as in
+            // resetForm(): without it, an "Other purposes" workshop would open
+            // with its figure stored and the field hidden.
+            syncCafeCredit();
 
             if (data.image_url) {
                 preview.querySelector('img').src = data.image_url;

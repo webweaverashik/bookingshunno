@@ -45,22 +45,17 @@ class WorkshopRequest extends FormRequest
             'title' => ['required', 'string', 'min:2', 'max:150'],
 
             'slug' => [
-                'nullable',
-                'string',
-                'max:150',
-                'alpha_dash',
-                Rule::unique('workshops', 'slug')
-                    ->ignore($this->workshop()?->id)
-                    ->withoutTrashed(),
+                'nullable', 'string', 'max:150', 'alpha_dash',
+                Rule::unique('workshops', 'slug')->ignore($this->workshop()?->id)->withoutTrashed(),
             ],
 
             'category' => ['required', Rule::in(WorkshopCategory::values())],
-            'medium' => ['nullable', 'string', 'max:150'],
+            'medium'   => ['nullable', 'string', 'max:150'],
 
             'short_description' => ['nullable', 'string', 'max:400'],
-            'description' => ['nullable', 'string', 'max:5000'],
+            'description'       => ['nullable', 'string', 'max:5000'],
 
-            'price' => ['required', 'numeric', 'min:0', 'max:9999999.99'],
+            'price'       => ['required', 'numeric', 'min:0', 'max:9999999.99'],
 
             /*
              | Café credit per person, in taka.
@@ -70,6 +65,14 @@ class WorkshopRequest extends FormRequest
              | every form. Capped low because this is a courtesy coupon, and a
              | mistyped 5000 would issue thirty thousand taka of credit to a
              | party of six before anybody noticed.
+             |
+             | PHASE 38 — no rule here restricts it by category, and that is
+             | deliberate. prepareForValidation() has already zeroed it for any
+             | category that may not carry credit, so by the time these rules
+             | run the value is either legitimate or 0. A prohibited_unless rule
+             | on top would be a second statement of the same policy that could
+             | drift from the first, and it would turn a hidden field into a
+             | validation error the admin cannot see the cause of.
              */
             'cafe_credit_per_person' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'price_basis' => ['required', Rule::in(['per_person', 'per_session'])],
@@ -82,14 +85,14 @@ class WorkshopRequest extends FormRequest
             'min_participants' => ['required', 'integer', 'min:1', 'max:100'],
             'max_participants' => ['required', 'integer', 'min:1', 'max:100', 'gte:min_participants'],
 
-            'materials_included' => ['boolean'],
+            'materials_included'  => ['boolean'],
             'requires_experience' => ['boolean'],
-            'is_active' => ['boolean'],
-            'is_featured' => ['boolean'],
+            'is_active'           => ['boolean'],
+            'is_featured'         => ['boolean'],
 
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
 
-            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'image'        => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
             'remove_image' => ['boolean'],
         ];
     }
@@ -97,14 +100,14 @@ class WorkshopRequest extends FormRequest
     public function messages(): array
     {
         $window = $this->availability()->longestWindowMinutes();
-        $hours = round($window / 60, 1);
+        $hours  = round($window / 60, 1);
 
         return [
             'duration_minutes.multiple_of' => 'Duration must be a multiple of 30 minutes so start times line up.',
-            'duration_minutes.max' => "The longest studio window is {$hours} hours ({$window} minutes). A longer session could never be scheduled.",
-            'max_participants.gte' => 'Maximum participants cannot be below the minimum.',
-            'image.max' => 'The image must be 2 MB or smaller.',
-            'slug.alpha_dash' => 'The slug may only contain letters, numbers, dashes and underscores.',
+            'duration_minutes.max'         => "The longest studio window is {$hours} hours ({$window} minutes). A longer session could never be scheduled.",
+            'max_participants.gte'         => 'Maximum participants cannot be below the minimum.',
+            'image.max'                    => 'The image must be 2 MB or smaller.',
+            'slug.alpha_dash'              => 'The slug may only contain letters, numbers, dashes and underscores.',
         ];
     }
 
@@ -115,23 +118,57 @@ class WorkshopRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'title' => trim((string) $this->input('title')),
-            'slug' => $this->filled('slug') ? Str::slug($this->input('slug')) : null,
-            'materials_included' => $this->boolean('materials_included'),
+            'title'               => trim((string) $this->input('title')),
+            'slug'                => $this->filled('slug') ? Str::slug($this->input('slug')) : null,
+            'materials_included'  => $this->boolean('materials_included'),
             'requires_experience' => $this->boolean('requires_experience'),
-            'is_active' => $this->boolean('is_active'),
-            'is_featured' => $this->boolean('is_featured'),
-            'remove_image' => $this->boolean('remove_image'),
-            'sort_order' => $this->filled('sort_order') ? (int) $this->input('sort_order') : 0,
+            'is_active'           => $this->boolean('is_active'),
+            'is_featured'         => $this->boolean('is_featured'),
+            'remove_image'        => $this->boolean('remove_image'),
+            'sort_order'          => $this->filled('sort_order') ? (int) $this->input('sort_order') : 0,
+
             /*
-            | The column is NOT NULL with a default of zero, but the rule is
-            | nullable so staff are not forced to type 0 into every form. An
-            | empty box therefore has to become 0 HERE — validation would
-            | otherwise pass null straight into a column that refuses it.
-            | "0" survives filled(), so an explicit zero is not mistaken for blank.
-            */
-            'cafe_credit_per_person' => $this->filled('cafe_credit_per_person') ? $this->input('cafe_credit_per_person') : 0,
+             | PHASE 35A — the column is NOT NULL with a default of zero, but
+             | the rule above is nullable so staff are not forced to type 0 into
+             | every form. An empty box therefore has to become 0 HERE:
+             | validation would otherwise pass null straight into a column that
+             | refuses it. "0" survives filled(), so an explicit zero is not
+             | mistaken for blank.
+             |
+             | PHASE 38 — and it is zeroed outright for any category that may
+             | not carry credit, whatever the browser sent. The form hides the
+             | field for those, but hiding an input is presentation; this is the
+             | rule. It also handles the case the form cannot: switching an
+             | existing "Other purposes" workshop to Express clears its figure
+             | as part of the save, rather than leaving a hidden 50 on a clay
+             | session that nothing in the panel would ever show again.
+             |
+             | Silent rather than a validation error. The admin has just watched
+             | the field disappear; refusing the save to tell them it
+             | disappeared would be pedantry.
+             */
+            'cafe_credit_per_person' => $this->creditAllowed() && $this->filled('cafe_credit_per_person')
+                ? $this->input('cafe_credit_per_person')
+                : 0,
         ]);
+    }
+
+    /**
+     * Whether the category being submitted may carry café credit.
+     *
+     * Reads the SUBMITTED category rather than the workshop's stored one. This
+     * runs on create as well as update, and on an update the whole point is
+     * that the category may be the thing changing.
+     *
+     * An unrecognised or missing category answers false. The `in:` rule will
+     * reject the request a moment later, but it has not run yet, and defaulting
+     * to "credit allowed" on a value nobody recognises is the wrong way round.
+     */
+    private function creditAllowed(): bool
+    {
+        return WorkshopCategory::tryFrom((string) $this->input('category'))
+            ?->carriesCafeCredit()
+            ?? false;
     }
 
     public function after(): array
@@ -144,8 +181,11 @@ class WorkshopRequest extends FormRequest
                 // UploadedFile and passes the mime rules; only the temp file is
                 // missing. Catch it before the filesystem adapter throws on an
                 // empty path.
-                if ($image && !$image->isValid()) {
-                    $validator->errors()->add('image', 'The image could not be uploaded. It may be too large, or the server temp folder is not writable.');
+                if ($image && ! $image->isValid()) {
+                    $validator->errors()->add(
+                        'image',
+                        'The image could not be uploaded. It may be too large, or the server temp folder is not writable.'
+                    );
                 }
             },
         ];

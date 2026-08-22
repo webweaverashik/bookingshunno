@@ -128,24 +128,37 @@
 
                             Per person and per visit: the coupon is issued once,
                             worth this figure multiplied by the party size, the
-                            moment the payment request is settled. Zero means
-                            this experience earns nothing, which is right for
-                            every session — the client's rule is that only the
-                            non-session visit types carry it.
+                            moment the payment request is settled.
+
+                            PHASE 38 — SHOWN FOR "OTHER PURPOSES" ONLY. Credit is
+                            a thank-you for time spent in the space without a
+                            session; a paid workshop already includes materials
+                            and tuition and earns nothing on top. Hidden by
+                            default so the modal never flashes the field open
+                            before the JS has read the category.
+
+                            The categories that qualify come from the enum, not
+                            from a literal here — WorkshopCategory::creditBearing().
+                            The server does not trust this either way:
+                            WorkshopRequest::prepareForValidation() zeroes the
+                            figure for any other category whatever is posted, so
+                            what follows is convenience, not enforcement.
 
                             Deliberately not a discount. Café credit is spent at
                             the counter on food and drink; it never comes off the
                             price of the thing that earned it, which is why it
                             lives nowhere near PricingService.
                         --}}
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="workshop-cafe-credit"
+                            data-credit-categories="{{ implode(',', \App\Enums\Workshop\WorkshopCategory::creditBearing()) }}"
+                            hidden>
                             <label class="form-label">Café credit per person (BDT)</label>
                             <input type="number" name="cafe_credit_per_person"
                                 class="form-control form-control-solid border" min="0" max="1000" step="1"
                                 inputmode="decimal" />
                             <div class="form-text">
                                 Issued as a single coupon once the visit is paid for, worth this much per guest.
-                                Leave at 0 for experiences that earn no credit.
+                                Leave at 0 if this one earns no credit.
                             </div>
                             <div class="invalid-feedback d-block" data-error-for="cafe_credit_per_person"></div>
                         </div>
